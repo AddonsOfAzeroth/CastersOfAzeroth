@@ -29,7 +29,7 @@ local charDefaults = {
 	rotation = {
 		enabled = true,
 		spec = nil, -- nil = standaard van de class-module
-		source = "blizzard", -- "blizzard" (Assisted Combat) of "custom" (eigen prioriteit)
+		source = "custom", -- "custom" (own guide priority, Blizzard as fallback) or "blizzard"
 		glow = true,
 		glowStyle = "blizzard", -- "blizzard" of "pulse"
 		secondary = true,
@@ -479,6 +479,11 @@ CK:On("ADDON_LOADED", function(_, name)
 		CasterKitCharDB.profile = default
 	end
 	merge(CasterKitCharDB, charDefaults)
+	-- 0.2.2: the guide priority became the default rotation source (once per character)
+	if not CasterKitCharDB.rotation.customDefault then
+		CasterKitCharDB.rotation.source = "custom"
+		CasterKitCharDB.rotation.customDefault = true
+	end
 	CK.charDefaults = charDefaults
 	CK.playerClass = select(2, UnitClass("player"))
 	for _, m in ipairs(CK.modules) do

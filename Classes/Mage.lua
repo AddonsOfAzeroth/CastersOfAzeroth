@@ -90,27 +90,47 @@ local function defensive(ctx, push)
 	end
 end
 
+-- Frost leveling (Warcraft Tavern / Icy Veins Forever guides, Nov 2026)
 local function frost(ctx, list, add)
 	local function push(n, k) add(list, n, k) end
 	if not ctx.hostile then return end
+	local lowMana = ctx.manaPct < 0.25
+	local execute = ctx.targetHealthPct and ctx.targetHealthPct < 0.2
+	local melee = inMelee()
 
 	if ctx.aoe then
+		-- Nova the pack, Cone of Cold for Fingers of Frost, Ice Lance the frozen,
+		-- Arcane Explosion in melee, Flamestrike / Blizzard from range
 		if ctx:Ready("Ice Barrier") and not ctx:Buff("Ice Barrier") then push("Ice Barrier") end
-		if ctx.moving and ctx:Buff("Fingers of Frost") and ctx:Ready("Ice Lance") then push("Ice Lance", "proc") end
+		if melee and ctx:Ready("Frost Nova") then push("Frost Nova", "defensive") end
+		if melee and ctx:Ready("Cone of Cold") then push("Cone of Cold") end
+		if (ctx:Buff("Fingers of Frost") or frozen(ctx) > 0) and ctx:Ready("Ice Lance") then push("Ice Lance", "proc") end
+		if melee and ctx:Ready("Arcane Explosion") then push("Arcane Explosion") end
+		if not ctx.moving and ctx:Ready("Flamestrike") then push("Flamestrike") end
 		if not ctx.moving and ctx:Ready("Blizzard") then push("Blizzard") end
-		if ctx:Ready("Cone of Cold") then push("Cone of Cold") end
-		if ctx:Ready("Arcane Explosion") then push("Arcane Explosion") end
-		if ctx:Ready("Frost Nova") and inMelee() then push("Frost Nova", "defensive") end
+		if ctx.moving and ctx:Ready("Arcane Explosion") then push("Arcane Explosion") end
 		manaTools(ctx, push)
 		return
 	end
 
-	-- 1. Ice Barrier up (3% more damage while active)
+	-- 1. Ice Barrier up (absorb, no pushback, more Frost damage)
 	if ctx:Ready("Ice Barrier") and not ctx:Buff("Ice Barrier") then push("Ice Barrier") end
+	-- 2. in trouble: Mana Shield when low on health and the mob is on you
+	if ctx.targetingMe and ctx.healthPct < 0.4 and not ctx:Buff("Ice Barrier")
+		and not ctx:Buff("Mana Shield") and ctx:Ready("Mana Shield") then
+		push("Mana Shield", "defensive")
+	end
+	-- 3. Frost Nova in melee (then step back yourself); Cold Snap resets it
 	defensive(ctx, push)
-	-- 2. Fingers of Frost: spend it on Ice Lance, not Frostbolt
+	if ctx.targetingMe and melee and frozen(ctx) == 0 and ctx:Known("Frost Nova")
+		and not ctx:Ready("Frost Nova") and ctx:Ready("Cold Snap") then
+		push("Cold Snap", "defensive")
+	end
+	-- 4. finisher: Fire Blast on a nearly dead target
+	if execute and ctx:Ready("Fire Blast") then push("Fire Blast") end
+	-- 5. Fingers of Frost: spend it on Ice Lance
 	if ctx:Buff("Fingers of Frost") and ctx:Ready("Ice Lance") then push("Ice Lance", "proc") end
-	-- 3. Frozen target: Frostbolt, then Ice Lance so both shatter
+	-- 6. frozen target: Frostbolt, then Ice Lance so both shatter
 	local fz = frozen(ctx)
 	if fz > 0 and ctx:Known("Ice Lance") then
 		local castingBolt = ctx.casting == "Frostbolt"
@@ -121,15 +141,19 @@ local function frost(ctx, list, add)
 			if ctx:Ready("Ice Lance") then push("Ice Lance", "proc") end
 		end
 	end
-	-- 4. Missile Barrage
+	-- 7. procs: Missile Barrage, Clearcasting (free Frostbolt)
 	if ctx:Buff("Missile Barrage") and ctx:Ready("Arcane Missiles") then push("Arcane Missiles", "proc") end
+	if ctx:Buff("Clearcasting") and ctx:Known("Frostbolt") then push("Frostbolt", "proc") end
 	-- moving: instants only
 	if ctx.moving then
 		if ctx:Ready("Fire Blast") then push("Fire Blast") end
 		if ctx:Ready("Ice Lance") then push("Ice Lance") end
+		if melee and ctx:Ready("Arcane Explosion") then push("Arcane Explosion") end
 	end
 	manaTools(ctx, push)
-	-- 5. filler
+	-- 8. wand: save mana when low, or finish a low target while Fire Blast cools down
+	if not ctx.moving and ctx:Known("Shoot") and (lowMana or execute) then push("Shoot") end
+	-- 9. filler
 	if ctx:Known("Frostbolt") then push("Frostbolt") else push("Fireball") end
 	if ctx:Ready("Fire Blast") then push("Fire Blast") end
 end
