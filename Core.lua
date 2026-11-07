@@ -380,13 +380,23 @@ end
 -- Aura helpers
 ---------------------------------------------------------------------------
 -- Auras whose data is secret are skipped (treated as not found).
+-- Returns the aura (or nil) and, as second value, true when auras are hidden
+-- right now (secret in combat): then "nil" means unknown, not missing.
 function CK:FindAura(unit, name, filter)
+	if C_UnitAuras and C_UnitAuras.GetAuraDataBySpellName then
+		local ok, a = pcall(C_UnitAuras.GetAuraDataBySpellName, unit, name, filter)
+		if ok and not issecret(a) then return a, false end
+	end
 	if C_UnitAuras and C_UnitAuras.GetAuraDataByIndex then
 		for i = 1, 40 do
-			local a = C_UnitAuras.GetAuraDataByIndex(unit, i, filter)
-			if not a then return end
-			if not issecret(a.name) and a.name == name then return a end
+			-- errors while auras are secret ("cannot be accessed when secret")
+			local ok, a = pcall(C_UnitAuras.GetAuraDataByIndex, unit, i, filter)
+			if not ok or issecret(a) then return nil, true end
+			if not a then return nil, false end
+			if issecret(a.name) then return nil, true end
+			if a.name == name then return a, false end
 		end
+		return nil, false
 	elseif UnitAura then
 		for i = 1, 40 do
 			local n, _, count, _, dur, exp = UnitAura(unit, i, filter)

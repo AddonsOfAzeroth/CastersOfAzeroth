@@ -110,7 +110,7 @@ local function frost(ctx, list, add)
 		-- Arcane Explosion in melee, Flamestrike / Blizzard from range
 		-- close = enemies within ~10 yd (nameplates), or at least the target
 		local close = ctx.nearby >= 2 or melee
-		if ctx:Ready("Ice Barrier") and not ctx:Buff("Ice Barrier") then push("Ice Barrier") end
+		if ctx:Ready("Ice Barrier") and ctx:Missing("Ice Barrier") then push("Ice Barrier") end
 		if close and ctx:Ready("Frost Nova") then push("Frost Nova", "defensive") end
 		if close and ctx:Ready("Cone of Cold") then push("Cone of Cold") end
 		if (ctx:Buff("Fingers of Frost") or frozen(ctx) > 0) and ctx:Ready("Ice Lance")
@@ -130,10 +130,10 @@ local function frost(ctx, list, add)
 	end
 
 	-- 1. Ice Barrier up (absorb, no pushback, more Frost damage)
-	if ctx:Ready("Ice Barrier") and not ctx:Buff("Ice Barrier") then push("Ice Barrier") end
+	if ctx:Ready("Ice Barrier") and ctx:Missing("Ice Barrier") then push("Ice Barrier") end
 	-- 2. in trouble: Mana Shield when low on health and the mob is on you
-	if ctx.targetingMe and ctx.healthPct < 0.4 and not ctx:Buff("Ice Barrier")
-		and not ctx:Buff("Mana Shield") and ctx:Ready("Mana Shield") then
+	if ctx.targetingMe and ctx.healthPct < 0.4 and ctx:Missing("Ice Barrier")
+		and ctx:Missing("Mana Shield") and ctx:Ready("Mana Shield") then
 		push("Mana Shield", "defensive")
 	end
 	-- 3. Frost Nova in melee (then step back yourself); Cold Snap resets it
@@ -300,9 +300,18 @@ CK:AddReminderProvider(function(add)
 	-- buffs: shown always (or only when low, per setting), red when missing or running low
 	local function buff(key, names, spell, missingText)
 		if CK.char.leveling.buffsOff[key] then return end
-		local found
+		local found, hidden
 		for _, n in ipairs(names) do
-			if CK:FindAura("player", n, "HELPFUL") then found = n break end
+			local a, h = CK:FindAura("player", n, "HELPFUL")
+			if a then found = n break end
+			hidden = hidden or h
+		end
+		if not found and hidden then
+			-- auras hidden (combat): keep the button, don't call it missing
+			local cfg = CK.char.leveling
+			add({ key = key, icon = CK:SpellTexture(spell), count = "", always = cfg.buffMode == "always",
+				warn = false, spell = spell, tooltip = spell })
+			return
 		end
 		local left = found and CK:AuraRemaining("player", found, "HELPFUL")
 		local text = not found and "!" or ""

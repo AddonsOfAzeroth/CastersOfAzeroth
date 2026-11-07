@@ -445,20 +445,24 @@ function UF:UpdatePartyBuffs()
 			local wanted = CK.char.units.partyBuffs and CK:Known(b.spell) and UnitExists(u)
 				and Safe(UnitIsConnected(u), true) and not Safe(UnitIsDeadOrGhost(u), false)
 				and (not b.filter or b.filter(u))
-			local found
+			local found, hidden
 			if wanted then
 				for _, name in ipairs(b.names) do
-					if CK:FindAura(u, name, "HELPFUL") then found = name break end
+					local a, h = CK:FindAura(u, name, "HELPFUL")
+					if a then found = name break end
+					hidden = hidden or h
 				end
 			end
+			-- auras hidden (combat): leave the button as it is
+			local unknown = hidden and not found
 			local left = found and CK:AuraRemaining(u, found, "HELPFUL")
-			local low = not found or (left and left ~= 1 and left < cfg.buffWarnMinutes * 60)
-			local show = wanted and (cfg.buffMode == "always" or low)
+			local low = not unknown and (not found or (left and left ~= 1 and left < cfg.buffWarnMinutes * 60))
+			local show = wanted and (cfg.buffMode == "always" or low or (unknown and btn:IsShown()))
 			-- secure buttons cannot be shown or hidden in combat: only refresh looks then
 			if not inCombat then btn:SetShown(show and true or false) end
 			if btn:IsShown() then
 				btn.icon:SetTexture(CK:SpellTexture(b.spell))
-				btn.text:SetText(found and left and left ~= 1 and left ~= math.huge and fmtLeft(left) or (found and "" or "!"))
+				btn.text:SetText(found and left and left ~= 1 and left ~= math.huge and fmtLeft(left) or ((found or unknown) and "" or "!"))
 				local inRange = C_Spell and C_Spell.IsSpellInRange and Safe(C_Spell.IsSpellInRange(b.spell, u))
 				btn.icon:SetDesaturated(inRange == false)
 				if low then

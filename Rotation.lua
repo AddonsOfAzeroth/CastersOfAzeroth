@@ -35,6 +35,11 @@ end
 
 function ctx:CooldownRemaining(name) return CK:CooldownRemaining(name) end
 function ctx:Buff(name) return CK:FindAura("player", name, "HELPFUL") ~= nil end
+-- true only when the buff is known to be absent (false while auras are hidden)
+function ctx:Missing(name)
+	local a, hidden = CK:FindAura("player", name, "HELPFUL")
+	return a == nil and not hidden
+end
 function ctx:BuffRemaining(name) return CK:AuraRemaining("player", name, "HELPFUL") end
 function ctx:Debuff(name, mine)
 	return CK:FindAura("target", name, mine and "HARMFUL|PLAYER" or "HARMFUL") ~= nil
