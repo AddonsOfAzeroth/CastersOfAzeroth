@@ -56,11 +56,38 @@ local charDefaults = {
 		scale = 0.85,
 		point = { "BOTTOMRIGHT", "UIParent", "BOTTOMRIGHT", -6, 6 },
 	},
+	units = {
+		enabled = true,
+		player = true,
+		target = true,
+		tot = true,
+		party = true,
+		hideBlizzard = true,
+		classColor = true,
+		scale = 1,
+		castbar = true,
+		targetCastbar = true,
+		hideBlizzardCastbar = true,
+		castbarLatency = true,
+	},
+	chat = {
+		enabled = true,
+		timestamps = true,
+		shortChannels = true,
+		classColors = true,
+		tabsPerChannel = true,
+		fadeTabs = true,
+		width = 440,
+		height = 190,
+		fontSize = 13,
+	},
+	points = {}, -- saved positions of movable frames, by key
 	class = {},
 }
 
 local accountDefaults = {
 	minimap = { hide = false, angle = 215 },
+	language = "enUS",
 }
 
 local function merge(dst, src)
@@ -387,7 +414,7 @@ function CK:BarConflict()
 	if IsLoaded("ElvUI") and ElvUI then
 		local E = ElvUI[1]
 		if E and E.private and E.private.actionbar and E.private.actionbar.enable then
-			return "ElvUI (actiebalken)"
+			return CK.L["ElvUI (action bars)"]
 		end
 	end
 end
@@ -419,7 +446,7 @@ CK:On("PLAYER_LOGIN", function()
 	end
 	local conflict = CK:BarConflict()
 	if conflict and CK.char.bars.enabled then
-		CK:Print(("%s beheert al de actiebalken. CasterKit-balken staan uit; de rotatiehulp licht wel op op die knoppen. Typ /ck voor instellingen."):format(conflict))
+		CK:Print(CK.L["%s already manages the action bars. CasterKit bars are off; the rotation helper still lights up those buttons. Type /ck for settings."]:format(conflict))
 	end
 end)
 
@@ -441,10 +468,10 @@ SlashCmdList.CASTERKIT = function(msg)
 	if msg == "lock" or msg == "unlock" then
 		CK.char.bars.locked = (msg == "lock")
 		CK:Fire("SETTINGS", "bars")
-		CK:Print(CK.char.bars.locked and "Kaders vergrendeld." or "Kaders ontgrendeld: sleep ze waar je wil, typ /ck lock als je klaar bent.")
+		CK:Print(CK.char.bars.locked and CK.L["Frames locked."] or CK.L["Frames unlocked: drag them where you like, type /ck lock when done."])
 	elseif msg == "debug" then
 		CK.debug = not CK.debug
-		CK:Print("debug", CK.debug and "aan" or "uit")
+		CK:Print("debug", CK.debug and CK.L["on"] or CK.L["off"])
 	elseif msg == "aoe" then
 		CK:ToggleAoE()
 	elseif msg == "reset" then
@@ -452,7 +479,7 @@ SlashCmdList.CASTERKIT = function(msg)
 			CK:ResetGroup("bars")
 			CK.char.rotation.point = nil
 			CK:Fire("SETTINGS", "rotation")
-			CK:Print("Posities en balkinstellingen teruggezet.")
+			CK:Print(CK.L["Positions and bar settings reset."])
 		end)
 	else
 		CK:ToggleConfig()
@@ -461,11 +488,7 @@ end
 
 function CK:ToggleAoE()
 	self.char.rotation.aoe = not self.char.rotation.aoe
-	self:Print(self.char.rotation.aoe and "AoE-modus aan." or "AoE-modus uit (één doelwit).")
+	self:Print(self.char.rotation.aoe and CK.L["AoE mode on."] or CK.L["AoE mode off (single target)."])
 	self:Fire("SETTINGS", "rotation")
 end
 
--- Key bindings (Bindings.xml)
-BINDING_HEADER_CASTERKIT = "CasterKit"
-BINDING_NAME_CASTERKIT_AOE = "Wissel AoE-modus"
-BINDING_NAME_CASTERKIT_CONFIG = "Open instellingen"

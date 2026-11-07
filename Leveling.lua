@@ -1,6 +1,7 @@
 -- CasterKit by DinX: leveling helpers (XP bar, reminders, merchant)
 local _, ns = ...
 local CK = ns.CK
+local L = CK.L
 local S = CK.Style
 
 local L = CK:NewModule("Leveling")
@@ -28,7 +29,7 @@ local function fmtNum(n)
 	n = math.floor(n + 0.5)
 	local s = tostring(n)
 	while true do
-		local r, k = s:gsub("^(-?%d+)(%d%d%d)", "%1.%2")
+		local r, k = s:gsub("^(-?%d+)(%d%d%d)", "%1" .. L.thousands .. "%2")
 		s = r
 		if k == 0 then break end
 	end
@@ -36,7 +37,7 @@ local function fmtNum(n)
 end
 
 local function fmtTime(sec)
-	if sec >= 3600 then return ("%du%02d"):format(sec / 3600, (sec % 3600) / 60) end
+	if sec >= 3600 then return L["%dh%02d"]:format(sec / 3600, (sec % 3600) / 60) end
 	return ("%d min"):format(math.max(1, sec / 60))
 end
 
@@ -63,13 +64,13 @@ function L:CreateXPBar()
 	holder:EnableMouse(true)
 	holder:SetScript("OnEnter", function(self)
 		GameTooltip:SetOwner(self, "ANCHOR_TOP")
-		GameTooltip:AddLine("Ervaring", 1, 1, 1)
+		GameTooltip:AddLine(L["Experience"], 1, 1, 1)
 		local cur, max = UnitXP("player"), UnitXPMax("player")
-		GameTooltip:AddDoubleLine("Huidig", ("%s / %s"):format(fmtNum(cur), fmtNum(max)))
-		GameTooltip:AddDoubleLine("Nog nodig", fmtNum(max - cur))
+		GameTooltip:AddDoubleLine(L["Current"], ("%s / %s"):format(fmtNum(cur), fmtNum(max)))
+		GameTooltip:AddDoubleLine(L["Still needed"], fmtNum(max - cur))
 		local r = GetXPExhaustion() or 0
 		if r > 0 then GameTooltip:AddDoubleLine("Rested", fmtNum(r)) end
-		GameTooltip:AddDoubleLine("Deze sessie", fmtNum(session.gained))
+		GameTooltip:AddDoubleLine(L["This session"], fmtNum(session.gained))
 		GameTooltip:Show()
 	end)
 	holder:SetScript("OnLeave", GameTooltip_Hide)
@@ -116,7 +117,7 @@ function L:UpdateXPBar()
 	local elapsed = GetTime() - session.start
 	if session.gained > 0 and elapsed > 120 then
 		local perSec = session.gained / elapsed
-		parts[#parts + 1] = ("%s XP/u"):format(fmtNum(perSec * 3600))
+		parts[#parts + 1] = L["%s XP/h"]:format(fmtNum(perSec * 3600))
 		parts[#parts + 1] = ("±%s"):format(fmtTime((max - cur) / perSec))
 	end
 	if #session.gains > 0 then
@@ -168,7 +169,7 @@ local function slot(i)
 		if not self.entry then return end
 		GameTooltip:SetOwner(self, "ANCHOR_TOP")
 		GameTooltip:AddLine(self.entry.tooltip or "", 1, 1, 1, true)
-		if self.entry.spell then GameTooltip:AddLine("Klik: " .. self.entry.spell, 0.4, 0.8, 1) end
+		if self.entry.spell then GameTooltip:AddLine(L["Click: "] .. self.entry.spell, 0.4, 0.8, 1) end
 		GameTooltip:Show()
 	end)
 	b:SetScript("OnLeave", GameTooltip_Hide)
@@ -265,24 +266,24 @@ end
 CK:AddReminderProvider(function(add)
 	local cfg = CK.char.leveling
 	local free = CK:FreeBagSlots()
-	add({ key = "bags", icon = 133633, count = free, warn = free <= 2, tooltip = ("Nog %d vrije plaatsen in je tassen."):format(free) })
+	add({ key = "bags", icon = 133633, count = free, warn = free <= 2, tooltip = L["%d free bag slots left."]:format(free) })
 
 	local dur = lowestDurability()
 	if dur then
 		add({ key = "durability", icon = 136241, count = ("%d%%"):format(dur * 100), warn = dur < 0.3,
-			tooltip = "Je uitrusting is versleten. Laat herstellen bij een verkoper." })
+			tooltip = L["Your gear is worn. Repair at a vendor."] })
 	end
 
 	if cfg.trainer and cfg.trainerPending then
 		add({ key = "trainer", icon = 136234, warn = true,
-			tooltip = ("Level %d: er zijn nieuwe spreuken bij je trainer."):format(cfg.trainerPending) })
+			tooltip = L["Level %d: new spells are waiting at your trainer."]:format(cfg.trainerPending) })
 	end
 
 	if cfg.talents then
 		local pts = CK:UnspentTalentPoints()
 		if pts > 0 then
 			add({ key = "talents", icon = 132222, count = pts, warn = true,
-				tooltip = ("%d talentpunt(en) vrij. Klik om je talenten te openen."):format(pts),
+				tooltip = L["%d talent point(s) available. Click to open your talents."]:format(pts),
 				onClick = function()
 					if ToggleTalentFrame then ToggleTalentFrame()
 					elseif PlayerSpellsUtil and PlayerSpellsUtil.ToggleClassTalentFrame then PlayerSpellsUtil.ToggleClassTalentFrame() end
@@ -312,14 +313,14 @@ local function onMerchant()
 			end
 		end)
 		if sold > 0 then
-			CK:Print(("%d grijze item(s) verkocht voor %s."):format(sold, GetCoinTextureString(value)))
+			CK:Print(L["Sold %d grey item(s) for %s."]:format(sold, GetCoinTextureString(value)))
 		end
 	end
 	if cfg.repair and CanMerchantRepair and CanMerchantRepair() then
 		local cost, needed = GetRepairAllCost()
 		if needed and cost > 0 and cost <= GetMoney() then
 			RepairAllItems()
-			CK:Print("Uitrusting hersteld voor " .. GetCoinTextureString(cost) .. ".")
+			CK:Print(L["Repaired your gear for %s."]:format(GetCoinTextureString(cost)))
 		end
 	end
 end
@@ -383,7 +384,7 @@ function L:TooltipUnit(tooltip, unit)
 	local measured = key and CK.char.leveling.mobXP and CK.char.leveling.mobXP[key]
 	local xp = measured or self:EstimateMobXP(unit)
 	if xp <= 0 then
-		tooltip:AddLine("Geeft geen XP meer", 0.6, 0.6, 0.6)
+		tooltip:AddLine(L["No longer gives XP"], 0.6, 0.6, 0.6)
 		return
 	end
 	local need = UnitXPMax("player") - UnitXP("player")
@@ -396,9 +397,9 @@ function L:TooltipUnit(tooltip, unit)
 		local restedKills = math.floor(rested / xp)
 		kills = restedKills + math.ceil((need - restedKills * xp * 2) / xp)
 	end
-	local tag = measured and "gemeten" or "geschat"
-	local group = IsInGroup() and ", solo-waarde" or ""
-	tooltip:AddLine(("±%d kills tot level %d (%s%s)"):format(kills, UnitLevel("player") + 1, tag, group), 0.58, 0.36, 0.86)
+	local tag = measured and L["measured"] or L["estimated"]
+	local group = IsInGroup() and L[", solo value"] or ""
+	tooltip:AddLine(L["±%d kills to level %d (%s%s)"]:format(kills, UnitLevel("player") + 1, tag, group), 0.58, 0.36, 0.86)
 	tooltip:Show()
 end
 
@@ -436,7 +437,7 @@ function L:OnEnable()
 		if level % 2 == 0 then
 			CK.char.leveling.trainerPending = level
 			if CK.char.leveling.trainer then
-				UIErrorsFrame:AddMessage(("Level %d: nieuwe spreuken bij je trainer!"):format(level), 1, 0.82, 0.25)
+				UIErrorsFrame:AddMessage(L["Level %d: new spells at your trainer!"]:format(level), 1, 0.82, 0.25)
 			end
 		end
 		C_Timer.After(1, function() self:UpdateXPBar() end)

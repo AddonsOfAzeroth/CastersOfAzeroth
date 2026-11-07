@@ -61,6 +61,68 @@ function S:Icon(parent, size)
 	return f
 end
 
+---------------------------------------------------------------------------
+-- Movers: any frame can be dragged while the frames are unlocked.
+-- Position is saved in CK.char.points[key]; defaultFn(frame) places it otherwise.
+---------------------------------------------------------------------------
+S.movers = {}
+
+function S:ApplyPoint(frame, key)
+	local m = self.movers[key]
+	if InCombatLockdown() and frame:IsProtected() then return end
+	frame:ClearAllPoints()
+	local pt = CK.char.points[key]
+	if pt then
+		frame:SetPoint(pt[1], UIParent, pt[3], pt[4], pt[5])
+	elseif m and m.defaultFn then
+		m.defaultFn(frame)
+	end
+end
+
+function S:RegisterMover(frame, key, label, defaultFn)
+	frame:SetMovable(true)
+	frame:SetClampedToScreen(true)
+	local o = CreateFrame("Frame", nil, frame, "BackdropTemplate")
+	o:SetAllPoints()
+	o:SetFrameStrata("DIALOG")
+	o:EnableMouse(true)
+	o:RegisterForDrag("LeftButton")
+	o:SetBackdrop({ bgFile = self.flat, edgeFile = self.flat, edgeSize = 1 })
+	o:SetBackdropColor(0.41, 0.80, 0.94, 0.25)
+	o:SetBackdropBorderColor(0.41, 0.80, 0.94, 1)
+	local t = self:Font(o, 11)
+	t:SetPoint("CENTER")
+	t:SetText(label)
+	o:SetScript("OnDragStart", function()
+		if InCombatLockdown() then return end
+		frame:StartMoving()
+	end)
+	o:SetScript("OnDragStop", function()
+		frame:StopMovingOrSizing()
+		local p, _, rp, x, y = frame:GetPoint()
+		CK.char.points[key] = { p, "UIParent", rp, math.floor(x + 0.5), math.floor(y + 0.5) }
+	end)
+	o:Hide()
+	self.movers[key] = { frame = frame, overlay = o, defaultFn = defaultFn }
+	self:ApplyPoint(frame, key)
+end
+
+function S:UpdateMovers()
+	local show = not CK.char.bars.locked and not InCombatLockdown()
+	for _, m in pairs(self.movers) do m.overlay:SetShown(show) end
+end
+
+function S:ResetMovers()
+	for key, m in pairs(self.movers) do
+		CK.char.points[key] = nil
+		self:ApplyPoint(m.frame, key)
+	end
+end
+
+CK:Listen("SETTINGS", function(group) if group == "bars" then S:UpdateMovers() end end)
+CK:On("PLAYER_REGEN_DISABLED", function() for _, m in pairs(S.movers) do m.overlay:Hide() end end)
+CK:On("PLAYER_REGEN_ENABLED", function() S:UpdateMovers() end)
+
 local function kill(region)
 	if region then
 		region:SetAlpha(0)

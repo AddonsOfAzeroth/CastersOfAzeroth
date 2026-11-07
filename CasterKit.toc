@@ -1,8 +1,9 @@
 ## Interface: 16001
 ## Title: CasterKit
-## Notes: Caster-UI: actiebalken in één kader, rotatiehulp en levelhulpjes.
+## Notes: Caster UI: all action bars in one frame, rotation helper and leveling helpers.
+## Notes-nlNL: Caster-UI: actiebalken in één kader, rotatiehulp en levelhulpjes.
 ## Author: DinX
-## Version: 0.1.1
+## Version: 0.1.2
 ## IconTexture: Interface\Icons\Spell_Frost_FrostBolt02
 ## SavedVariables: CasterKitDB
 ## SavedVariablesPerCharacter: CasterKitCharDB
@@ -14,10 +15,14 @@ libs\LibButtonGlow-1.0\LibButtonGlow-1.0.lua
 libs\LibActionButton-1.0\LibActionButton-1.0.lua
 
 Core.lua
+Locale.lua
 Style.lua
 Bars.lua
 MicroMenu.lua
 Rotation.lua
 Leveling.lua
+UnitFrames.lua
+Castbar.lua
+Chat.lua
 Classes\Mage.lua
 Config.lua

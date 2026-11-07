@@ -1,6 +1,7 @@
 -- CasterKit by DinX: all action bars stacked in one frame
 local _, ns = ...
 local CK = ns.CK
+local L = CK.L
 local S = CK.Style
 local LAB = LibStub("LibActionButton-1.0")
 
@@ -97,7 +98,7 @@ function Bars:CreatePanel()
 	mover:SetBackdropBorderColor(0.41, 0.80, 0.94, 1)
 	local label = S:Font(mover, 12)
 	label:SetPoint("CENTER")
-	label:SetText("CasterKit-balken: sleep mij\n/ck lock om te vergrendelen")
+	label:SetText(L["CasterKit bars: drag me\n/ck lock to lock"])
 	mover:SetScript("OnDragStart", function()
 		if InCombatLockdown() then return end
 		p:StartMoving()

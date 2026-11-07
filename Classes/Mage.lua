@@ -1,6 +1,7 @@
 -- CasterKit by DinX: mage module (Forever leveling guide priorities)
 local _, ns = ...
 local CK = ns.CK
+local L = CK.L
 
 if select(2, UnitClass("player")) ~= "MAGE" then return end
 
@@ -198,7 +199,7 @@ function Mage:OnEnable()
 	CK:On("PLAYER_LEVEL_UP", function(_, level)
 		local drink = BETTER_WATER[level]
 		if drink then
-			CK:Print(("Tip: vanaf nu verkoopt de innkeeper %s, beter dan je eigen Conjure Water tot je volgende rank."):format(drink))
+			CK:Print(L["Tip: the innkeeper now sells %s, better than your own Conjure Water until your next rank."]:format(drink))
 		end
 	end)
 end
@@ -214,18 +215,18 @@ CK:AddReminderProvider(function(add)
 	if CK:Known("Conjure Water") then
 		add({ key = "water", icon = bags.bestWater and CK:ItemIcon(bags.bestWater) or CK:SpellTexture("Conjure Water"),
 			count = bags.water, always = true, warn = not inCombat and bags.water < 10,
-			tooltip = ("Conjured water: %d. Klik om bij te maken."):format(bags.water), spell = "Conjure Water" })
+			tooltip = L["Conjured water: %d. Click to conjure more."]:format(bags.water), spell = "Conjure Water" })
 	end
 	if CK:Known("Conjure Food") then
 		add({ key = "food", icon = bags.bestFood and CK:ItemIcon(bags.bestFood) or CK:SpellTexture("Conjure Food"),
 			count = bags.food, always = true, warn = not inCombat and bags.food < 5,
-			tooltip = ("Conjured food: %d. Klik om bij te maken."):format(bags.food), spell = "Conjure Food" })
+			tooltip = L["Conjured food: %d. Click to conjure more."]:format(bags.food), spell = "Conjure Food" })
 	end
 
 	local gemSpell = firstKnown(GEM_SPELLS)
 	if gemSpell then
 		add({ key = "gem", icon = CK:SpellTexture(gemSpell), count = bags.gems > 0 and bags.gems or nil,
-			warn = not inCombat and bags.gems == 0, tooltip = "Geen mana gem in je tassen.", spell = gemSpell })
+			warn = not inCombat and bags.gems == 0, tooltip = L["No mana gem in your bags."], spell = gemSpell })
 	end
 
 	-- Eat and drink with one click (out of combat, when you need it)
@@ -237,16 +238,16 @@ CK:AddReminderProvider(function(add)
 			if hp < 0.95 and bags.bestFood then lines[#lines + 1] = "/use item:" .. bags.bestFood end
 			if mp < 0.95 and bags.bestWater then lines[#lines + 1] = "/use item:" .. bags.bestWater end
 			add({ key = "eatdrink", icon = 132799, always = true, macrotext = table.concat(lines, "\n"),
-				tooltip = "Eten en drinken: klik om je conjured food en water te gebruiken." })
+				tooltip = L["Eat and drink: click to use your conjured food and water."] })
 		end
 	end
 
 	local armor = (IsInInstance() and CK:Known("Mage Armor") and "Mage Armor") or firstKnown({ "Ice Armor", "Frost Armor" })
 	if armor and not hasAnyBuff(ARMORS) then
-		add({ key = "armor", icon = CK:SpellTexture(armor), warn = true, tooltip = "Geen armor-buff actief.", spell = armor })
+		add({ key = "armor", icon = CK:SpellTexture(armor), warn = true, tooltip = L["No armor buff active."], spell = armor })
 	end
 	if CK:Known("Arcane Intellect") and not hasAnyBuff({ "Arcane Intellect", "Arcane Brilliance" }) then
 		add({ key = "intellect", icon = CK:SpellTexture("Arcane Intellect"), warn = true,
-			tooltip = "Arcane Intellect ontbreekt.", spell = "Arcane Intellect" })
+			tooltip = L["Arcane Intellect is missing."], spell = "Arcane Intellect" })
 	end
 end)

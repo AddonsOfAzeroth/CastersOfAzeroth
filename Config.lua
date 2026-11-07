@@ -1,6 +1,7 @@
 -- CasterKit by DinX: settings window and minimap button
 local _, ns = ...
 local CK = ns.CK
+local L = CK.L
 local S = CK.Style
 
 local C = CK:NewModule("Config")
@@ -233,12 +234,14 @@ function C:CreateWindow()
 		return page
 	end
 
-	self:BuildGeneral(newPage("general", "Algemeen"))
-	self:BuildBars(newPage("bars", "Actiebalken"))
-	self:BuildMicro(newPage("micro", "Micromenu"))
-	self:BuildRotation(newPage("rotation", "Rotatie"))
-	self:BuildLeveling(newPage("leveling", "Levelen"))
-	self:BuildAbout(newPage("about", "Over"))
+	self:BuildGeneral(newPage("general", L["General"]))
+	self:BuildBars(newPage("bars", L["Action bars"]))
+	self:BuildMicro(newPage("micro", L["Micro menu"]))
+	self:BuildUnits(newPage("units", "Frames"))
+	self:BuildRotation(newPage("rotation", L["Rotation"]))
+	self:BuildLeveling(newPage("leveling", L["Leveling"]))
+	self:BuildChat(newPage("chat", "Chat"))
+	self:BuildAbout(newPage("about", L["About"]))
 end
 
 function C:Show(key)
@@ -254,7 +257,7 @@ function C:Refresh()
 	end
 	if self.conflictNote then
 		local c = CK:BarConflict()
-		self.conflictNote:SetText(c and ("|cffff5050%s beheert nu de actiebalken.|r Zet dat uit om de CasterKit-balken te gebruiken; de rotatiehulp werkt intussen op die knoppen."):format(c) or "Geen andere actiebalk-addon actief.")
+		self.conflictNote:SetText(c and L["|cffff5050%s currently manages the action bars.|r Disable it to use the CasterKit bars; meanwhile the rotation helper works on those buttons."]:format(c) or L["No other action bar addon active."])
 	end
 end
 
@@ -262,103 +265,140 @@ end
 -- Pages
 ---------------------------------------------------------------------------
 function C:BuildGeneral(p)
-	p:Header("Algemeen")
-	p:Check("Kaders vergrendeld", "Zet uit om de balken, het hintblokje en het micromenu te verslepen.",
+	p:Header(L["General"])
+	p:Check(L["Frames locked"], L["Turn off to drag the bars, hint box, frames and micro menu."],
 		function() return CK.char.bars.locked end,
 		function(v) CK.char.bars.locked = v; changed("bars"); changed("micro") end)
-	p:Check("Minimapknop tonen", nil,
+	p:Check(L["Show minimap button"], nil,
 		function() return not CK.db.minimap.hide end,
 		function(v) CK.db.minimap.hide = not v; C:UpdateMinimapButton() end)
+	p:Choice(L["Language"], CK.languages,
+		function() return CK.db.language end,
+		function(v) CK.db.language = v end)
+	p:Note(L["Reload the UI to apply the language everywhere."])
 	p:Gap()
 	p:Header("Spec")
 	local def = CK:GetClass()
 	if def then
 		local opts = {}
 		for _, key in ipairs(def.specOrder) do opts[#opts + 1] = { key, def.specs[key].name } end
-		p:Choice("Rotatie voor", opts,
+		p:Choice(L["Rotation for"], opts,
 			function() local _, k = CK:GetSpec(); return k end,
 			function(v) CK.char.rotation.spec = v; changed("rotation") end)
 	else
-		p:Note("Voor jouw class is er nog geen rotatie. De balken en levelhulpjes werken wel.")
+		p:Note(L["There is no rotation for your class yet. Bars and leveling helpers still work."])
 	end
 	p:Gap()
-	p:Header("Opnieuw beginnen")
-	p:Button("Posities terugzetten", function()
+	p:Header(L["Start over"])
+	p:Button(L["Reset positions"], function()
 		CK:OutOfCombat("reset", function()
 			CK.char.bars.point = CK.CopyTable(CK.charDefaults.bars.point)
 			CK.char.micro.point = CK.CopyTable(CK.charDefaults.micro.point)
 			CK.char.rotation.point = nil
-			changed("bars"); changed("micro"); changed("rotation")
+			S:ResetMovers()
+			changed("bars"); changed("micro"); changed("rotation"); changed("units"); changed("chat")
 		end)
 	end)
-	p:Button("Interface herladen", ReloadUI)
+	p:Button(L["Reload UI"], ReloadUI)
 end
 
 function C:BuildBars(p)
-	p:Header("Actiebalken")
+	p:Header(L["Action bars"])
 	self.conflictNote = p:Note("")
-	p:Check("CasterKit-actiebalken gebruiken", "Uitzetten vraagt een herlaad om de Blizzard-balken terug te geven.", setting("bars", "enabled"))
-	p:Check("Blizzard-balken verbergen", "Verbergt de standaardbalken die CasterKit vervangt.", setting("bars", "hideBlizzard"))
-	p:Slider("Aantal rijen", 1, CK.Bars.MAX_ROWS, 1, setting("bars", "rows"))
-	p:Slider("Knoppen per rij", 4, 12, 1, setting("bars", "perRow"))
-	p:Slider("Knopgrootte", 24, 52, 1, setting("bars", "size"))
-	p:Slider("Tussenruimte", 0, 10, 1, setting("bars", "spacing"))
+	p:Check(L["Use CasterKit action bars"], L["Turning this off needs a reload to give the Blizzard bars back."], setting("bars", "enabled"))
+	p:Check(L["Hide Blizzard bars"], L["Hides the default bars that CasterKit replaces."], setting("bars", "hideBlizzard"))
+	p:Slider(L["Rows"], 1, CK.Bars.MAX_ROWS, 1, setting("bars", "rows"))
+	p:Slider(L["Buttons per row"], 4, 12, 1, setting("bars", "perRow"))
+	p:Slider(L["Button size"], 24, 52, 1, setting("bars", "size"))
+	p:Slider(L["Spacing"], 0, 10, 1, setting("bars", "spacing"))
 	local getS, setS = setting("bars", "scale")
-	p:Slider("Schaal", 0.6, 1.5, 0.05, getS, setS, function(v) return ("%d%%"):format(v * 100 + 0.5) end)
-	p:Check("Hoofdbalk (1 t/m =) bovenaan", nil, setting("bars", "mainOnTop"))
-	p:Check("Achtergrond achter de balken", nil, setting("bars", "background"))
-	p:Note("Sneltoetsen stel je in via het gewone Blizzard-menu (Toetsenbord). Rij 1 = Action Bar, rij 2 = Bottom Left, rij 3 = Bottom Right, rij 4 = Right.")
+	p:Slider(L["Scale"], 0.6, 1.5, 0.05, getS, setS, function(v) return ("%d%%"):format(v * 100 + 0.5) end)
+	p:Check(L["Main bar (1 to =) on top"], nil, setting("bars", "mainOnTop"))
+	p:Check(L["Background behind the bars"], nil, setting("bars", "background"))
+	p:Note(L["Set key bindings in the normal Blizzard menu (Keybindings). Row 1 = Action Bar, row 2 = Bottom Left, row 3 = Bottom Right, row 4 = Right."])
 end
 
 function C:BuildMicro(p)
-	p:Header("Micromenu en tassen")
-	p:Check("Micromenu in een CasterKit-paneel", "Personage, spreukenboek, talenten, quests… netjes in één kader.", setting("micro", "enabled"))
-	p:Check("Tassen in hetzelfde paneel", "Met het aantal vrije plaatsen op je rugzak.", setting("micro", "bags"))
+	p:Header(L["Micro menu and bags"])
+	p:Check(L["Micro menu in a CasterKit panel"], L["Character, spellbook, talents, quests… tidy in one panel."], setting("micro", "enabled"))
+	p:Check(L["Bags in the same panel"], L["With the number of free slots on your backpack."], setting("micro", "bags"))
 	local getS, setS = setting("micro", "scale")
-	p:Slider("Schaal", 0.6, 1.2, 0.05, getS, setS, function(v) return ("%d%%"):format(v * 100 + 0.5) end)
-	p:Note("Ontgrendel de kaders (Algemeen) om het paneel te verslepen.")
+	p:Slider(L["Scale"], 0.6, 1.2, 0.05, getS, setS, function(v) return ("%d%%"):format(v * 100 + 0.5) end)
+	p:Note(L["Unlock the frames (General) to drag the panel."])
+end
+
+function C:BuildUnits(p)
+	p:Header("Unit frames")
+	p:Check(L["Use CasterKit frames"], L["Replaces Blizzard's player, target and party frames."], setting("units", "enabled"))
+	p:Check(L["Player"], nil, setting("units", "player"))
+	p:Check(L["Target (with your debuffs)"], nil, setting("units", "target"))
+	p:Check("Target of target", nil, setting("units", "tot"))
+	p:Check(L["Party"], nil, setting("units", "party"))
+	p:Check(L["Class color on the health bar"], nil, setting("units", "classColor"))
+	local getS, setS = setting("units", "scale")
+	p:Slider(L["Scale"], 0.6, 1.5, 0.05, getS, setS, function(v) return ("%d%%"):format(v * 100 + 0.5) end)
+	p:Gap()
+	p:Header("Castbar")
+	p:Check(L["Own cast bar"], nil, setting("units", "castbar"))
+	p:Check(L["Target cast bar"], L["Orange = interruptible (Counterspell), grey with lock = not."], setting("units", "targetCastbar"))
+	p:Check(L["Show latency at the end"], L["The red part: from there you can already press your next spell."], setting("units", "castbarLatency"))
+	p:Check(L["Hide Blizzard cast bar"], nil, setting("units", "hideBlizzardCastbar"))
+	p:Note(L["Hidden Blizzard frames only come back after a reload. Unlock the frames (General) to drag them."])
+end
+
+function C:BuildChat(p)
+	p:Header("Chat")
+	p:Check(L["CasterKit chat (IRC style)"], nil, setting("chat", "enabled"))
+	p:Check(L["Timestamps [14:03]"], nil, setting("chat", "timestamps"))
+	p:Check(L["Short channel names ([T], [G], [g]…)"], nil, setting("chat", "shortChannels"))
+	p:Check(L["Names in class color"], nil, setting("chat", "classColors"))
+	p:Check(L["One tab per channel"], L["General, Guild, Whisper, Trade, LFG, Combat. Asked once."], setting("chat", "tabsPerChannel"))
+	p:Check(L["Fade tabs until you hover them"], nil, setting("chat", "fadeTabs"))
+	p:Slider(L["Width"], 300, 800, 10, setting("chat", "width"))
+	p:Slider(L["Height"], 120, 400, 10, setting("chat", "height"))
+	p:Slider(L["Font size"], 10, 18, 1, setting("chat", "fontSize"))
 end
 
 function C:BuildRotation(p)
-	p:Header("Rotatiehulp")
-	p:Note("CasterKit toont alleen welke knop je best indrukt. Jij drukt zelf: er wordt nooit iets automatisch gecast.")
-	p:Check("Rotatiehulp aan", nil, setting("rotation", "enabled"))
-	p:Choice("Bron van de suggestie", { { "blizzard", "Blizzard (Assisted Combat)" }, { "custom", "Eigen prioriteit (guide)" } }, setting("rotation", "source"))
-	p:Note("Blizzard schermt in gevechten veel waarden af voor addons. De suggestie van Blizzard zelf werkt altijd; de eigen prioriteit valt terug op Blizzard als iets afgeschermd is.")
-	p:Check("Knoppen laten oplichten", nil, setting("rotation", "glow"))
-	p:Choice("Stijl", { { "blizzard", "Blizzard-glinster" }, { "pulse", "Pulserende rand" } }, setting("rotation", "glowStyle"))
-	p:Check("Volgende spreuk ook tonen (zwakke rand)", nil, setting("rotation", "secondary"))
-	p:Check("Hintblokje boven de balken", nil, setting("rotation", "hint"))
-	p:Check("Alleen bij een vijandig doelwit", nil, setting("rotation", "onlyHostile"))
-	p:Check("AoE-modus (meerdere vijanden)", "Ook via /ck aoe, middelklik op de minimapknop of een eigen sneltoets.", setting("rotation", "aoe"))
+	p:Header(L["Rotation helper"])
+	p:Note(L["CasterKit only shows which button to press. You press it yourself: nothing is ever cast automatically."])
+	p:Check(L["Rotation helper on"], nil, setting("rotation", "enabled"))
+	p:Choice(L["Suggestion source"], { { "blizzard", "Blizzard (Assisted Combat)" }, { "custom", L["Own priority (guide)"] } }, setting("rotation", "source"))
+	p:Note(L["In combat Blizzard hides many values from addons. Blizzard's own suggestion always works; the own priority falls back to Blizzard when something is hidden."])
+	p:Check(L["Light up buttons"], nil, setting("rotation", "glow"))
+	p:Choice(L["Style"], { { "blizzard", L["Blizzard glow"] }, { "pulse", L["Pulsing border"] } }, setting("rotation", "glowStyle"))
+	p:Check(L["Also show the next spell (faint border)"], nil, setting("rotation", "secondary"))
+	p:Check(L["Hint box above the bars"], nil, setting("rotation", "hint"))
+	p:Check(L["Only with a hostile target"], nil, setting("rotation", "onlyHostile"))
+	p:Check(L["AoE mode (multiple enemies)"], L["Also via /ck aoe, middle-click on the minimap button or your own key binding."], setting("rotation", "aoe"))
 	p:Gap()
-	p:Note("Kleuren: goud = nu indrukken, paars = proc (bv. Fingers of Frost), blauw = defensief (vallen, vastzitten, te dichtbij).")
+	p:Note(L["Colors: gold = press now, purple = proc (e.g. Fingers of Frost), blue = defensive (falling, rooted, too close)."])
 end
 
 function C:BuildLeveling(p)
-	p:Header("Levelen")
-	p:Check("XP-balk met XP per uur en tijd tot level", nil, setting("leveling", "xpbar"))
-	p:Check("Blizzard-XP-balk verbergen", nil, setting("leveling", "hideBlizzardXP"))
-	p:Check("Kills tot level in de tooltip van vijanden", nil, setting("leveling", "mobTooltip"))
-	p:Check("Herinneringen (water, food, buffs, tassen…)", nil, setting("leveling", "reminders"))
-	p:Check("Melding: nieuwe spreuken bij de trainer", nil, setting("leveling", "trainer"))
-	p:Check("Melding: talentpunten vrij", nil, setting("leveling", "talents"))
+	p:Header(L["Leveling"])
+	p:Check(L["XP bar with XP per hour and time to level"], nil, setting("leveling", "xpbar"))
+	p:Check(L["Hide Blizzard XP bar"], nil, setting("leveling", "hideBlizzardXP"))
+	p:Check(L["Kills to level in enemy tooltips"], nil, setting("leveling", "mobTooltip"))
+	p:Check(L["Reminders (water, food, buffs, bags…)"], nil, setting("leveling", "reminders"))
+	p:Check(L["Notify: new spells at the trainer"], nil, setting("leveling", "trainer"))
+	p:Check(L["Notify: talent points available"], nil, setting("leveling", "talents"))
 	p:Gap()
-	p:Header("Bij een verkoper")
-	p:Check("Grijze items automatisch verkopen", nil, setting("leveling", "sellGrey"))
-	p:Check("Automatisch herstellen", nil, setting("leveling", "repair"))
+	p:Header(L["At a vendor"])
+	p:Check(L["Sell grey items automatically"], nil, setting("leveling", "sellGrey"))
+	p:Check(L["Repair automatically"], nil, setting("leveling", "repair"))
 end
 
 function C:BuildAbout(p)
 	p:Header("CasterKit")
-	p:Note(("Versie %s, gemaakt door DinX."):format(CK.version))
-	p:Note("Een caster-interface voor WoW Forever: alle actiebalken in één kader, een rotatiehulp die de juiste knop laat oplichten, en hulpjes voor het levelen.")
+	p:Note(L["Version %s, made by DinX."]:format(CK.version))
+	p:Note(L["A caster interface for WoW Forever: all action bars in one frame, a rotation helper that lights up the right button, and leveling helpers."])
 	p:Gap()
-	p:Header("Binnen de regels")
-	p:Note("CasterKit gebruikt alleen de officiële addon-API. Het toont informatie en laat knoppen oplichten, maar cast nooit zelf iets, verstuurt geen chatberichten en werkt niet samen met externe programma's.")
+	p:Header(L["Within the rules"])
+	p:Note(L["CasterKit only uses the official addon API. It shows information and lights up buttons, but never casts anything itself, never sends chat messages and does not work with external programs."])
 	p:Gap()
-	p:Header("Commando's")
-	p:Note("/ck  instellingen\n/ck unlock  en  /ck lock  kaders verslepen\n/ck aoe  AoE-modus wisselen\n/ck reset  posities terugzetten")
+	p:Header(L["Commands"])
+	p:Note(L["/ck  settings\n/ck unlock  and  /ck lock  drag frames\n/ck aoe  toggle AoE mode\n/ck reset  reset positions"])
 end
 
 ---------------------------------------------------------------------------
@@ -416,11 +456,11 @@ function C:CreateMinimapButton()
 	b:SetScript("OnEnter", function(self)
 		GameTooltip:SetOwner(self, "ANCHOR_LEFT")
 		GameTooltip:AddLine("CasterKit")
-		GameTooltip:AddLine("Klik: instellingen", 1, 1, 1)
-		GameTooltip:AddLine("Rechtsklik: kaders (ont)grendelen", 1, 1, 1)
-		GameTooltip:AddLine("Middelklik: AoE-modus", 1, 1, 1)
+		GameTooltip:AddLine(L["Click: settings"], 1, 1, 1)
+		GameTooltip:AddLine(L["Right-click: lock/unlock frames"], 1, 1, 1)
+		GameTooltip:AddLine(L["Middle-click: AoE mode"], 1, 1, 1)
 		local spec = CK:GetSpec()
-		if spec then GameTooltip:AddLine("Rotatie: " .. spec.name .. (CK.char.rotation.aoe and " (AoE)" or ""), 0.41, 0.8, 0.94) end
+		if spec then GameTooltip:AddLine(L["Rotation: "] .. spec.name .. (CK.char.rotation.aoe and " (AoE)" or ""), 0.41, 0.8, 0.94) end
 		GameTooltip:Show()
 	end)
 	b:SetScript("OnLeave", GameTooltip_Hide)
@@ -445,7 +485,7 @@ function C:RegisterBlizzardSettings()
 	local b = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
 	b:SetSize(200, 26)
 	b:SetPoint("TOPLEFT", 16, -50)
-	b:SetText("Open CasterKit-instellingen")
+	b:SetText(L["Open CasterKit settings"])
 	b:SetScript("OnClick", function()
 		if SettingsPanel then HideUIPanel(SettingsPanel) end
 		CK:ToggleConfig(true)
