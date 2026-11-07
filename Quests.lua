@@ -1127,6 +1127,20 @@ function Q:Render(total, tracked)
 		local pr = provider()
 		bb:SetShown(pr ~= nil and type(pr.ToggleBoard) == "function")
 	end
+	-- keep the sort / strategy labels clear of the header icons (truncate with "...")
+	local icons = 26 + (h.mark:GetStringWidth() or 8) + ((bb and bb:IsShown()) and 18 or 0)
+	local room = inner - (h.text:GetStringWidth() or 60) - 4 - icons
+	for _, btn in ipairs({ mb, stb }) do
+		if btn and btn:IsShown() then
+			local fs = btn.text
+			local w = ((fs.GetUnboundedStringWidth and fs:GetUnboundedStringWidth()) or fs:GetStringWidth() or 40) + 4
+			if w > room then w = math.max(room, 12) end
+			btn.text:SetWordWrap(false)
+			btn.text:SetWidth(w - 4)
+			btn:SetWidth(w)
+			room = room - w - 2
+		end
+	end
 	local sl = self.sprintLine
 	if sl then
 		local line = ask("SprintLine")
