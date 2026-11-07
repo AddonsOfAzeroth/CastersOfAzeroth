@@ -356,8 +356,44 @@ local function questPosition(questID)
 	end
 end
 
--- Right-click: point the CasterKit arrow at this quest (stays until arrival or cleared).
+-- Navigation (Nav.lua) on: it owns the arrow; the tracker hands it quests.
+local function nav()
+	local N = CK.Nav
+	if N and N.OwnsArrow then
+		local ok, owns = pcall(N.OwnsArrow, N)
+		if ok and owns then return N end
+	end
+end
+
+local function questKind(questID)
+	if QL and QL.ReadyForTurnIn and flag(try(QL.ReadyForTurnIn, questID)) then return "turnin" end
+	if QL and QL.IsComplete and flag(try(QL.IsComplete, questID)) then return "turnin" end
+	return "quest"
+end
+
+-- Ctrl-click: add the quest to the navigation route.
+local function addToRoute(questID, title)
+	local N = CK.Nav
+	if not (N and N.AddQuest) then return end
+	local m, x, y = questPosition(questID)
+	pcall(N.AddQuest, N, questID, title, m, x, y)
+end
+
+-- Click: point the CasterKit arrow at this quest (stays until arrival or cleared).
 local function setWaypoint(questID, title)
+	local N = nav()
+	if N then
+		local m, x, y = questPosition(questID)
+		if m then
+			local ok, set = pcall(N.SetOverride, N, m, x, y, title, questKind(questID), questID)
+			if ok and set then
+				Q.manualArrow = true
+				Q.arrowKey = nil
+				Q.selected = questID
+			end
+		end
+		return
+	end
 	local A = CK.Arrow
 	if not (A and A.SetTarget) then return end
 	local m, x, y = questPosition(questID)
@@ -375,6 +411,16 @@ end
 function Q:UpdateArrow()
 	local A = CK.Arrow
 	if not (A and A.SetTarget and A.Clear) then return end
+	-- navigation decides where the arrow points; only keep the selection in sync
+	local N = nav()
+	if N then
+		self.arrowKey = nil
+		if self.manualArrow and not (N.HasOverride and N:HasOverride()) then
+			self.manualArrow = false
+			self.selected = nil
+		end
+		return
+	end
 	-- a target the player picked with right-click wins until reached or cleared
 	if self.manualArrow then
 		local m = A.GetTarget and try(A.GetTarget, A)
@@ -418,7 +464,9 @@ local function onTitleClick(self, button)
 	guard(function()
 		local id = self.questID
 		if not id then return end
-		if IsShiftKeyDown() then
+		if IsControlKeyDown and IsControlKeyDown() and button == "LeftButton" and CK.Nav then
+			addToRoute(id, self.questTitle)
+		elseif IsShiftKeyDown() then
 			openQuest(id, self.logIndex)
 		elseif button == "RightButton" then
 			local c = CK.char.quests.collapsed
@@ -427,7 +475,12 @@ local function onTitleClick(self, button)
 		elseif Q.selected == id then
 			-- click the selected quest again: back to the route
 			Q.selected, Q.manualArrow, Q.arrowKey = nil, false, nil
-			if CK.Arrow and CK.Arrow.Clear then pcall(CK.Arrow.Clear, CK.Arrow) end
+			local N = nav()
+			if N then
+				pcall(N.ClearOverride, N)
+			elseif CK.Arrow and CK.Arrow.Clear then
+				pcall(CK.Arrow.Clear, CK.Arrow)
+			end
 			Q:Redraw()
 		else
 			setWaypoint(id, self.questTitle)
@@ -1119,6 +1172,14 @@ function Q:OnEnable()
 		self.manualArrow = false
 		self.selected = nil
 		guard(self.Schedule, self)
+	end)
+	-- the navigation route changed: drop the selection mark when its stop is gone
+	CK:Listen("NAV", function()
+		local N = nav()
+		if N and self.selected and not (N.HasOverride and N:HasOverride()) then
+			self.selected, self.manualArrow = nil, false
+			guard(self.Schedule, self)
+		end
 	end)
 	self:Refresh()
 end

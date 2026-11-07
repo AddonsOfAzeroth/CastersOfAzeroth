@@ -23,6 +23,7 @@ local lines = {}
 local lineHolder
 local playerLine     -- line from the player to the first stop, or nil
 local playerX, playerY
+local targetLine, targetPin -- white line/pin to the arrow's target (when navigation is off)
 local coordsBar, border
 local ticker
 local fails = 0
@@ -132,14 +133,39 @@ local function project(stop, mapID)
 	local mt = info and num(info.mapType)
 	local continent = Enum and Enum.UIMapType and Enum.UIMapType.Continent or 2
 	if not mt or mt < continent then return end -- no world/cosmic clutter
-	if not isParent(smap, mapID) then return end
-	local ok, minX, maxX, minY, maxY = pcall(C_Map.GetMapRectOnMap, smap, mapID)
-	minX, maxX, minY, maxY = num(minX), num(maxX), num(minY), num(maxY)
-	if not ok or not minX or not maxX or not minY or not maxY or maxX <= minX or maxY <= minY then return end
-	local x, y = minX + sx * (maxX - minX), minY + sy * (maxY - minY)
+	local x, y
+	if isParent(smap, mapID) then
+		-- stop on a child map (zone) shown on its parent (continent)
+		local ok, minX, maxX, minY, maxY = pcall(C_Map.GetMapRectOnMap, smap, mapID)
+		minX, maxX, minY, maxY = num(minX), num(maxX), num(minY), num(maxY)
+		if not ok or not minX or not maxX or not minY or not maxY or maxX <= minX or maxY <= minY then return end
+		x, y = minX + sx * (maxX - minX), minY + sy * (maxY - minY)
+	elseif isParent(mapID, smap) then
+		-- stop on a parent map (e.g. a flight path on the continent) shown on a zone
+		local ok, minX, maxX, minY, maxY = pcall(C_Map.GetMapRectOnMap, mapID, smap)
+		minX, maxX, minY, maxY = num(minX), num(maxX), num(minY), num(maxY)
+		if not ok or not minX or not maxX or not minY or not maxY or maxX <= minX or maxY <= minY then return end
+		x, y = (sx - minX) / (maxX - minX), (sy - minY) / (maxY - minY)
+	else
+		return
+	end
 	if x < 0 or x > 1 or y < 0 or y > 1 then return end
 	return x, y
 end
+
+-- Navigation route (Nav.lua) when navigation is on, else nil
+local function navRoute()
+	local N = CK.Nav
+	if not (N and N.IsActive and N.GetRoute) then return end
+	local ok, isOn = pcall(N.IsActive, N)
+	if not ok or not isOn then return end
+	local ok2, r = pcall(N.GetRoute, N)
+	if ok2 and type(r) == "table" then return r end
+	return {}
+end
+
+local GREEN = { 0.35, 0.85, 0.40 }
+local KIND_NAMES = { quest = "Quest objective", turnin = "Turn-in", custom = "Waypoint", flight = "Flight" }
 
 ---------------------------------------------------------------------------
 -- Pin visuals (shared by the data provider and the fallback)
@@ -163,6 +189,28 @@ local function DotOnEnter(dot)
 		local stop = dot.stop
 		if not stop then return end
 		GameTooltip:SetOwner(dot, "ANCHOR_RIGHT")
+		if stop.kind then
+			-- navigation stop: use the live entry when the route still has it
+			local route = navRoute()
+			local live = route and stop.rank and route[stop.rank]
+			if live and live.key == stop.key then stop = live end
+			GameTooltip:AddLine(stop.title or L["Next stop"], 1, 1, 1)
+			local kn = KIND_NAMES[stop.kind]
+			if kn then
+				local m = S.colors.muted
+				GameTooltip:AddLine(L[kn], m[1], m[2], m[3])
+			end
+			if type(stop.questIDs) == "table" and #stop.questIDs > 1 then
+				for _, id in ipairs(stop.questIDs) do GameTooltip:AddLine(questTitle(id), 1, 1, 1) end
+			end
+			local cum = num(stop.cum)
+			if cum then
+				local t = S.colors.text
+				GameTooltip:AddLine(L["%d yd"]:format(math.floor(cum + 0.5)), t[1], t[2], t[3])
+			end
+			GameTooltip:Show()
+			return
+		end
 		if stop.target then
 			GameTooltip:AddLine(stop.title or L["Next stop"], 1, 1, 1)
 			GameTooltip:Show()
@@ -214,11 +262,32 @@ local function PaintPin(pin, stop)
 	local dot = pin.dot
 	dot.stop = stop
 	local rank = num(stop.rank) or 0
+	-- the current navigation stop gets a white ring
+	if stop.kind and rank == 1 then
+		dot.ring:SetVertexColor(1, 1, 1, 1)
+	else
+		dot.ring:SetVertexColor(0, 0, 0, 0.9)
+	end
 	if stop.target then
 		dot.fill:SetVertexColor(1, 1, 1, 1)
 		dot.text:SetText("")
 		dot.sub:Hide()
-	elseif stop.turnIn then
+	elseif stop.kind == "landing" then
+		local p = S.colors.proc
+		dot.fill:SetVertexColor(p[1], p[2], p[3], 0.8)
+		dot.text:SetText("")
+		dot.sub:Hide()
+	elseif stop.kind == "flight" then
+		local p = S.colors.proc
+		dot.fill:SetVertexColor(p[1], p[2], p[3], 1)
+		dot.text:SetText("F")
+		dot.sub:SetText(rank)
+		dot.sub:Show()
+	elseif stop.kind == "custom" then
+		dot.fill:SetVertexColor(GREEN[1], GREEN[2], GREEN[3], 1)
+		dot.text:SetText(rank)
+		dot.sub:Hide()
+	elseif stop.turnIn or stop.kind == "turnin" then
 		local h = S.colors.hint
 		dot.fill:SetVertexColor(h[1], h[2], h[3], 1)
 		dot.text:SetText("?")
@@ -274,21 +343,20 @@ local function updateThickness()
 	if targetPin and targetPin.dot then targetPin.dot:SetScale(1 / s) end
 end
 
-local function getLine(i)
+local function getLine(i, color, alpha)
 	local ln = lines[i]
 	if not ln then
 		ln = lineHolder:CreateLine(nil, "ARTWORK")
 		lines[i] = ln
 	end
-	local a = S.colors.accent
-	ln:SetColorTexture(a[1], a[2], a[3], 0.75)
+	local a = color or S.colors.accent
+	ln:SetColorTexture(a[1], a[2], a[3], alpha or 0.75)
 	ln:SetThickness(LINE_WIDTH / canvasScale())
 	ln:Show()
 	return ln
 end
 
 -- Move the start of the player line to the player's current spot
-local targetLine, targetPin
 local function placePlayerLine(x, y)
 	local c = canvas()
 	if not (playerLine or targetLine) or not c then return end
@@ -433,10 +501,99 @@ end
 ---------------------------------------------------------------------------
 -- Fallback: own frames on the scroll child, placed by normalised x, y
 ---------------------------------------------------------------------------
+local function fallbackPin(i, c)
+	local pin = fallbackPins[i]
+	if not pin then
+		pin = CreateFrame("Frame", nil, c)
+		BuildPin(pin)
+		fallbackPins[i] = pin
+	end
+	pin:SetFrameLevel(math.min(9000, c:GetFrameLevel() + 2000))
+	pin.dot:SetScale(1 / canvasScale())
+	return pin
+end
+
+-- Navigation route: numbered stops, flight legs dashed in purple
+local function drawNav(route)
+	local c = canvas()
+	local mapID = shownMapID()
+	if not c or not mapID or #route == 0 then return end
+	local w, h = num(c:GetWidth()), num(c:GetHeight())
+	if not w or not h then return end
+	local count = 0
+	local function place(stop, x, y)
+		count = count + 1
+		local pin = fallbackPin(count, c)
+		pin:ClearAllPoints()
+		pin:SetPoint("CENTER", c, "TOPLEFT", x * w, -y * h)
+		PaintPin(pin, stop)
+		pin:Show()
+		return pin
+	end
+	local recs = {}
+	for i, e in ipairs(route) do
+		local rec = { e = e }
+		local x, y = project(e, mapID)
+		if x then rec.pin, rec.x, rec.y = place(e, x, y), x, y end
+		if e.kind == "flight" and e.toMapID then
+			local lx, ly = project({ mapID = e.toMapID, x = e.toX, y = e.toY }, mapID)
+			if lx then
+				rec.land, rec.lx, rec.ly = place({ kind = "landing", title = e.toName, rank = 0 }, lx, ly), lx, ly
+			end
+		end
+		recs[i] = rec
+	end
+	if count == 0 or not ensureHolder() then return end
+	lineHolder:SetFrameLevel(math.min(9000, c:GetFrameLevel() + 1999))
+	lineHolder:Show()
+	local n = 0
+	-- player to the current stop
+	local first = recs[1]
+	if first and first.pin then
+		local px, py = playerPos(mapID)
+		if px then
+			n = n + 1
+			playerLine = getLine(n)
+			playerLine:SetEndPoint("CENTER", first.pin, 0, 0)
+			placePlayerLine(px, py)
+		end
+	end
+	local s = canvasScale()
+	for i, rec in ipairs(recs) do
+		-- flight leg: dashes from the flight master to the landing
+		if rec.pin and rec.land then
+			local x0, y0, x1, y1 = rec.x * w, rec.y * h, rec.lx * w, rec.ly * h
+			local len = ((x1 - x0) ^ 2 + (y1 - y0) ^ 2) ^ 0.5
+			local dashes = math.max(4, math.min(60, math.floor(len * s / 18)))
+			for k = 0, dashes - 1 do
+				local t0, t1 = k / dashes, (k + 0.55) / dashes
+				n = n + 1
+				local ln = getLine(n, S.colors.proc, 0.9)
+				ln:SetStartPoint("TOPLEFT", c, x0 + (x1 - x0) * t0, -(y0 + (y1 - y0) * t0))
+				ln:SetEndPoint("TOPLEFT", c, x0 + (x1 - x0) * t1, -(y0 + (y1 - y0) * t1))
+			end
+		end
+		-- to the next stop (after a flight: from the landing)
+		local nxt = recs[i + 1]
+		if nxt and nxt.pin then
+			local from
+			if rec.e.kind == "flight" then from = rec.land else from = rec.pin end
+			if from then
+				n = n + 1
+				local ln = getLine(n)
+				ln:SetStartPoint("CENTER", from, 0, 0)
+				ln:SetEndPoint("CENTER", nxt.pin, 0, 0)
+			end
+		end
+	end
+end
+
 local function drawFallback()
 	for _, pin in ipairs(fallbackPins) do pin:Hide() end
 	hideLines()
 	if not on("route") then return end
+	local nav = navRoute()
+	if nav then return drawNav(nav) end
 	local c = canvas()
 	local mapID = shownMapID()
 	local list, route = stopsOnMap(mapID)
@@ -445,14 +602,7 @@ local function drawFallback()
 	if not w or not h then return end
 	local pins = {}
 	for i, s in ipairs(list) do
-		local pin = fallbackPins[i]
-		if not pin then
-			pin = CreateFrame("Frame", nil, c)
-			BuildPin(pin)
-			fallbackPins[i] = pin
-		end
-		pin:SetFrameLevel(math.min(9000, c:GetFrameLevel() + 2000))
-		pin.dot:SetScale(1 / canvasScale())
+		local pin = fallbackPin(i, c)
 		pin:ClearAllPoints()
 		pin:SetPoint("CENTER", c, "TOPLEFT", s.x * w, -s.y * h)
 		PaintPin(pin, s.stop)
@@ -466,7 +616,7 @@ end
 local function drawTarget()
 	local A = CK.Arrow
 	local c = canvas()
-	if not (A and A.GetTarget and c and on("route")) then return end
+	if not (A and A.GetTarget and c and on("route")) or navRoute() then return end
 	local m, tx, ty, title = A:GetTarget()
 	local mapID = shownMapID()
 	if not (m and mapID) then return end
@@ -797,6 +947,10 @@ function MP:OnEnable()
 end
 
 CK:Listen("QUESTPLAN", function()
+	if WMF and WMF:IsShown() then MP:Refresh() end
+end)
+
+CK:Listen("NAV", function()
 	if WMF and WMF:IsShown() then MP:Refresh() end
 end)
 

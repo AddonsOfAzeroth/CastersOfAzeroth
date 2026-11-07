@@ -1,4 +1,7 @@
 -- CasterKit by DinX: navigation arrow
+-- The arrow logic (distance, direction, arrival) runs on its own driver frame,
+-- so the GPS panel (Nav.lua) can show it while this module's own frame is hidden.
+-- The arrow shows the straight-line direction: there is no API for paths or terrain.
 local _, ns = ...
 local CK = ns.CK
 local S = CK.Style
@@ -15,13 +18,21 @@ local GREEN = { 0.35, 0.85, 0.40 }
 local RED = { 0.95, 0.35, 0.30 }
 local THROTTLE = 0.05 -- seconds between updates (~20 fps)
 local ARRIVE_HOLD = 2 -- seconds of "Arrived" before ARROW_ARRIVED fires
-local DEFAULT_SPEED = 7 -- yards per second
+local DEFAULT_SPEED = 7 -- yards per second on foot
+local DEFAULT_MOUNT = 11.2 -- yards per second on a 60% mount
 
 local frame, arrow, titleText, infoText
+local driver -- invisible frame that runs the update while a target is set
 local target -- { mapID, x, y, title, cont, wn, ww, arrivedAt, fired }
 local acc = 0
 local lastDist
 local inCombat = false
+local embedded = false -- true while the GPS panel shows the arrow
+
+-- Last computed state, read by the GPS panel (do not modify from outside).
+-- status: "none", "ok", "other" (other continent), "nopos" (no player position)
+local state = { status = "none" }
+AR.state = state
 
 -- A plain number, or nil when missing or secret.
 local function num(v)
@@ -41,17 +52,17 @@ local function worldPosRaw(mapID, x, y)
 end
 
 local function worldPos(mapID, x, y)
-	if not (mapID and C_Map and C_Map.GetWorldPosFromMapPos and CreateVector2D) then return end
+	if not (mapID and x and y and C_Map and C_Map.GetWorldPosFromMapPos and CreateVector2D) then return end
 	local ok, cont, n, w = pcall(worldPosRaw, mapID, x, y)
 	if ok and cont then return cont, n, w end
 end
 
 -- Player's continent and world position; nil in instances or when hidden.
-local function playerPos()
+local function playerPosRaw()
 	if C_Map and C_Map.GetBestMapForUnit and C_Map.GetPlayerMapPosition then
 		local mapID = num(C_Map.GetBestMapForUnit("player"))
 		local pos = mapID and C_Map.GetPlayerMapPosition(mapID, "player")
-		if pos then
+		if pos and not IsSecret(pos) then
 			local x, y = pos:GetXY()
 			x, y = num(x), num(y)
 			if x and y and (x > 0 or y > 0) then
@@ -70,18 +81,52 @@ local function playerPos()
 	end
 end
 
+local function playerPos()
+	local ok, cont, n, w = pcall(playerPosRaw)
+	if ok and cont then return cont, n, w end
+end
+
+-- Shared with Nav.lua and others.
+AR.WorldPos = worldPos
+AR.PlayerPos = playerPos
+
 ---------------------------------------------------------------------------
--- Display helpers
+-- Speed and text helpers
 ---------------------------------------------------------------------------
 local function blend(a, b, t)
 	return a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t, a[3] + (b[3] - a[3]) * t
 end
 
-local function runSpeed()
+local function learned(key, lo, hi)
 	local q = CK.char and CK.char.questLearn
-	local v = q and num(q.runSpeed)
-	if v and v >= 3 and v <= 60 then return v end
-	return DEFAULT_SPEED
+	local v = q and num(q[key])
+	if v and v >= lo and v <= hi then return v end
+end
+
+local function runSpeed()
+	return learned("runSpeed", 3, 60) or DEFAULT_SPEED
+end
+
+local function isMounted()
+	if not IsMounted then return false end
+	local ok, m = pcall(IsMounted)
+	return ok and not IsSecret(m) and m and true or false
+end
+
+-- Yards per second for ETAs: the current speed while moving, otherwise the
+-- mounted speed (when mounted) or the learned run speed.
+local function travelSpeed()
+	local cur, run
+	if GetUnitSpeed then
+		local ok, a, b = pcall(GetUnitSpeed, "player")
+		if ok then cur, run = num(a), num(b) end
+	end
+	if cur and cur > 0.5 then return cur end
+	if isMounted() then
+		if run and run > DEFAULT_SPEED + 0.5 then return run end
+		return learned("mountSpeed", 8, 60) or DEFAULT_MOUNT
+	end
+	return runSpeed()
 end
 
 local function formatETA(sec)
@@ -96,24 +141,42 @@ local function distText(d)
 	return L["%d yd"]:format(floor(d + 0.5))
 end
 
-local function showOther()
+AR.RunSpeed = runSpeed
+AR.TravelSpeed = travelSpeed
+AR.IsMounted = isMounted
+AR.FormatETA = formatETA
+AR.DistText = distText
+
+local function setStatus(status)
+	state.status = status
+	state.dist, state.rel, state.arrived = nil, nil, false
+end
+
+local function showStatus(text)
 	lastDist = nil
+	if not arrow then return end
 	arrow:Hide()
 	infoText:SetTextColor(unpack(S.colors.muted))
-	infoText:SetText(L["Other zone"])
+	infoText:SetText(text)
 end
 
 ---------------------------------------------------------------------------
--- Update (runs throttled, only while a target is shown)
+-- Update (runs throttled, only while a target is set)
 ---------------------------------------------------------------------------
 local function update()
 	local t = target
-	if not t then return end
+	if not t then return setStatus("none") end
 	if not t.cont then t.cont, t.wn, t.ww = worldPos(t.mapID, t.x, t.y) end
 	local cont, pn, pw = playerPos()
-	if not cont or not t.cont or cont ~= t.cont then
+	if not cont or not t.cont then
 		t.arrivedAt = nil
-		return showOther()
+		setStatus("nopos")
+		return showStatus(not cont and L["No position here"] or L["Other zone"])
+	end
+	if cont ~= t.cont then
+		t.arrivedAt = nil
+		setStatus("other")
+		return showStatus(L["Other continent"])
 	end
 
 	local dn, dw = t.wn - pn, t.ww - pw
@@ -122,14 +185,14 @@ local function update()
 
 	local arrive = num(CK.char.arrow.arriveYards) or 15
 	local arrived = dist <= arrive
+	state.status, state.dist, state.arrived = "ok", dist, arrived
 
 	-- rotation: 0 = north, counter-clockwise, same as GetPlayerFacing()
 	local facing = GetPlayerFacing and num(GetPlayerFacing())
 	local r, g, b = unpack(S.colors.accent)
 	if facing then
 		local rel = atan2(dw, dn) - facing
-		arrow:SetRotation(rel)
-		arrow:Show()
+		state.rel = rel
 		local dot = cos(rel) -- 1 = straight ahead, -1 = behind
 		if arrived then
 			r, g, b = unpack(GREEN)
@@ -138,16 +201,28 @@ local function update()
 		else
 			r, g, b = blend(S.colors.accent, RED, dot * dot * 0.55)
 		end
-		arrow:SetVertexColor(r, g, b, 1)
 	else
-		arrow:Hide()
+		state.rel = nil
+	end
+	state.r, state.g, state.b = r, g, b
+
+	if arrow then
+		if state.rel then
+			arrow:SetRotation(state.rel)
+			arrow:SetVertexColor(r, g, b, 1)
+			arrow:Show()
+		else
+			arrow:Hide()
+		end
 	end
 
 	if arrived then
 		local now = GetTime()
 		t.arrivedAt = t.arrivedAt or now
-		infoText:SetTextColor(unpack(GREEN))
-		infoText:SetText(L["Arrived"])
+		if infoText then
+			infoText:SetTextColor(unpack(GREEN))
+			infoText:SetText(L["Arrived"])
+		end
 		if not t.fired and now - t.arrivedAt >= ARRIVE_HOLD then
 			t.fired = true
 			local m, x, y = t.mapID, t.x, t.y
@@ -156,8 +231,10 @@ local function update()
 		end
 	else
 		t.arrivedAt = nil
-		infoText:SetTextColor(unpack(S.colors.muted))
-		infoText:SetText(distText(dist) .. "  " .. formatETA(dist / runSpeed()))
+		if infoText then
+			infoText:SetTextColor(unpack(S.colors.muted))
+			infoText:SetText(distText(dist) .. "  " .. formatETA(dist / travelSpeed()))
+		end
 	end
 end
 
@@ -178,18 +255,28 @@ end
 -- Frame
 ---------------------------------------------------------------------------
 local function refresh()
-	if not frame then return end
+	if not CK.char then return end
 	local cfg = CK.char.arrow
+	-- the driver runs while there is a target that someone shows
+	if driver then
+		if target and (cfg.enabled or embedded) then
+			acc = THROTTLE
+			driver:SetScript("OnUpdate", onUpdate)
+		else
+			driver:SetScript("OnUpdate", nil)
+			lastDist = nil
+			setStatus("none")
+		end
+	end
+	if not frame then return end
 	local scale = num(cfg.scale)
 	frame:SetScale((scale and scale > 0.3 and scale < 3) and scale or 1)
-	if cfg.enabled and target then
+	if embedded then
+		frame:Hide()
+	elseif cfg.enabled and target then
 		titleText:SetText(target.title or L["Navigation arrow"])
 		frame:Show()
-		acc = THROTTLE
-		frame:SetScript("OnUpdate", onUpdate)
 	else
-		frame:SetScript("OnUpdate", nil)
-		lastDist = nil
 		-- show an empty panel while unlocked so it can be dragged
 		if not CK.char.bars.locked and not inCombat and not InCombatLockdown() then
 			titleText:SetText(L["Navigation arrow"])
@@ -207,6 +294,8 @@ end
 
 local function build()
 	if frame or not CK.char then return end
+	driver = driver or CreateFrame("Frame")
+
 	frame = CreateFrame("Frame", nil, UIParent, "BackdropTemplate")
 	frame:SetSize(186, 52)
 	frame:SetFrameStrata("MEDIUM")
@@ -235,15 +324,25 @@ local function build()
 	infoText:SetTextColor(unpack(S.colors.muted))
 
 	frame:EnableMouse(true)
+	-- navigation on: right-click skips the stop (clearing would be re-set by the route)
+	local function navOwns()
+		local N = CK.Nav
+		if not (N and N.OwnsArrow and N.Skip) then return end
+		local ok, owns = pcall(N.OwnsArrow, N)
+		if ok and owns then return N end
+	end
 	frame:SetScript("OnMouseUp", function(_, button)
-		if button == "RightButton" then AR:Clear() end
+		if button ~= "RightButton" then return end
+		local N = navOwns()
+		if N then pcall(N.Skip, N) else AR:Clear() end
 	end)
 	frame:SetScript("OnEnter", function(self)
 		if not target then return end
 		GameTooltip:SetOwner(self, "ANCHOR_LEFT")
 		GameTooltip:AddLine(target.title or L["Navigation arrow"], 1, 1, 1)
 		GameTooltip:AddLine(lastDist and distText(lastDist) or L["Other zone"], unpack(S.colors.text))
-		GameTooltip:AddLine(L["Right-click to clear"], unpack(S.colors.muted))
+		GameTooltip:AddLine(L["The arrow shows the straight-line direction, not a path around hills or water."], 0.6, 0.65, 0.71, true)
+		GameTooltip:AddLine(navOwns() and L["Right-click to skip this stop"] or L["Right-click to clear"], unpack(S.colors.muted))
 		GameTooltip:Show()
 	end)
 	frame:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -278,6 +377,7 @@ end
 function AR:Clear()
 	target = nil
 	lastDist = nil
+	setStatus("none")
 	if frame and GameTooltip:GetOwner() == frame then GameTooltip:Hide() end
 	refresh()
 	CK:Fire("ARROW_TARGET")
@@ -287,6 +387,23 @@ function AR:GetTarget()
 	if not target then return nil end
 	return target.mapID, target.x, target.y, target.title
 end
+
+-- Last computed state: status, distance (yd), relative angle (radians or nil),
+-- arrived, colour. Valid while a target is set and someone shows the arrow.
+function AR:GetState()
+	return state.status, state.dist, state.rel, state.arrived, state.r, state.g, state.b
+end
+
+-- The GPS panel shows the arrow: hide this module's own frame but keep the
+-- arrival logic running.
+function AR:SetEmbedded(on)
+	on = on and true or false
+	if on == embedded then return end
+	embedded = on
+	refresh()
+end
+
+function AR:IsEmbedded() return embedded end
 
 ---------------------------------------------------------------------------
 -- Lifecycle

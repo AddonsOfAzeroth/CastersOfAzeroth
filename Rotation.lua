@@ -483,12 +483,38 @@ function R:Tick()
 	if mapDirty or GetTime() - mapTime > 1 then pcall(self.RebuildMap, self) end
 	local ok, list = pcall(self.Evaluate, self)
 	if not ok then
-		if CK.debug then CK:Print("rotatie:", list) end
+		self.lastError = tostring(list)
+		if CK.debug then CK:Print("rotation:", list) end
 		list = {}
 	end
 	self.current = list
 	self:UpdateGlows(list)
 	self:UpdateHint(list)
+end
+
+-- /ck rot: print what the helper sees right now (for troubleshooting)
+function R:Diagnose()
+	local cfg = CK.char.rotation
+	local spec, key = CK:GetSpec()
+	local c = self.ctx
+	CK:Print(("rotation: enabled=%s glow=%s source=%s spec=%s blizzard=%s"):format(
+		tostring(cfg.enabled), tostring(cfg.glow), tostring(cfg.source), tostring(key), tostring(self:HasBlizzard())))
+	CK:Print(("target: hostile=%s inCombat=%s mana=%s nearby=%s aoe=%s"):format(
+		tostring(c.hostile), tostring(c.inCombat), tostring(c.manaPct), tostring(c.nearby), tostring(c.aoe)))
+	local names = {}
+	for i, e in ipairs(self.current or {}) do
+		local n = #(self:ButtonsFor(e.name) or {})
+		names[#names + 1] = ("%d. %s (%s, %d button%s)"):format(i, e.name, e.kind, n, n == 1 and "" or "s")
+	end
+	CK:Print("suggestions: " .. (#names > 0 and table.concat(names, "  ") or "none"))
+	local known = {}
+	for _, n in ipairs({ "Frostbolt", "Fireball", "Fire Blast", "Frost Nova", "Shoot" }) do
+		known[#known + 1] = n .. "=" .. (CK:Known(n) and "yes" or "no")
+	end
+	CK:Print("spellbook: " .. table.concat(known, " "))
+	local mapped = 0
+	for _ in pairs(map) do mapped = mapped + 1 end
+	CK:Print(("buttons found for %d spells; last error: %s"):format(mapped, tostring(self.lastError or "none")))
 end
 
 function R:OnEnable()

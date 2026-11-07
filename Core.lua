@@ -13,6 +13,18 @@ CK.classes = {}
 -- Defaults
 ---------------------------------------------------------------------------
 local charDefaults = {
+	nav = {
+		enabled = true,
+		followQuests = true, -- smart quest route (QuestPlan) after the own stops
+		useFlights = true,   -- suggest known flight paths when they save > 60 s
+		showPanel = true,    -- GPS panel (mover "nav"); off = the small arrow frame
+		panelScale = 1,
+		mapList = true,      -- route list docked to the world map
+		minimap = true,      -- current stop + next 3 on the minimap, with lines
+		autoAdvance = true,  -- own custom waypoints leave the route on arrival
+		queue = {},          -- own stops {mapID, x, y, title, kind, questID}
+		taxiKnown = {},      -- flight path node IDs (and "n:<name>") seen at flight masters
+	},
 	skins = {
 		enabled = true,
 		character = true,
@@ -557,6 +569,7 @@ local PERSONAL = {
 	rotation = { spec = true },
 	bags = { junkList = true },
 	loot = { autoLoot = true },
+	nav = { queue = true, taxiKnown = true },
 }
 
 local function profileCopy(src)
@@ -633,6 +646,8 @@ SlashCmdList.CASTERKIT = function(msg)
 	elseif msg == "debug" then
 		CK.debug = not CK.debug
 		CK:Print("debug", CK.debug and CK.L["on"] or CK.L["off"])
+	elseif msg == "rot" then
+		if CK.Rotation and CK.Rotation.Diagnose then CK.Rotation:Diagnose() end
 	elseif msg == "aoe" then
 		CK:ToggleAoE()
 	elseif msg == "reset" then
