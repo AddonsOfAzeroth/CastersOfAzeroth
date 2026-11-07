@@ -42,7 +42,7 @@ maar cast nooit zelf iets, verstuurt geen chatberichten en werkt niet met extern
 | `Config.lua` | instellingenvenster, minimapknop |
 
 Een nieuwe class toevoegen: maak `Classes/<Class>.lua` met `CK:RegisterClass("TOKEN", { defaultSpec, specs, specOrder })`
-en zet het in `CasterKit.toc`.
+en zet het in `CastersOfAzeroth.toc`.
 
 ## Bibliotheken
 
