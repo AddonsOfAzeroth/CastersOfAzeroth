@@ -4,7 +4,7 @@ local CK = ns.CK
 local L = CK.L
 local S = CK.Style
 
-local L = CK:NewModule("Leveling")
+local LV = CK:NewModule("Leveling")
 CK.reminderProviders = {}
 
 -- Class modules call this: fn(add) where add{ key, icon, count, warn, always, tooltip, spell, macrotext, onClick }
@@ -41,7 +41,7 @@ local function fmtTime(sec)
 	return ("%d min"):format(math.max(1, sec / 60))
 end
 
-function L:CreateXPBar()
+function LV:CreateXPBar()
 	local holder = CreateFrame("Frame", "CasterKitXP", UIParent, "BackdropTemplate")
 	holder:SetHeight(12)
 	S:Backdrop(holder, 1)
@@ -77,7 +77,7 @@ function L:CreateXPBar()
 	self.xp = holder
 end
 
-function L:PlaceXPBar()
+function LV:PlaceXPBar()
 	local h = self.xp
 	h:ClearAllPoints()
 	h:SetPoint("TOPLEFT", CK.panel, "BOTTOMLEFT", 0, -3)
@@ -86,7 +86,7 @@ function L:PlaceXPBar()
 end
 
 local lastXP
-function L:OnXP()
+function LV:OnXP()
 	local cur, max = UnitXP("player"), UnitXPMax("player")
 	if lastXP then
 		local delta = cur - lastXP.cur
@@ -101,7 +101,7 @@ function L:OnXP()
 	self:UpdateXPBar()
 end
 
-function L:UpdateXPBar()
+function LV:UpdateXPBar()
 	local h = self.xp
 	local show = CK.char.leveling.xpbar and UnitLevel("player") < maxLevel()
 	h:SetShown(show)
@@ -129,7 +129,7 @@ function L:UpdateXPBar()
 	h.text:SetText(table.concat(parts, "  ·  "))
 end
 
-function L:HideBlizzardXP()
+function LV:HideBlizzardXP()
 	if not CK.char.leveling.hideBlizzardXP or not CK.char.leveling.xpbar then return end
 	for _, name in ipairs({ "StatusTrackingBarManager", "MainStatusTrackingBarContainer", "SecondaryStatusTrackingBarContainer" }) do
 		local f = _G[name]
@@ -148,7 +148,7 @@ local slots = {}
 
 local function slot(i)
 	if slots[i] then return slots[i] end
-	local b = CreateFrame("Button", "CasterKitReminder" .. i, L.strip, "SecureActionButtonTemplate,BackdropTemplate")
+	local b = CreateFrame("Button", "CasterKitReminder" .. i, LV.strip, "SecureActionButtonTemplate,BackdropTemplate")
 	b:SetSize(26, 26)
 	b:RegisterForClicks("AnyUp", "AnyDown")
 	S:Backdrop(b, 1)
@@ -169,7 +169,12 @@ local function slot(i)
 		if not self.entry then return end
 		GameTooltip:SetOwner(self, "ANCHOR_TOP")
 		GameTooltip:AddLine(self.entry.tooltip or "", 1, 1, 1, true)
-		if self.entry.spell then GameTooltip:AddLine(L["Click: "] .. self.entry.spell, 0.4, 0.8, 1) end
+		if self.entry.use then
+			GameTooltip:AddLine(L["Left-click: use %s"]:format(CK:ItemName(self.entry.use) or "?"), 0.4, 0.8, 1)
+			if self.entry.spell then GameTooltip:AddLine(L["Right-click: "] .. self.entry.spell, 0.4, 0.8, 1) end
+		elseif self.entry.spell then
+			GameTooltip:AddLine(L["Click: "] .. self.entry.spell, 0.4, 0.8, 1)
+		end
 		GameTooltip:Show()
 	end)
 	b:SetScript("OnLeave", GameTooltip_Hide)
@@ -180,20 +185,20 @@ local function slot(i)
 	return b
 end
 
-function L:CreateStrip()
+function LV:CreateStrip()
 	local f = CreateFrame("Frame", "CasterKitReminders", UIParent)
 	f:SetSize(1, 26)
 	self.strip = f
 end
 
-function L:PlaceStrip()
+function LV:PlaceStrip()
 	local f = self.strip
 	f:ClearAllPoints()
 	f:SetPoint("BOTTOMLEFT", CK.panel, "TOPLEFT", 0, 10)
 	f:SetScale(CK.char.bars.scale)
 end
 
-function L:CollectEntries()
+function LV:CollectEntries()
 	local list = {}
 	local function add(e) list[#list + 1] = e end
 	for _, fn in ipairs(CK.reminderProviders) do pcall(fn, add) end
@@ -204,7 +209,7 @@ function L:CollectEntries()
 	return out
 end
 
-function L:UpdateStrip()
+function LV:UpdateStrip()
 	if not CK.char.leveling.reminders then
 		if not InCombatLockdown() then self.strip:Hide() end
 		return
@@ -227,10 +232,16 @@ function L:UpdateStrip()
 		b.entry = e
 		b.icon:SetTexture(e.icon or 134400)
 		b.count:SetText(e.count or "")
+		-- e.use: left click uses that item, right click casts e.spell (e.g. conjure more)
+		local item = e.use and ("item:" .. e.use) or nil
 		b:SetAttribute("type", e.spell and "spell" or (e.macrotext and "macro") or nil)
 		b:SetAttribute("spell", e.spell)
 		b:SetAttribute("unit", e.spell and "player" or nil)
 		b:SetAttribute("macrotext", e.macrotext)
+		b:SetAttribute("type1", item and "item" or nil)
+		b:SetAttribute("item1", item)
+		b:SetAttribute("type2", item and "spell" or nil)
+		b:SetAttribute("spell2", item and e.spell or nil)
 		if e.warn then
 			b:SetBackdropBorderColor(unpack(S.colors.warn))
 			b.pulse:Play()
@@ -343,7 +354,7 @@ local function grayLevel(pl)
 end
 
 -- Classic formula; Forever may differ, so measured values win when we have them.
-function L:EstimateMobXP(unit)
+function LV:EstimateMobXP(unit)
 	local pl, ml = UnitLevel("player"), UnitLevel(unit)
 	if ml < 0 then ml = pl + 10 end
 	if ml <= grayLevel(pl) then return 0 end
@@ -361,7 +372,7 @@ end
 
 local XP_PATTERN = "^(.+) dies, you gain (%d+) experience"
 
-function L:OnXPMessage(msg)
+function LV:OnXPMessage(msg)
 	if CK.IsSecret(msg) or type(msg) ~= "string" then return end
 	local name, amount = msg:match(XP_PATTERN)
 	amount = tonumber(amount)
@@ -373,7 +384,7 @@ function L:OnXPMessage(msg)
 	CK.char.leveling.mobXP[key] = amount - bonus
 end
 
-function L:TooltipUnit(tooltip, unit)
+function LV:TooltipUnit(tooltip, unit)
 	if not CK.char.leveling.mobTooltip or not unit then return end
 	if not UnitCanAttack("player", unit) or UnitIsPlayer(unit) or UnitIsDead(unit) then return end
 	if UnitLevel("player") >= maxLevel() then return end
@@ -403,7 +414,7 @@ function L:TooltipUnit(tooltip, unit)
 	tooltip:Show()
 end
 
-function L:HookTooltip()
+function LV:HookTooltip()
 	if TooltipDataProcessor and Enum.TooltipDataType then
 		TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Unit, function(tooltip)
 			if tooltip ~= GameTooltip then return end
@@ -421,7 +432,7 @@ end
 ---------------------------------------------------------------------------
 -- Lifecycle
 ---------------------------------------------------------------------------
-function L:OnEnable()
+function LV:OnEnable()
 	self:CreateXPBar()
 	self:CreateStrip()
 	self:PlaceXPBar()

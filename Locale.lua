@@ -229,6 +229,14 @@ add({
 	["A new alt starts with these settings at its first login."] = "Een nieuwe alt begint met deze instellingen bij de eerste login.",
 })
 
+add({
+	["Conjured water: %d"] = "Conjured water: %d",
+	["Conjured food: %d"] = "Conjured food: %d",
+	["Mana gem"] = "Mana gem",
+	["Left-click: use %s"] = "Linksklik: %s gebruiken",
+	["Right-click: "] = "Rechtsklik: ",
+})
+
 -- Key bindings (Bindings.xml); names are read before saved settings load, so English
 BINDING_HEADER_CASTERKIT = "CasterKit"
 BINDING_NAME_CASTERKIT_AOE = "Toggle AoE mode"

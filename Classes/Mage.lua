@@ -215,18 +215,19 @@ CK:AddReminderProvider(function(add)
 	if CK:Known("Conjure Water") then
 		add({ key = "water", icon = bags.bestWater and CK:ItemIcon(bags.bestWater) or CK:SpellTexture("Conjure Water"),
 			count = bags.water, always = true, warn = not inCombat and bags.water < 10,
-			tooltip = L["Conjured water: %d. Click to conjure more."]:format(bags.water), spell = "Conjure Water" })
+			tooltip = L["Conjured water: %d"]:format(bags.water), spell = "Conjure Water", use = bags.bestWater })
 	end
 	if CK:Known("Conjure Food") then
 		add({ key = "food", icon = bags.bestFood and CK:ItemIcon(bags.bestFood) or CK:SpellTexture("Conjure Food"),
 			count = bags.food, always = true, warn = not inCombat and bags.food < 5,
-			tooltip = L["Conjured food: %d. Click to conjure more."]:format(bags.food), spell = "Conjure Food" })
+			tooltip = L["Conjured food: %d"]:format(bags.food), spell = "Conjure Food", use = bags.bestFood })
 	end
 
 	local gemSpell = firstKnown(GEM_SPELLS)
 	if gemSpell then
 		add({ key = "gem", icon = CK:SpellTexture(gemSpell), count = bags.gems > 0 and bags.gems or nil,
-			warn = not inCombat and bags.gems == 0, tooltip = L["No mana gem in your bags."], spell = gemSpell })
+			warn = not inCombat and bags.gems == 0, spell = gemSpell, use = bags.gem,
+			tooltip = bags.gem and L["Mana gem"] or L["No mana gem in your bags."] })
 	end
 
 	-- Eat and drink with one click (out of combat, when you need it)
