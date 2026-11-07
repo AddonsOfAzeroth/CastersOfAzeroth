@@ -28,8 +28,6 @@ local SKIP = {
 	red = { "Later", "Much higher level: come back later." },
 }
 
-local hider = CreateFrame("Frame")
-hider:Hide()
 
 ---------------------------------------------------------------------------
 -- Small safe helpers: values that are secret or of the wrong type become default
@@ -775,20 +773,18 @@ function Q:Render(total, tracked)
 end
 
 ---------------------------------------------------------------------------
--- Hiding Blizzard's and Questie's trackers (frames are parked on a hidden parent)
+-- Hiding Blizzard's and Questie's trackers. Only Hide() on show: re-parenting
+-- the tracker taints Edit Mode's frame layout (blocked actions).
 ---------------------------------------------------------------------------
 local function keepHidden(frame)
-	if not frame or not frame.SetParent then return end
+	if not frame or not frame.Hide then return end
 	if not frame.ckQuestHidden then
 		frame.ckQuestHidden = true
-		local key = "quests-park-" .. (frame:GetName() or tostring(frame))
-		hooksecurefunc(frame, "SetParent", function(f, parent)
-			if parent ~= hider and f.ckQuestHidden then
-				CK:OutOfCombat(key, function() f:SetParent(hider) end)
-			end
+		frame:HookScript("OnShow", function(f)
+			if f.ckQuestHidden then f:Hide() end
 		end)
 	end
-	if frame:GetParent() ~= hider then frame:SetParent(hider) end
+	frame:Hide()
 end
 
 local BLIZZARD = { "ObjectiveTrackerFrame", "QuestWatchFrame", "WatchFrame" }

@@ -334,6 +334,8 @@ end
 -- Data provider (preferred): pins scale and pan with the map
 ---------------------------------------------------------------------------
 local function setupProvider()
+	-- disabled: writing WMF.pinPools / adding a provider taints the map (blocked actions)
+	if true then return false end
 	if not (WMF and WMF.AddDataProvider and WMF.pinPools and WMF.AcquirePin and WMF.RemoveAllPinsByTemplate
 		and MapCanvasDataProviderMixin and MapCanvasPinMixin and CreateFromMixins and Mixin) then
 		return false
@@ -499,38 +501,18 @@ local function updateCoords()
 end
 
 ---------------------------------------------------------------------------
--- Fade while moving (replaces Blizzard's mapFade fader while enabled)
+-- Fade while moving: Blizzard's own fader (CVar mapFade), so we never touch
+-- the map's alpha or the fader's frame list
 ---------------------------------------------------------------------------
-local fadeTarget = 1
-
-local function stopBlizzardFade(frame)
-	if frame == WMF and on() and PlayerMovementFrameFader and PlayerMovementFrameFader.RemoveFrame then
-		pcall(PlayerMovementFrameFader.RemoveFrame, WMF)
-	end
-end
-
-local function updateFadeTarget()
-	local m = db()
-	if not on("fadeMoving") then
-		fadeTarget = 1
-		return
-	end
-	local moving = IsPlayerMoving and try(IsPlayerMoving)
-	if IsSecret(moving) then moving = false end
-	local over = WMF:IsMouseOver()
-	if IsSecret(over) then over = false end
-	fadeTarget = (moving and not over) and (num(m.fadeAlpha) or 0.5) or 1
-end
-
-local function stepAlpha(elapsed)
-	local cur = num(WMF:GetAlpha()) or 1
-	local diff = fadeTarget - cur
-	if math.abs(diff) < 0.01 then
-		if cur ~= fadeTarget then WMF:SetAlpha(fadeTarget) end
-		return
-	end
-	local step = math.min(1, elapsed * 6)
-	WMF:SetAlpha(cur + diff * step)
+local function applyFade()
+	local setCVar = C_CVar and C_CVar.SetCVar or SetCVar
+	local getCVar = C_CVar and C_CVar.GetCVar or GetCVar
+	if not setCVar or not getCVar then return end
+	local want = on("fadeMoving") and "1" or "0"
+	if not on() then return end
+	CK:OutOfCombat("mapFade", function()
+		if getCVar("mapFade") ~= want then pcall(setCVar, "mapFade", want) end
+	end)
 end
 
 ---------------------------------------------------------------------------
@@ -545,7 +527,6 @@ local function tick(elapsed)
 	if elapsedTotal >= TICK then
 		elapsedTotal = 0
 		if on("coords") then updateCoords() end
-		updateFadeTarget()
 		-- keep the player line on the player
 		if playerLine then
 			local px, py = playerPos(shownMapID())
@@ -560,7 +541,6 @@ local function tick(elapsed)
 			end
 		end
 	end
-	stepAlpha(elapsed)
 end
 
 local function onUpdate(_, elapsed)
@@ -576,17 +556,6 @@ end
 ---------------------------------------------------------------------------
 -- Look: scale, border, coords visibility
 ---------------------------------------------------------------------------
-local function applyScale()
-	CK:OutOfCombat("mapScale", function()
-		guard("scale", function()
-			if not WMF then return end
-			local s = 1
-			if on() and not isMaximized() then s = num(db().scale) or 1 end
-			if math.abs((num(WMF:GetScale()) or 1) - s) > 0.001 then WMF:SetScale(s) end
-		end)
-	end)
-end
-
 local function applyLook()
 	if not WMF then return end
 	local enabled = on()
@@ -614,12 +583,7 @@ local function applyLook()
 			ticker:SetScript("OnUpdate", nil)
 		end
 	end
-	if not on("fadeMoving") then
-		fadeTarget = 1
-		WMF:SetAlpha(1)
-	end
-	if enabled and WMF:IsShown() then stopBlizzardFade(WMF) end
-	applyScale()
+	applyFade()
 end
 
 function MP:Apply()
@@ -647,21 +611,11 @@ local function setup()
 
 	WMF:HookScript("OnShow", function()
 		guard("show", function()
-			stopBlizzardFade(WMF)
 			applyLook()
 			if on("coords") then updateCoords() end
 		end)
 		MP:Refresh()
 	end)
-	WMF:HookScript("OnHide", function()
-		fadeTarget = 1
-		if on() then pcall(WMF.SetAlpha, WMF, 1) end
-	end)
-	if PlayerMovementFrameFader and PlayerMovementFrameFader.AddDeferredFrame then
-		hooksecurefunc(PlayerMovementFrameFader, "AddDeferredFrame", function(frame) stopBlizzardFade(frame) end)
-	end
-	if WMF.Maximize then hooksecurefunc(WMF, "Maximize", applyScale) end
-	if WMF.Minimize then hooksecurefunc(WMF, "Minimize", applyScale) end
 
 	MP:Apply()
 end
