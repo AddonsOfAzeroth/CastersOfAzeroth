@@ -516,6 +516,17 @@ local function buildNodes(quests)
 	return nodes, noStop
 end
 
+-- The stop we are heading to stays first unless another one is clearly better,
+-- so the route doesn't flip between quests while you walk around.
+local STICKY = 1.5
+local heading -- { id = questID, turnIn = bool } of the current first stop
+
+local function holds(n, h)
+	for _, q in ipairs(n.quests) do
+		if q.questID == h.id and (q.turnIn and true or false) == h.turnIn then return true end
+	end
+end
+
 local function planRoute(quests, start, speed)
 	local nodes, noStop = buildNodes(quests)
 	-- greedy: best value per second (travel + work) from the current spot
@@ -531,6 +542,19 @@ local function planRoute(quests, start, speed)
 		cur = n
 	end
 	twoOpt(order, start, speed)
+	if heading and #order > 1 and not holds(order[1], heading) then
+		for i = 2, #order do
+			if holds(order[i], heading) then
+				local function score(n) return n.value / (travelTime(start, n, speed) + n.work + 5) end
+				if score(order[1]) < score(order[i]) * STICKY then
+					table.insert(order, 1, table.remove(order, i))
+				end
+				break
+			end
+		end
+	end
+	local first = order[1] and order[1].quests[1]
+	heading = first and { id = first.questID, turnIn = first.turnIn and true or false } or nil
 	-- quests without a stop: by value per work second
 	table.sort(noStop, function(a, b)
 		return a.value / (a.work + TRAVEL_UNKNOWN) > b.value / (b.work + TRAVEL_UNKNOWN)
