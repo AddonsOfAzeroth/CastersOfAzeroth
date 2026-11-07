@@ -1383,7 +1383,7 @@ local function placeMapList()
 		f:SetPoint("TOPLEFT", WMF, "TOPRIGHT", 3, 0)
 	end
 	local base = sc and sc:GetFrameLevel() or WMF:GetFrameLevel()
-	f:SetFrameLevel(math.min(9000, base + 1500))
+	f:SetFrameLevel(math.min(9500, base + 6000))
 end
 
 local function applyMapList()
