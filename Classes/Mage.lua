@@ -183,6 +183,12 @@ local Mage = {
 		ARCANE = { name = "Arcane", icon = 135932, rotation = arcane },
 	},
 	specOrder = { "FROST", "FIRE", "ARCANE" },
+	-- buff buttons the settings can switch on/off: { key, label }
+	buffOptions = {
+		{ "armor", "Armor (Frost, Ice or Mage Armor)" },
+		{ "intellect", "Arcane Intellect" },
+		{ "dampen", "Dampen Magic (solo only)" },
+	},
 }
 
 -- Applies with or without a target.
@@ -243,8 +249,9 @@ CK:AddReminderProvider(function(add)
 		end
 	end
 
-	-- buffs: always shown with time left, red when missing or under 5 minutes
+	-- buffs: shown always (or only when low, per setting), red when missing or running low
 	local function buff(key, names, spell, missingText)
+		if CK.char.leveling.buffsOff[key] then return end
 		local found
 		for _, n in ipairs(names) do
 			if CK:FindAura("player", n, "HELPFUL") then found = n break end
@@ -254,8 +261,9 @@ CK:AddReminderProvider(function(add)
 		if left and left ~= math.huge and left ~= 1 then
 			text = left >= 3600 and ("%dh"):format(left / 3600) or (left >= 60 and ("%dm"):format(left / 60) or ("%ds"):format(left))
 		end
-		local low = not found or (left and left ~= 1 and left < 300)
-		add({ key = key, icon = CK:SpellTexture(spell), count = text, always = true,
+		local cfg = CK.char.leveling
+		local low = not found or (left and left ~= 1 and left < cfg.buffWarnMinutes * 60)
+		add({ key = key, icon = CK:SpellTexture(spell), count = text, always = cfg.buffMode == "always" or low,
 			warn = not inCombat and low, spell = spell,
 			tooltip = found and found or missingText })
 	end

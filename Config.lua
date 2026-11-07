@@ -422,6 +422,16 @@ function C:BuildLeveling(p)
 	p:Check(L["Hide Blizzard XP bar"], nil, setting("leveling", "hideBlizzardXP"))
 	p:Check(L["Kills to level in enemy tooltips"], nil, setting("leveling", "mobTooltip"))
 	p:Check(L["Reminders (water, food, buffs, bags…)"], nil, setting("leveling", "reminders"))
+	p:Choice(L["Buff buttons"], { { "always", L["Always, with timer"] }, { "missing", L["Only when missing or running low"] } }, setting("leveling", "buffMode"))
+	local getB, setB = setting("leveling", "buffWarnMinutes")
+	p:Slider(L["Running low below"], 1, 15, 1, getB, setB, function(v) return L["%d min"]:format(v) end)
+	local def = CK:GetClass()
+	for _, opt in ipairs(def and def.buffOptions or {}) do
+		local key = opt[1]
+		p:Check("   " .. L[opt[2]], nil,
+			function() return not CK.char.leveling.buffsOff[key] end,
+			function(v) CK.char.leveling.buffsOff[key] = (not v) or nil; changed("leveling") end)
+	end
 	p:Check(L["Notify: new spells at the trainer"], nil, setting("leveling", "trainer"))
 	p:Check(L["Notify: talent points available"], nil, setting("leveling", "talents"))
 	p:Gap()

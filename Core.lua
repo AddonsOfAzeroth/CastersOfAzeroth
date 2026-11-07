@@ -42,6 +42,9 @@ local charDefaults = {
 		xpbar = true,
 		hideBlizzardXP = true,
 		mobTooltip = true,
+		buffMode = "always", -- "always" or "missing"
+		buffWarnMinutes = 5,
+		buffsOff = {}, -- [key] = true hides that buff button
 		mobXP = {},
 		reminders = true,
 		trainer = true,

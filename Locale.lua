@@ -241,6 +241,19 @@ add({
 	["Dampen Magic is missing (solo: less magic damage taken)."] = "Dampen Magic ontbreekt (solo: minder magische schade).",
 })
 
+add({
+	["Buff buttons"] = "Buffknopjes",
+	["Always, with timer"] = "Altijd, met timer",
+	["Only when missing or running low"] = "Enkel als ze ontbreken of bijna op zijn",
+	["Running low below"] = "Bijna op onder",
+	["%d min"] = "%d min",
+})
+
+add({
+	["Armor (Frost, Ice or Mage Armor)"] = "Armor (Frost, Ice of Mage Armor)",
+	["Dampen Magic (solo only)"] = "Dampen Magic (enkel solo)",
+})
+
 -- Key bindings (Bindings.xml); names are read before saved settings load, so English
 BINDING_HEADER_CASTERKIT = "CasterKit"
 BINDING_NAME_CASTERKIT_AOE = "Toggle AoE mode"
