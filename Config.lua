@@ -406,7 +406,7 @@ function C:BuildQuests(p)
 	p:Slider(L["Quests shown"], 3, 25, 1, setting("quests", "maxQuests"))
 	p:Slider(L["Width"], 180, 400, 10, setting("quests", "width"))
 	p:Slider(L["Font size"], 10, 16, 1, setting("quests", "fontSize"))
-	p:Note(L["Click a quest title to fold it open or closed; click the lines under it (or Shift-click the title) to open it in the quest log. Right-click sets the arrow. Unlock the frames (General) to move the list."])
+	p:Note(L["Click a quest title to select it: the arrow points to it (click again for the route). Right-click folds it open or closed. Click the lines under it (or Shift-click the title) to open it in the quest log. Unlock the frames (General) to move the list."])
 end
 
 function C:BuildMap(p)

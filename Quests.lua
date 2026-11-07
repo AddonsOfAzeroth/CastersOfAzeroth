@@ -366,6 +366,7 @@ local function setWaypoint(questID, title)
 		if ok then
 			Q.manualArrow = true
 			Q.arrowKey = nil
+			Q.selected = questID
 		end
 	end
 end
@@ -379,6 +380,7 @@ function Q:UpdateArrow()
 		local m = A.GetTarget and try(A.GetTarget, A)
 		if m then return end
 		self.manualArrow = false
+		self.selected = nil
 	end
 	local cfg = CK.char.quests
 	local stop = cfg.enabled and cfg.arrow and nextStop()
@@ -416,13 +418,19 @@ local function onTitleClick(self, button)
 	guard(function()
 		local id = self.questID
 		if not id then return end
-		if button == "RightButton" then
-			setWaypoint(id, self.questTitle)
-		elseif IsShiftKeyDown() then
+		if IsShiftKeyDown() then
 			openQuest(id, self.logIndex)
-		else
+		elseif button == "RightButton" then
 			local c = CK.char.quests.collapsed
 			c[id] = not c[id] or nil
+			Q:Redraw()
+		elseif Q.selected == id then
+			-- click the selected quest again: back to the route
+			Q.selected, Q.manualArrow, Q.arrowKey = nil, false, nil
+			if CK.Arrow and CK.Arrow.Clear then pcall(CK.Arrow.Clear, CK.Arrow) end
+			Q:Redraw()
+		else
+			setWaypoint(id, self.questTitle)
 			Q:Redraw()
 		end
 	end)
@@ -449,7 +457,7 @@ end
 function Q:TitleRow(i)
 	local t = titles[i]
 	if t then return t end
-	t = CreateFrame("Button", nil, self.panel)
+	t = CreateFrame("Button", nil, self.content)
 	t:RegisterForClicks("LeftButtonUp", "RightButtonUp")
 	t:SetScript("OnClick", onTitleClick)
 	local hl = t:CreateTexture(nil, "HIGHLIGHT")
@@ -487,7 +495,7 @@ end
 function Q:LineRow(i)
 	local o = lines[i]
 	if o then return o end
-	o = CreateFrame("Button", nil, self.panel)
+	o = CreateFrame("Button", nil, self.content)
 	o:RegisterForClicks("LeftButtonUp", "RightButtonUp")
 	o:SetScript("OnClick", onLineClick)
 	local hl = o:CreateTexture(nil, "HIGHLIGHT")
@@ -575,10 +583,45 @@ function Q:CreatePanel()
 	bar:Hide()
 	self.nextBar = bar
 
+	-- Rows live on a scrolling content frame under the header
+	local sc = CreateFrame("ScrollFrame", nil, p)
+	sc:EnableMouseWheel(true)
+	local content = CreateFrame("Frame", nil, sc)
+	content:SetSize(10, 10)
+	sc:SetScrollChild(content)
+	sc:SetScript("OnMouseWheel", function(frame, delta)
+		local max = frame:GetVerticalScrollRange() or 0
+		local v = math.max(0, math.min(max, (frame:GetVerticalScroll() or 0) - delta * 40))
+		frame:SetVerticalScroll(v)
+		Q:UpdateScrollbar()
+	end)
+	local thumb = p:CreateTexture(nil, "OVERLAY")
+	thumb:SetColorTexture(a[1], a[2], a[3], 0.6)
+	thumb:SetWidth(2)
+	thumb:Hide()
+	self.scroll, self.content, self.thumb = sc, content, thumb
+	bar:SetParent(content)
+
 	S:RegisterMover(p, "quests", L["Quests"], function(f)
 		-- under the minimap
 		f:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -10, -230)
-	end)
+	end, true)
+end
+
+function Q:UpdateScrollbar()
+	local sc, thumb = self.scroll, self.thumb
+	local max = sc:GetVerticalScrollRange() or 0
+	local h = sc:GetHeight() or 0
+	if max <= 1 or h <= 0 then
+		thumb:Hide()
+		return
+	end
+	local th = math.max(16, h * h / (h + max))
+	local pos = (sc:GetVerticalScroll() or 0) / max
+	thumb:ClearAllPoints()
+	thumb:SetPoint("TOPRIGHT", sc, "TOPRIGHT", -1, -(h - th) * pos)
+	thumb:SetHeight(th)
+	thumb:Show()
 end
 
 local function titleString(q)
@@ -686,7 +729,7 @@ local function placeLine(self, y, inner, size, text, color, have, need, pct)
 		o.bar:Hide()
 	end
 	o:ClearAllPoints()
-	o:SetPoint("TOPLEFT", self.panel, "TOPLEFT", PAD + INDENT, y)
+	o:SetPoint("TOPLEFT", self.content, "TOPLEFT", PAD + INDENT, y - self.y0)
 	o:SetSize(w, h + barH)
 	o:Show()
 	return y - (h + barH + GAP)
@@ -714,6 +757,8 @@ function Q:Render(total, tracked)
 	mb.text:SetText("· " .. L[MODE_NAMES[mode] or MODE_NAMES.smart])
 	mb:SetSize((mb.text:GetStringWidth() or 40) + 4, size + 4)
 	local y = -PAD - (size + 6)
+	self.y0 = y
+	local content = self.content
 
 	local smart = mode == "smart" and self.usingPlan
 	local accentHex = hex(S.colors.accent)
@@ -738,6 +783,7 @@ function Q:Render(total, tracked)
 			local rank = smart and plan and num(plan.rank)
 			local s = titleString(q)
 			if rank then s = "|cff" .. accentHex .. rank .. ".|r " .. s end
+			if self.selected == q.id then s = "|cff" .. accentHex .. ">|r " .. s end
 			t.text:SetText(s)
 			t.text:SetTextColor(levelColor(q.level))
 			local skip = plan and Safe(plan.skip, nil)
@@ -752,7 +798,7 @@ function Q:Render(total, tracked)
 			local collapsed = cfg.collapsed[q.id]
 			t.mark:SetText(collapsed and "+" or "")
 			t:ClearAllPoints()
-			t:SetPoint("TOPLEFT", p, "TOPLEFT", PAD, y)
+			t:SetPoint("TOPLEFT", content, "TOPLEFT", PAD, y - self.y0)
 			t:SetSize(inner, size + 4)
 			t:Show()
 			y = y - (size + 4)
@@ -780,7 +826,7 @@ function Q:Render(total, tracked)
 			if smart and qi == 1 then
 				local bar = self.nextBar
 				bar:ClearAllPoints()
-				bar:SetPoint("TOPLEFT", p, "TOPLEFT", PAD - 4, top)
+				bar:SetPoint("TOPLEFT", content, "TOPLEFT", PAD - 4, top - self.y0)
 				bar:SetHeight(math.max(1, top - y - GAP))
 				bar:Show()
 			end
@@ -790,7 +836,27 @@ function Q:Render(total, tracked)
 
 	for i = ti + 1, #titles do titles[i]:Hide() end
 	for i = lineCount + 1, #lines do lines[i]:Hide() end
-	p:SetHeight(-y + PAD - GAP * 2)
+
+	-- fit on screen: the list scrolls when it would run off the bottom
+	local contentH = math.max(1, self.y0 - y - GAP * 2)
+	local full = -self.y0 + contentH + PAD
+	local top = p:GetTop()
+	local room = top and (top - 10) or full
+	local height = math.min(full, math.max(room, -self.y0 + PAD + 20))
+	local sc = self.scroll
+	content:SetSize(width, contentH)
+	sc:ClearAllPoints()
+	sc:SetPoint("TOPLEFT", p, "TOPLEFT", 0, self.y0)
+	sc:SetPoint("BOTTOMRIGHT", p, "BOTTOMRIGHT", 0, PAD)
+	p:SetHeight(height)
+	local max = math.max(0, contentH - (height + self.y0 - PAD))
+	if (sc:GetVerticalScroll() or 0) > max then sc:SetVerticalScroll(max) end
+	sc:EnableMouseWheel(max > 0) -- otherwise the wheel keeps zooming the camera
+	if sc.UpdateScrollChildRect then sc:UpdateScrollChildRect() end
+	self:UpdateScrollbar()
+	-- old saved positions were anchored by their centre: switch to the top edge once
+	local pt = CK.char.points.quests
+	if pt and pt[1] ~= "TOPLEFT" and pt[1] ~= "TOPRIGHT" then S:AnchorTop(p, "quests") end
 end
 
 ---------------------------------------------------------------------------
@@ -900,6 +966,10 @@ function Q:Refresh()
 end
 
 function Q:OnEnable()
+	local cfg = CK.char.quests
+	if not cfg.arrowDefaultOn then
+		cfg.arrow, cfg.arrowDefaultOn = true, true
+	end
 	self:CreatePanel()
 	local function update(event, unit)
 		if event == "UNIT_QUEST_LOG_CHANGED" and Safe(unit, nil) ~= "player" then return end
@@ -922,6 +992,7 @@ function Q:OnEnable()
 	-- arrived at the arrow's target: point at the plan's next stop when it changed
 	CK:Listen("ARROW_ARRIVED", function()
 		self.manualArrow = false
+		self.selected = nil
 		guard(self.Schedule, self)
 	end)
 	self:Refresh()

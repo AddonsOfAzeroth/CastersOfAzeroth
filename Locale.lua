@@ -263,7 +263,7 @@ add({
 	["Quests in your current zone first"] = "Quests in je huidige zone eerst",
 	["Hide finished objectives"] = "Afgewerkte doelen verbergen",
 	["Quests shown"] = "Aantal quests",
-	["Click a quest title to fold it open or closed; click the lines under it (or Shift-click the title) to open it in the quest log. Right-click sets the arrow. Unlock the frames (General) to move the list."] = "Klik op een questtitel om hem open of dicht te klappen; klik op de regels eronder (of Shift-klik op de titel) om hem in het questlog te openen. Rechtsklik zet de pijl. Ontgrendel de kaders (Algemeen) om de lijst te verplaatsen.",
+	["Click a quest title to select it: the arrow points to it (click again for the route). Right-click folds it open or closed. Click the lines under it (or Shift-click the title) to open it in the quest log. Unlock the frames (General) to move the list."] = "Klik op een questtitel om hem te selecteren: de pijl wijst ernaar (nog eens klikken voor de route). Rechtsklik klapt hem open of dicht. Klik op de regels eronder (of Shift-klik op de titel) om hem in het questlog te openen. Ontgrendel de kaders (Algemeen) om de lijst te verplaatsen.",
 })
 
 add({

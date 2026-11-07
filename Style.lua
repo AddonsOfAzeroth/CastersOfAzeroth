@@ -79,7 +79,26 @@ function S:ApplyPoint(frame, key)
 	end
 end
 
-function S:RegisterMover(frame, key, label, defaultFn)
+-- Re-anchor a frame by its top edge (TOPLEFT or TOPRIGHT of the screen,
+-- whichever side is nearer), so a change in height grows it downward.
+function S:AnchorTop(frame, key)
+	local left, right, top = frame:GetLeft(), frame:GetRight(), frame:GetTop()
+	if not (left and right and top) then return end
+	local fs, us = frame:GetEffectiveScale(), UIParent:GetEffectiveScale()
+	left, right, top = left * fs / us, right * fs / us, top * fs / us
+	local w, h = UIParent:GetWidth(), UIParent:GetHeight()
+	local pt
+	if (left + right) / 2 > w / 2 then
+		pt = { "TOPRIGHT", "UIParent", "TOPRIGHT", math.floor(right - w + 0.5), math.floor(top - h + 0.5) }
+	else
+		pt = { "TOPLEFT", "UIParent", "TOPLEFT", math.floor(left + 0.5), math.floor(top - h + 0.5) }
+	end
+	CK.char.points[key] = pt
+	frame:ClearAllPoints()
+	frame:SetPoint(pt[1], UIParent, pt[3], pt[4] * us / fs, pt[5] * us / fs)
+end
+
+function S:RegisterMover(frame, key, label, defaultFn, anchorTop)
 	frame:SetMovable(true)
 	frame:SetClampedToScreen(true)
 	local o = CreateFrame("Frame", nil, frame, "BackdropTemplate")
@@ -99,6 +118,10 @@ function S:RegisterMover(frame, key, label, defaultFn)
 	end)
 	o:SetScript("OnDragStop", function()
 		frame:StopMovingOrSizing()
+		if anchorTop then
+			S:AnchorTop(frame, key)
+			return
+		end
 		local p, _, rp, x, y = frame:GetPoint()
 		CK.char.points[key] = { p, "UIParent", rp, math.floor(x + 0.5), math.floor(y + 0.5) }
 	end)

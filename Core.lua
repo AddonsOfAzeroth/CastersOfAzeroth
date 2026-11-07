@@ -98,7 +98,7 @@ local charDefaults = {
 		allCollapsed = false,
 		sortMode = "smart", -- smart, distance, xp, xpmin, level, progress, zone
 		showEstimates = true,
-		arrow = false, -- CasterKit arrow (Arrow.lua) to the next stop
+		arrow = true, -- CasterKit arrow (Arrow.lua) to the next stop
 	},
 	tooltip = {
 		anchor = true,
