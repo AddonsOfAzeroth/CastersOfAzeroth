@@ -163,6 +163,11 @@ local function DotOnEnter(dot)
 		local stop = dot.stop
 		if not stop then return end
 		GameTooltip:SetOwner(dot, "ANCHOR_RIGHT")
+		if stop.target then
+			GameTooltip:AddLine(stop.title or L["Next stop"], 1, 1, 1)
+			GameTooltip:Show()
+			return
+		end
 		local a = S.colors.accent
 		GameTooltip:AddLine(L["Stop %d"]:format(num(stop.rank) or 0), a[1], a[2], a[3])
 		if type(stop.questIDs) == "table" then
@@ -209,7 +214,11 @@ local function PaintPin(pin, stop)
 	local dot = pin.dot
 	dot.stop = stop
 	local rank = num(stop.rank) or 0
-	if stop.turnIn then
+	if stop.target then
+		dot.fill:SetVertexColor(1, 1, 1, 1)
+		dot.text:SetText("")
+		dot.sub:Hide()
+	elseif stop.turnIn then
 		local h = S.colors.hint
 		dot.fill:SetVertexColor(h[1], h[2], h[3], 1)
 		dot.text:SetText("?")
@@ -253,11 +262,16 @@ local function hideLines()
 		ln:ClearAllPoints()
 	end
 	playerLine, playerX, playerY = nil, nil, nil
+	targetLine = nil
+	if targetPin then targetPin:Hide() end
 end
 
 local function updateThickness()
-	local t = LINE_WIDTH / canvasScale()
+	local s = canvasScale()
+	local t = LINE_WIDTH / s
 	for _, ln in ipairs(lines) do ln:SetThickness(t) end
+	for _, pin in ipairs(fallbackPins) do if pin.dot then pin.dot:SetScale(1 / s) end end
+	if targetPin and targetPin.dot then targetPin.dot:SetScale(1 / s) end
 end
 
 local function getLine(i)
@@ -274,12 +288,14 @@ local function getLine(i)
 end
 
 -- Move the start of the player line to the player's current spot
+local targetLine, targetPin
 local function placePlayerLine(x, y)
 	local c = canvas()
-	if not playerLine or not c then return end
+	if not (playerLine or targetLine) or not c then return end
 	local w, h = num(c:GetWidth()), num(c:GetHeight())
 	if not w or not h then return end
-	playerLine:SetStartPoint("TOPLEFT", c, x * w, -y * h)
+	if playerLine then playerLine:SetStartPoint("TOPLEFT", c, x * w, -y * h) end
+	if targetLine then targetLine:SetStartPoint("TOPLEFT", c, x * w, -y * h) end
 	playerX, playerY = x, y
 end
 
@@ -293,6 +309,7 @@ local function drawLines(pins, route, mapID)
 		if not low or lv < low then low = lv end
 	end
 	lineHolder:SetFrameLevel(math.max(1, (low or 2) - 1))
+	lineHolder:Show()
 	local n = 0
 	-- player to the first route stop, when both are on this map
 	if pins[1].stop == route[1] then
@@ -434,7 +451,8 @@ local function drawFallback()
 			BuildPin(pin)
 			fallbackPins[i] = pin
 		end
-		pin:SetFrameLevel(c:GetFrameLevel() + 50)
+		pin:SetFrameLevel(math.min(9000, c:GetFrameLevel() + 2000))
+		pin.dot:SetScale(1 / canvasScale())
 		pin:ClearAllPoints()
 		pin:SetPoint("CENTER", c, "TOPLEFT", s.x * w, -s.y * h)
 		PaintPin(pin, s.stop)
@@ -444,6 +462,43 @@ local function drawFallback()
 	drawLines(pins, route, mapID)
 end
 
+-- The arrow's target (a quest picked in the list): white pin with a line from you
+local function drawTarget()
+	local A = CK.Arrow
+	local c = canvas()
+	if not (A and A.GetTarget and c and on("route")) then return end
+	local m, tx, ty, title = A:GetTarget()
+	local mapID = shownMapID()
+	if not (m and mapID) then return end
+	local x, y = project({ mapID = m, x = tx, y = ty }, mapID)
+	if not x then return end
+	local w, h = num(c:GetWidth()), num(c:GetHeight())
+	if not w or not h or not ensureHolder() then return end
+	if not targetPin then
+		targetPin = CreateFrame("Frame", nil, c)
+		BuildPin(targetPin)
+	end
+	targetPin:SetFrameLevel(math.min(9000, c:GetFrameLevel() + 2001))
+	targetPin.dot:SetScale(1 / canvasScale())
+	targetPin:ClearAllPoints()
+	targetPin:SetPoint("CENTER", c, "TOPLEFT", x * w, -y * h)
+	PaintPin(targetPin, { target = true, title = title, mapID = m, x = tx, y = ty })
+	targetPin:Show()
+	local px, py = playerPos(mapID)
+	if not px then return end
+	lineHolder:SetFrameLevel(math.min(9000, c:GetFrameLevel() + 1999))
+	lineHolder:Show()
+	local idx = #lines + 1
+	for i, l in ipairs(lines) do
+		if not l:IsShown() then idx = i break end
+	end
+	local ln = getLine(idx)
+	ln:SetColorTexture(1, 1, 1, 0.85)
+	ln:SetEndPoint("CENTER", targetPin, 0, 0)
+	targetLine = ln
+	placePlayerLine(px, py)
+end
+
 function MP:Refresh()
 	if not WMF then return end
 	if provider then
@@ -451,6 +506,7 @@ function MP:Refresh()
 	else
 		guard("fallback", drawFallback)
 	end
+	guard("target", drawTarget)
 end
 
 ---------------------------------------------------------------------------
@@ -528,7 +584,7 @@ local function tick(elapsed)
 		elapsedTotal = 0
 		if on("coords") then updateCoords() end
 		-- keep the player line on the player
-		if playerLine then
+		if playerLine or targetLine then
 			local px, py = playerPos(shownMapID())
 			if px and (px ~= playerX or py ~= playerY) then placePlayerLine(px, py) end
 		end
@@ -556,9 +612,66 @@ end
 ---------------------------------------------------------------------------
 -- Look: scale, border, coords visibility
 ---------------------------------------------------------------------------
+local skinBg
+local skinned = {}
+local function setArtAlpha(a)
+	local bf = WMF.BorderFrame
+	if not bf then return end
+	local function fade(region)
+		if region and region.SetAlpha then
+			region:SetAlpha(a)
+			skinned[region] = true
+		end
+	end
+	-- textures directly on the border frame (background, title bar, streaks)
+	for _, r in ipairs({ bf:GetRegions() }) do
+		if r.GetObjectType and r:GetObjectType() == "Texture" then fade(r) end
+	end
+	fade(bf.NineSlice)
+	fade(bf.PortraitContainer)
+	fade(bf.Portrait)
+	fade(bf.portrait)
+	fade(bf.TopTileStreaks)
+	fade(bf.InsetBorderTop)
+	fade(bf.Tutorial)
+	-- navigation bar art (its buttons stay)
+	local nav = WMF.NavBar
+	if nav then
+		for _, r in ipairs({ nav:GetRegions() }) do
+			if r.GetObjectType and r:GetObjectType() == "Texture" then fade(r) end
+		end
+		fade(nav.overlay)
+		fade(nav.InsetBorderBottomLeft)
+		fade(nav.InsetBorderBottomRight)
+		fade(nav.InsetBorderBottom)
+		fade(nav.InsetBorderLeft)
+		fade(nav.InsetBorderRight)
+	end
+end
+
+local function applySkin()
+	if not WMF then return end
+	local want = on() and on("skin")
+	if want then
+		if not skinBg then
+			skinBg = CreateFrame("Frame", nil, WMF, "BackdropTemplate")
+			skinBg:SetAllPoints(WMF)
+			skinBg:SetFrameLevel(math.max(0, WMF:GetFrameLevel() - 1))
+			skinBg:EnableMouse(false)
+			S:Backdrop(skinBg)
+		end
+		skinBg:Show()
+		setArtAlpha(0)
+	elseif skinBg then
+		skinBg:Hide()
+		for region in pairs(skinned) do region:SetAlpha(1) end
+	end
+end
+
 local function applyLook()
 	if not WMF then return end
 	local enabled = on()
+	applySkin()
 	createCoords()
 	if coordsBar then coordsBar:SetShown(on("coords")) end
 	local bc = blizzardCoords()
@@ -684,6 +797,10 @@ function MP:OnEnable()
 end
 
 CK:Listen("QUESTPLAN", function()
+	if WMF and WMF:IsShown() then MP:Refresh() end
+end)
+
+CK:Listen("ARROW_TARGET", function()
 	if WMF and WMF:IsShown() then MP:Refresh() end
 end)
 

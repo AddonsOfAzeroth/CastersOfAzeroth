@@ -272,6 +272,7 @@ function AR:SetTarget(mapID, x, y, title)
 	end
 	build()
 	refresh()
+	CK:Fire("ARROW_TARGET")
 end
 
 function AR:Clear()
@@ -279,6 +280,7 @@ function AR:Clear()
 	lastDist = nil
 	if frame and GameTooltip:GetOwner() == frame then GameTooltip:Hide() end
 	refresh()
+	CK:Fire("ARROW_TARGET")
 end
 
 function AR:GetTarget()

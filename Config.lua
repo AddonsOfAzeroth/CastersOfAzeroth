@@ -412,6 +412,7 @@ end
 function C:BuildMap(p)
 	p:Header(L["World map"])
 	p:Check(L["CasterKit map upgrade"], nil, setting("map", "enabled"))
+	p:Check(L["Flat map frame"], L["Hides Blizzard's frame art (borders, title bar, portrait)."], setting("map", "skin"))
 	p:Check(L["Show the quest route on the map"], L["Numbered stops in the fastest order, with lines between them."], setting("map", "route"))
 	p:Check(L["Coordinates (player and cursor)"], nil, setting("map", "coords"))
 	p:Check(L["Coordinates on the minimap"], L["Unlock the frames to move them."], setting("map", "minimapCoords"))

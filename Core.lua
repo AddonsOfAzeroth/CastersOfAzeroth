@@ -110,6 +110,7 @@ local charDefaults = {
 		route = true,
 		coords = true,
 		minimapCoords = true,
+		skin = true, -- flat look: Blizzard's frame art hidden
 		fadeMoving = true,
 		fadeAlpha = 0.5,
 		scale = 1,
