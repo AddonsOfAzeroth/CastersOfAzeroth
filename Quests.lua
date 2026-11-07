@@ -338,6 +338,19 @@ function Q:Collect()
 	for _, q in ipairs(list) do q.planPos, q.plan = nil, nil end
 	self.usingPlan = applyPlan(cfg.sortMode or "smart")
 	table.sort(list, self.usingPlan and planSorter or sorter)
+	-- optional provider: quests sharing the same mobs stay next to each other
+	if provider() then
+		local i = 1
+		while i < #list do
+			local partner = num(ask("SharedWith", list[i].id))
+			if partner and list[i + 1].id ~= partner then
+				for j = i + 2, #list do
+					if list[j].id == partner then table.insert(list, i + 1, table.remove(list, j)) break end
+				end
+			end
+			i = i + 1
+		end
+	end
 	if total < #list then total = #list end
 	self:BuildGroups()
 	return total, #list
@@ -556,6 +569,7 @@ local function onTitleClick(self, button)
 			Q:Redraw()
 		else
 			Q:ClickQuest(id, self.questTitle)
+			ask("OnQuestClick", id) -- optional provider (e.g. opens its quest details); no-op without one
 		end
 	end)
 end
@@ -1157,6 +1171,7 @@ function Q:Render(total, tracked)
 		if provider() then
 			local marker = ask("PriorityMarker", q.id)
 			if type(marker) == "string" then s = marker .. s end
+			if num(ask("SharedWith", q.id)) then s = s .. " |cff" .. accentHex .. "&|r" end -- shares mobs with a neighbour
 		end
 		if self.selected == q.id then s = "|cff" .. accentHex .. ">|r " .. s end
 		t.text:SetText(s)
