@@ -1,0 +1,2014 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CasterKit-simulatie</title>
+<link rel="icon" href="data:,">
+<style>
+@property --ang { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
+:root{
+  --mage:#3FC7EB;
+  --panel:rgba(12,12,12,.85);
+  --panel-solid:#121212;
+  --bd:#000;
+  --gold:#ffd100;
+  --font:"Arial Narrow","Roboto Condensed","Segoe UI",Tahoma,Arial,sans-serif;
+  --bs:36px; --gap:4px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:#0b0b0d;color:#ddd}
+#app{display:flex;height:100vh;width:100vw;overflow:hidden}
+#stage{flex:1;position:relative;overflow:hidden;background:#000;min-width:0}
+#screen{position:absolute;left:50%;top:50%;width:1440px;height:810px;transform-origin:50% 50%;
+  overflow:hidden;font-family:var(--font);color:#fff;user-select:none;-webkit-user-select:none;font-size:13px;cursor:default}
+.ol{text-shadow:-1px -1px 0 #000,1px -1px 0 #000,-1px 1px 0 #000,1px 1px 0 #000,0 0 2px #000}
+.panel{background:var(--panel);border:1px solid var(--bd)}
+
+/* ---------- wereld (placeholder) ---------- */
+#world{position:absolute;inset:0;overflow:hidden;
+  background:linear-gradient(#26364a 0%,#4b6475 34%,#8a8c78 47%,#4f5a34 49%,#3a4a24 70%,#25301a 100%)}
+#world .sun{position:absolute;left:62%;top:9%;width:160px;height:160px;border-radius:50%;
+  background:radial-gradient(circle,rgba(255,236,190,.55),rgba(255,220,160,0) 70%)}
+#world .hills{position:absolute;left:-5%;right:-5%;top:36%;height:18%;
+  background:radial-gradient(ellipse 22% 60% at 15% 100%,#3d4a33 98%,transparent 100%),
+             radial-gradient(ellipse 30% 75% at 48% 100%,#46543a 98%,transparent 100%),
+             radial-gradient(ellipse 25% 55% at 82% 100%,#3a4630 98%,transparent 100%)}
+#world .farm{position:absolute;left:18%;top:39%;width:70px;height:46px;background:#5a3f2a;border:1px solid #2a1c10;
+  box-shadow:0 -22px 0 -6px #6d2b22}
+#world .tree{position:absolute;width:46px;height:70px;border-radius:50% 50% 45% 45%;background:#2f3f20;box-shadow:inset -8px -6px 0 rgba(0,0,0,.25)}
+#world .path{position:absolute;left:38%;right:38%;top:49%;bottom:-2%;background:linear-gradient(#7a6c4a,#5d5134);
+  clip-path:polygon(46% 0,54% 0,100% 100%,0 100%);opacity:.7}
+#world .vign{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 45%,transparent 55%,rgba(0,0,0,.55))}
+#mob{position:absolute;left:720px;top:470px;transform-origin:50% 100%;display:none;cursor:pointer}
+#mob .shadow{position:absolute;left:-34px;bottom:-8px;width:68px;height:18px;border-radius:50%;background:rgba(0,0,0,.45)}
+#mob .sel{position:absolute;left:-42px;bottom:-12px;width:84px;height:24px;border-radius:50%;border:2px solid rgba(220,40,40,.9);display:none}
+#mob.selected .sel{display:block}
+#mob svg{position:absolute;left:-30px;bottom:0;width:60px;height:120px;display:block}
+#mob.frozen svg .body{fill:#7fc6ff}
+#mob.dead svg{transform:rotate(-90deg) translate(40px,10px);opacity:.55}
+#mob .sheep{display:none;position:absolute;left:-26px;bottom:0;width:52px;height:36px;border-radius:50% 50% 40% 40%;background:#eee;box-shadow:inset -6px -4px 0 #ccc}
+#mob.poly svg{display:none} #mob.poly .sheep{display:block}
+#mob .ice{display:none;position:absolute;left:-36px;bottom:-6px;width:72px;height:40px;background:linear-gradient(rgba(170,220,255,.15),rgba(170,220,255,.6));
+  clip-path:polygon(0 100%,8% 30%,20% 70%,32% 10%,46% 60%,58% 0,70% 55%,84% 20%,92% 65%,100% 100%)}
+#mob.frozen .ice{display:block}
+.np{position:absolute;left:-60px;width:120px;bottom:135px;text-align:center}
+.np .nm{font-size:12px;color:#ff5a4a}
+.np .bar{height:6px;background:rgba(0,0,0,.8);border:1px solid #000;margin-top:2px}
+.np .bar i{display:block;height:100%;background:#c43c3c;width:100%}
+.np .dist{font-size:10px;color:#ccc}
+#fct{position:absolute;inset:0;pointer-events:none}
+.fct{position:absolute;font-weight:bold;font-size:22px;color:#ffe066;animation:fct 1.3s ease-out forwards;white-space:nowrap;transform:translateX(-50%)}
+.fct.frost{color:#8fd8ff}.fct.fire{color:#ff9a3c}.fct.arcane{color:#ff8cff}.fct.heal{color:#7cff6b}.fct.crit{font-size:30px}
+@keyframes fct{0%{opacity:0;margin-top:0}12%{opacity:1}100%{opacity:0;margin-top:-70px}}
+
+/* ---------- algemene blizzard-elementen ---------- */
+#uierr{position:absolute;left:0;right:0;top:120px;text-align:center;color:#ff2020;font-size:18px;pointer-events:none}
+#uierr div{animation:fadeErr 2.2s forwards}
+@keyframes fadeErr{0%,70%{opacity:1}100%{opacity:0}}
+#zonetext{position:absolute;left:0;right:0;top:70px;text-align:center;font-size:30px;color:#ffd100;pointer-events:none;opacity:0;transition:opacity 1s}
+
+/* minimap */
+#minimap{position:absolute;right:22px;top:22px;width:168px;height:168px}
+#minimap .mm{position:absolute;inset:0;border-radius:50%;overflow:hidden;border:2px solid #000;
+  background:radial-gradient(circle at 40% 45%,#7c8a52 0 18%,#6a7744 19% 35%,#59663a 36% 60%,#4b5731 61%);box-shadow:0 0 0 1px rgba(255,255,255,.08)}
+#minimap .mm::before{content:"";position:absolute;left:20%;top:55%;width:70%;height:10px;background:#9b8a5e;transform:rotate(-25deg);opacity:.7}
+#minimap .mm::after{content:"";position:absolute;left:50%;top:50%;width:0;height:0;margin:-7px 0 0 -5px;border-left:5px solid transparent;border-right:5px solid transparent;border-bottom:14px solid #ffd85a}
+#minimap .zone{position:absolute;left:-10px;right:-10px;top:-18px;text-align:center;font-size:12px;color:#ffd100}
+#minimap .clock{position:absolute;left:50%;bottom:-16px;transform:translateX(-50%);font-size:11px;color:#ddd}
+#mmbtn{position:absolute;width:32px;height:32px;border-radius:50%;padding:0;border:2px solid #000;background:#111;cursor:pointer;overflow:hidden;
+  box-shadow:0 0 0 1px #3FC7EB88, 0 0 6px rgba(0,0,0,.8)}
+#mmbtn img{width:100%;height:100%;transform:scale(1.2);display:block;border-radius:50%}
+#mmbtn:hover{box-shadow:0 0 0 2px var(--mage),0 0 10px var(--mage)}
+#mmbtn:focus-visible{outline:2px solid #fff}
+
+/* buffs speler */
+#buffs{position:absolute;right:210px;top:24px;display:flex;flex-direction:row-reverse;gap:6px}
+.buff{width:30px;text-align:center}
+.buff .bi{width:30px;height:30px;border:1px solid #000;overflow:hidden;background:#000}
+.buff .bi img{width:100%;height:100%;transform:scale(1.18);display:block}
+.buff .bt{font-size:11px;color:#fff;margin-top:1px}
+.buff.proc .bi{box-shadow:0 0 0 1px #c45cff,0 0 6px #c45cff}
+
+/* chat */
+#chat{position:absolute;left:12px;bottom:12px;width:225px;height:156px;display:flex;flex-direction:column}
+#chatlog{flex:1;overflow:hidden;display:flex;flex-direction:column;justify-content:flex-end;font-size:12px;line-height:1.3;padding:4px 5px;background:rgba(0,0,0,.35)}
+#chatlog div{word-wrap:break-word}
+#chatin{height:20px;margin-top:3px;background:rgba(0,0,0,.6);border:1px solid #000;color:#fff;font:12px var(--font);padding:0 4px;outline:none}
+#chatin:focus{border-color:#555}
+
+/* ---------- addon-kaders ---------- */
+#stack{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:6px}
+.mv{position:relative}
+/* speler-castbar 300x20 (v0.1.2) */
+#castbar{width:300px;height:20px;display:flex;align-items:stretch;gap:2px;visibility:hidden}
+#castbar.on{visibility:visible}
+#castbar.off{display:none}
+#castbar .cic{width:20px;height:20px;border:1px solid #000;overflow:hidden;background:#000;flex:none}
+#castbar .cic img{width:100%;height:100%;transform:scale(1.18);display:block}
+#castbar .cb{flex:1;position:relative;background:var(--panel);border:1px solid #000;overflow:hidden}
+#castbar .cb i{position:absolute;left:0;top:0;bottom:0;background:var(--mage);width:0}
+#castbar .cb .lat{position:absolute;top:0;bottom:0;right:0;width:0;background:rgba(255,40,40,.5);display:none}
+#castbar.ch .cb .lat{right:auto;left:0}
+#castbar.showlat .cb .lat{display:block}
+#castbar.fail .cb i{background:#c42222;width:100%!important}
+#castbar.fail .cb .lat{display:none}
+#castbar .cn{position:absolute;left:5px;top:2px;font-size:12px;max-width:200px;overflow:hidden;white-space:nowrap}
+#castbar .ctm{position:absolute;right:5px;top:2px;font-size:12px}
+
+#hint{display:flex;align-items:flex-end;gap:6px;padding:4px 6px;visibility:hidden}
+#hint.on{visibility:visible}
+#hint .hb{position:relative;width:44px;height:44px}
+#hint .hs{position:relative;width:28px;height:28px;opacity:.9}
+#hint .lab{font-size:10px;color:#aaa;align-self:center;line-height:1.15}
+#hint .lab b{color:var(--mage);font-weight:normal;display:block;font-size:11px}
+#hint .lab .src{display:none;font-size:9px;color:#8fb8c8;margin-top:1px}
+#hint.fallback .lab .src{display:block}
+#hint .aoe{align-self:flex-start;font-size:11px;padding:1px 5px;background:#7a1f1f;border:1px solid #000;color:#ffd7d7;display:none}
+#hint.aoeon .aoe{display:block}
+
+#remind{align-self:flex-start;display:flex;gap:4px;align-items:center;flex-wrap:nowrap}
+.rm{position:relative;width:26px;height:26px;border:1px solid #000;background:#000;cursor:pointer}
+.rm .in{position:absolute;inset:0;overflow:hidden}
+.rm img{width:100%;height:100%;transform:scale(1.18);display:block}
+.rm .rc{position:absolute;right:1px;bottom:0;font-size:11px}
+.rm.bad{box-shadow:0 0 0 1px #ff2b2b;animation:rmPulse 1s ease-in-out infinite alternate}
+.rm.bad img{filter:grayscale(.6) brightness(.8)}
+.rm.warn{box-shadow:0 0 0 1px #ffb020}
+.rm:hover{box-shadow:0 0 0 1px #fff}
+@keyframes rmPulse{from{box-shadow:0 0 0 1px #ff2b2b,0 0 2px #ff2b2b}to{box-shadow:0 0 0 1px #ff2b2b,0 0 9px 2px #ff2b2b}}
+.note{font-size:11px;padding:3px 6px;border:1px solid #000;background:var(--panel);white-space:nowrap;cursor:pointer}
+.note.tr{color:#ffd100}.note.tal{color:#7cff6b}
+
+#barsWrap{position:relative}
+#barsBlock{display:flex;flex-direction:column;gap:3px}
+#bars{padding:5px;display:flex;flex-direction:column;gap:var(--gap)}
+#bars.nobg{background:transparent;border-color:transparent}
+.row{display:flex;gap:var(--gap)}
+.ab{position:relative;width:var(--bs);height:var(--bs);border:1px solid #000;background:rgba(0,0,0,.55);cursor:pointer}
+.ab .in{position:absolute;inset:0;overflow:hidden}
+.ab img.ic{width:100%;height:100%;transform:scale(1.18);display:block;pointer-events:none}
+.ab.empty{background:rgba(26,26,26,.6);cursor:default}
+.ab.empty .in{box-shadow:inset 0 0 6px rgba(0,0,0,.9)}
+.ab .cd{position:absolute;inset:0;pointer-events:none}
+.ab .tint{position:absolute;inset:0;mix-blend-mode:multiply;pointer-events:none;display:none}
+.ab.oor .tint{display:block;background:rgb(214,40,40)}
+.ab.oom .tint{display:block;background:rgb(110,120,255)}
+.ab .hk{position:absolute;right:2px;top:1px;font-size:11px;color:#e8e8e8;pointer-events:none;line-height:1}
+.ab.oor .hk{color:#ff4040}
+.ab .ct{position:absolute;right:2px;bottom:1px;font-size:12px;pointer-events:none;line-height:1}
+.ab .cdt{position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);text-align:center;font-size:15px;font-weight:bold;pointer-events:none;color:#fff}
+.ab .cdt.soon{color:#ff4b4b}
+.ab:not(.empty):hover .in::after{content:"";position:absolute;inset:0;background:rgba(255,255,255,.18)}
+.ab.down .in{transform:scale(.92)}
+.ab.down .in::before{content:"";position:absolute;inset:0;background:rgba(255,220,100,.25);z-index:2}
+.ab.casting{box-shadow:0 0 0 1px #fff}
+.glow{position:absolute;inset:-4px;pointer-events:none;display:none;z-index:6;border-radius:2px}
+[data-g=gold]{box-shadow:0 0 9px 2px rgba(255,196,40,.75)}
+[data-g=gold]>.glow{display:block;padding:3px;
+  background:repeating-conic-gradient(from var(--ang),#fff6b0 0deg 7deg,#ffcc22 7deg 15deg,#a86e00 15deg 22deg);
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;
+  mask:linear-gradient(#000 0 0) content-box exclude,linear-gradient(#000 0 0);
+  animation:ckSpin 2.4s linear infinite}
+[data-g=pulse]>.glow{display:block;border:3px solid #ffd100;animation:ckPulse .8s ease-in-out infinite alternate}
+[data-g=next]>.glow{display:block;inset:-2px;border:2px solid rgba(255,225,70,.6)}
+[data-g=proc]>.glow{display:block;border:3px solid #c45cff;animation:ckPulseP .55s ease-in-out infinite alternate}
+[data-g=def]>.glow{display:block;border:3px solid #3fa9ff;box-shadow:0 0 10px 2px rgba(63,169,255,.8);animation:ckPulseB 1s ease-in-out infinite alternate}
+@keyframes ckSpin{to{--ang:360deg}}
+@keyframes ckPulse{from{box-shadow:0 0 2px #ffd100;opacity:.55}to{box-shadow:0 0 14px 4px #ffd100;opacity:1}}
+@keyframes ckPulseP{from{box-shadow:0 0 2px #c45cff;opacity:.6}to{box-shadow:0 0 14px 4px #c45cff;opacity:1}}
+@keyframes ckPulseB{from{opacity:.65}to{opacity:1}}
+
+#xp{position:relative;height:12px;background:var(--panel);border:1px solid #000;cursor:default}
+#xp .rest{position:absolute;top:0;bottom:0;background:rgba(70,120,255,.55)}
+#xp .cur{position:absolute;left:0;top:0;bottom:0;background:#8f3fd1}
+#xp .xt{position:absolute;left:0;right:0;top:-1px;text-align:center;font-size:11px;white-space:nowrap}
+
+/* ---------- unit frames (v0.1.2, ElvUI-stijl: plat, 1px zwarte rand) ---------- */
+.uf{position:absolute;width:220px;height:48px;background:#0d0d0d;border:1px solid #000;display:flex;flex-direction:column}
+#playerFrame{right:calc(100% + 8px);bottom:calc(100% + 8px);transform-origin:100% 100%}
+#targetFrame{left:calc(100% + 8px);bottom:calc(100% + 8px);transform-origin:0 100%}
+.uf .hp,.tot .hp,.gf .hp{position:relative;flex:1;background:#262626;overflow:hidden}
+.uf .hp{border-bottom:1px solid #000}
+.uf .hp>i,.tot .hp>i,.gf .hp>i,.uf .pw>i,.gf .pw>i{position:absolute;left:0;top:0;bottom:0;width:100%}
+.uf .hp>i{background:var(--mage)}
+.uf .pw{position:relative;height:10px;flex:none;background:#151515;overflow:hidden}
+.uf .pw>i{background:#3a6fd0}
+.uf .tx,.tot .tx,.gf .tx{position:absolute;inset:0 5px;display:flex;align-items:center;gap:5px;white-space:nowrap}
+.uf .tx{font-size:13px}
+.uf .lvl{flex:none}
+.uf .nm,.gf .nm,.tot .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.uf .hv,.gf .hv{flex:none}
+.uf .raid{position:absolute;left:50%;top:-10px;width:18px;height:18px;margin-left:-9px;display:none;z-index:3;border:1px solid #000;border-radius:50% 50% 42% 42%;
+  background:radial-gradient(circle at 33% 45%,#000 0 2.5px,transparent 3px),radial-gradient(circle at 67% 45%,#000 0 2.5px,transparent 3px),#f2f2f2}
+.uf .raid.on{display:block}
+.uf .status{position:absolute;right:-7px;top:-7px;width:16px;height:16px;border:1px solid #000;display:none;overflow:hidden;z-index:3;background:#000}
+.uf .status img{width:100%;height:100%;transform:scale(1.18);display:block}
+.uf .status.on{display:block}
+.debuffs{position:absolute;left:0;bottom:calc(100% + 12px);display:flex;gap:3px}
+.db{position:relative;width:20px;height:20px;border:1px solid #c43030;background:#000}
+.db img{width:100%;height:100%;transform:scale(1.18);display:block}
+.db span{position:absolute;left:0;right:0;bottom:-2px;text-align:center;font-size:10px}
+#totFrame{position:absolute;left:calc(100% + 6px);top:0;width:110px;height:24px;border:1px solid #000;background:#0d0d0d;display:flex;flex-direction:column}
+.tot .tx{font-size:11px;justify-content:center}
+#tcast{position:absolute;left:0;top:calc(100% + 4px);width:220px;height:14px;display:flex;gap:2px}
+#tcast .tic{position:relative;width:14px;height:14px;border:1px solid #000;overflow:hidden;background:#000;flex:none}
+#tcast .tic img{width:100%;height:100%;transform:scale(1.18);display:block}
+#tcast .tb{flex:1;position:relative;background:var(--panel);border:1px solid #000;overflow:hidden}
+#tcast .tb i{position:absolute;left:0;top:0;bottom:0;width:0;background:#e8a317}
+#tcast.noint .tb i{background:#8c8c8c}
+#tcast.fail .tb i{background:#c42222;width:100%!important}
+#tcast .tn{position:absolute;left:4px;top:0;font-size:10px;line-height:12px;display:flex;align-items:center;gap:4px}
+#tcast .tt2{position:absolute;right:4px;top:0;font-size:10px;line-height:12px}
+#tcast .lock{display:none;position:relative;width:7px;height:5px;background:#e6e6e6;margin-top:3px;flex:none}
+#tcast .lock::before{content:"";position:absolute;left:1px;top:-4px;width:5px;height:5px;border:1.5px solid #e6e6e6;border-bottom:0;border-radius:3px 3px 0 0;box-sizing:border-box}
+#tcast.noint .lock{display:block}
+#groupFrames{position:absolute;left:20px;top:230px;transform-origin:0 0}
+#groupList{display:flex;flex-direction:column;gap:4px}
+.gf{position:relative;width:180px;height:36px;border:1px solid #000;background:#0d0d0d;display:flex;flex-direction:column}
+.gf .hp{border-bottom:1px solid #000}
+.gf .pw{position:relative;height:7px;flex:none;background:#151515;overflow:hidden}
+.gf .tx{font-size:12px}
+.gf .role{width:14px;height:14px;border:1px solid #000;flex:none;overflow:hidden;background:#000}
+.gf .role img{width:100%;height:100%;transform:scale(1.18);display:block}
+.uf.off,#totFrame.off,#tcast.off,#groupFrames.off{display:none!important}
+.uf.none,#totFrame.none,#tcast.none,#groupFrames.none{display:none}
+.unlocked .uf.none,.unlocked #totFrame.none,.unlocked #tcast.none{display:flex}
+.unlocked #groupFrames.none{display:block}
+
+/* micro + tassen */
+#micro{position:absolute;right:12px;bottom:12px;padding:4px;display:flex;flex-direction:column;gap:4px}
+#micro .mrow{display:flex;gap:3px;justify-content:flex-end}
+.mb{position:relative;width:23px;height:23px;border:1px solid #000;background:#000;cursor:pointer;padding:0}
+.mb img{width:100%;height:100%;transform:scale(1.18);display:block}
+.mb .in{position:absolute;inset:0;overflow:hidden}
+.mb:hover .in::after{content:"";position:absolute;inset:0;background:rgba(255,255,255,.2)}
+.mb.bag{width:28px;height:28px}
+.mb .fr{position:absolute;right:1px;bottom:0;font-size:12px}
+.mb.alert{box-shadow:0 0 0 1px #7cff6b}
+
+/* versleepmodus */
+.mover{position:absolute;inset:-2px;background:rgba(40,110,220,.45);border:1px solid #4aa3ff;display:none;z-index:50;cursor:move;
+  align-items:center;justify-content:center;flex-direction:column;font-size:11px;color:#fff;text-align:center;line-height:1.1;min-height:24px}
+.unlocked .mover{display:flex}
+.unlocked #castbar,.unlocked #hint{visibility:visible}
+.mover:hover{background:rgba(60,140,255,.6)}
+#lockbar{position:absolute;left:50%;top:14px;transform:translateX(-50%);display:none;padding:8px 12px;gap:10px;align-items:center;z-index:80}
+.unlocked #lockbar{display:flex}
+
+/* ---------- tooltip ---------- */
+#tt{position:absolute;z-index:200;max-width:300px;padding:7px 9px;background:rgba(8,8,10,.94);border:1px solid #000;box-shadow:0 0 0 1px rgba(255,255,255,.08);
+  display:none;pointer-events:none;font-size:12px;line-height:1.35}
+#tt .t1{font-size:14px;color:#fff}
+#tt .row2{display:flex;justify-content:space-between;gap:16px;color:#fff}
+#tt .y{color:#ffd100}.tt-g{color:#9a9a9a}.tt-r{color:#ff4040}.tt-b{color:var(--mage)}.tt-gr{color:#7cff6b}
+
+/* ---------- instellingen ---------- */
+#settings{position:absolute;left:50%;top:50%;width:640px;height:460px;margin:-250px 0 0 -320px;display:none;z-index:120;
+  background:rgba(14,14,14,.96);border:1px solid #000;box-shadow:0 0 0 1px rgba(255,255,255,.06),0 10px 40px rgba(0,0,0,.6);flex-direction:column}
+#settings.open{display:flex}
+#settings .hdr{height:30px;display:flex;align-items:center;padding:0 8px;border-bottom:1px solid #000;background:#0c0c0c;cursor:move;gap:8px}
+#settings .hdr .ttl{font-size:16px;color:var(--mage);font-weight:bold;letter-spacing:.5px}
+#settings .hdr .ver{font-size:11px;color:#888}
+#settings .hdr .x{margin-left:auto;width:20px;height:20px;border:1px solid #000;background:#222;color:#ddd;cursor:pointer;font:bold 12px var(--font);padding:0}
+#settings .hdr .x:hover{background:#7a1f1f}
+#settings .body{flex:1;display:flex;min-height:0}
+#settings [role=tablist]{width:130px;border-right:1px solid #000;padding:6px;display:flex;flex-direction:column;gap:3px;background:#0f0f0f}
+#settings [role=tab]{text-align:left;padding:7px 9px;background:#1a1a1a;border:1px solid #000;color:#ccc;font:13px var(--font);cursor:pointer}
+#settings [role=tab][aria-selected=true]{color:#fff;background:#1d2a30;box-shadow:inset 3px 0 0 var(--mage)}
+#settings [role=tab]:hover{color:#fff}
+#settings [role=tab]:focus-visible,#settings button:focus-visible,#settings input:focus-visible{outline:1px solid var(--mage);outline-offset:1px}
+#settings [role=tabpanel]{flex:1;padding:12px 16px;overflow:auto}
+#settings h3{margin:0 0 8px;font-size:14px;color:var(--gold);font-weight:normal;border-bottom:1px solid #2a2a2a;padding-bottom:4px}
+#settings h3:not(:first-child){margin-top:14px}
+.opt{display:flex;align-items:center;gap:10px;min-height:28px;font-size:13px;color:#ddd}
+.opt .lbl{flex:1}
+.opt .lbl small{display:block;color:#888;font-size:11px}
+.opt.wide{flex-wrap:wrap;row-gap:4px;padding:2px 0 4px}
+.opt.wide .lbl{flex-basis:100%}
+.ck{appearance:none;-webkit-appearance:none;width:16px;height:16px;border:1px solid #000;background:#262626;margin:0;cursor:pointer;flex:none;position:relative;box-shadow:inset 0 0 0 1px #3a3a3a}
+.ck:checked{background:var(--mage)}
+.ck:checked::after{content:"";position:absolute;left:4px;top:1px;width:4px;height:8px;border:solid #000;border-width:0 2px 2px 0;transform:rotate(45deg)}
+label.opt{cursor:pointer}
+.seg{display:flex;border:1px solid #000}
+.seg button{background:#1f1f1f;color:#ccc;border:0;border-right:1px solid #000;padding:4px 10px;font:12px var(--font);cursor:pointer;min-width:34px}
+.seg button:last-child{border-right:0}
+.seg button[aria-pressed=true]{background:var(--mage);color:#000}
+.rng{display:flex;align-items:center;gap:8px}
+.rng input{width:150px;accent-color:var(--mage)}
+.rng output{width:38px;text-align:right;color:#fff;font-size:12px}
+.sbtn{background:#1f1f1f;border:1px solid #000;color:#ddd;padding:5px 12px;font:12px var(--font);cursor:pointer;box-shadow:inset 0 0 0 1px #333}
+.sbtn:hover{background:#2a3a40;color:#fff}
+.sbtn.pri{color:var(--mage)}
+.about{font-size:13px;line-height:1.5;color:#ccc}
+.about .big{font-size:22px;color:var(--mage)}
+.about .box{border:1px solid #000;background:#101820;padding:8px 10px;margin:10px 0;box-shadow:inset 3px 0 0 var(--mage)}
+.about ul{margin:4px 0 0;padding-left:18px}
+
+/* ---------- simulatiebediening (bewust geen WoW-stijl) ---------- */
+#sim{width:310px;flex:none;overflow:auto;background:#f3f4f6;color:#1f2937;font:14px/1.4 system-ui,"Segoe UI",Roboto,Arial,sans-serif;border-left:1px solid #d1d5db;padding:12px 14px 24px}
+#sim h1{font-size:17px;margin:0 0 2px}
+#sim .sub{font-size:12px;color:#6b7280;margin:0 0 10px}
+#sim fieldset{border:1px solid #d1d5db;border-radius:8px;padding:8px 10px 10px;margin:0 0 10px;background:#fff}
+#sim legend{font-size:12px;font-weight:600;color:#374151;padding:0 4px;text-transform:uppercase;letter-spacing:.04em}
+#sim .btns{display:flex;flex-wrap:wrap;gap:6px}
+#sim button{font:13px system-ui,"Segoe UI",Arial,sans-serif;border:1px solid #cbd5e1;background:#f8fafc;color:#111827;border-radius:6px;padding:6px 9px;cursor:pointer;min-height:32px}
+#sim button:hover{background:#e2e8f0}
+#sim button[aria-pressed=true]{background:#1d4ed8;color:#fff;border-color:#1d4ed8}
+#sim button:focus-visible{outline:2px solid #2563eb;outline-offset:1px}
+#sim label{font-size:13px;display:flex;align-items:center;gap:6px;margin-top:6px}
+#sim input[type=range]{flex:1}
+#sim .why{font-size:13px;background:#eef2ff;border-radius:6px;padding:6px 8px;min-height:44px}
+#sim .why b{color:#1d4ed8}
+#sim .keys,#sim .small{font-size:12px;color:#4b5563}
+#sim .small{margin:2px 0 0 22px}
+#sim .lbl2{font-size:12px;color:#374151;margin:8px 0 4px}
+#sim kbd{font:11px ui-monospace,Consolas,monospace;background:#e5e7eb;border:1px solid #cbd5e1;border-radius:3px;padding:0 4px}
+#sim .state{font-size:12px;color:#374151;display:grid;grid-template-columns:1fr 1fr;gap:2px 8px;margin-top:6px}
+
+@media (max-width:900px){
+  #app{flex-direction:column;height:auto;overflow:visible}
+  #stage{flex:none;width:100%;aspect-ratio:16/9}
+  #sim{width:100%;border-left:0;border-top:1px solid #d1d5db}
+  html,body{height:auto}
+}
+</style>
+</head>
+<body>
+<div id="app">
+<main id="stage" data-ta="s_stage" aria-label="Simulated game screen">
+<div id="screen">
+  <div id="world">
+    <div class="sun"></div><div class="hills"></div><div class="farm"></div>
+    <div class="tree" style="left:9%;top:41%"></div><div class="tree" style="left:12%;top:44%;transform:scale(1.3)"></div>
+    <div class="tree" style="left:78%;top:42%"></div><div class="tree" style="left:84%;top:46%;transform:scale(1.5)"></div>
+    <div class="path"></div>
+    <div id="mob">
+      <div class="shadow"></div><div class="sel"></div>
+      <svg viewBox="0 0 60 120" aria-hidden="true">
+        <g class="body" fill="#6b3a2a" stroke="#1a0d08" stroke-width="2">
+          <circle cx="30" cy="16" r="10"/>
+          <path d="M18 30 h24 l4 40 h-32z"/>
+          <path d="M18 32 l-10 30 l5 2 l9-24z"/><path d="M42 32 l10 30 l-5 2 l-9-24z"/>
+          <path d="M20 70 l-2 46 h8 l4-38 l4 38 h8 l-2-46z"/>
+        </g>
+        <path d="M20 12 h20 v5 h-20z" fill="#b3261e"/>
+        <path d="M51 62 l6 -30 l2 1 l-5 30z" fill="#999" stroke="#222"/>
+      </svg>
+      <div class="sheep"></div><div class="ice"></div>
+      <div class="np ol"><div class="nm">Defias Pillager</div><div class="bar"><i></i></div><div class="dist">25 yd</div></div>
+    </div>
+    <div class="vign"></div>
+  </div>
+  <div id="fct"></div>
+  <div id="zonetext" class="ol"></div>
+  <div id="uierr" class="ol" aria-live="polite"></div>
+  <div id="buffs"></div>
+
+  <div id="minimap">
+    <div class="zone ol">Westfall</div>
+    <div class="mm"></div>
+    <div class="clock ol" id="clock">12:00</div>
+    <button id="mmbtn" type="button" data-ta="s_mmbtn" aria-label="Open CasterKit settings"></button>
+  </div>
+
+  <div id="chat"><div id="chatlog" class="ol"></div><input id="chatin" type="text" data-ta="s_chatA" data-tp="s_chatP" aria-label="Chat (type /ck)" placeholder="Enter = chat, /ck = settings" autocomplete="off"></div>
+
+  <div id="groupFrames" class="mv none" data-mover="group"><div id="groupList"></div></div>
+
+  <div id="stack">
+    <div id="castbar" class="mv" data-mover="castbar">
+      <div class="cic"></div><div class="cb"><i></i><span class="lat"></span><span class="cn ol"></span><span class="ctm ol"></span></div>
+    </div>
+    <div id="hint" class="mv panel" data-mover="hint">
+      <div class="hb ab" data-g=""></div><div class="hs ab" data-g=""></div>
+      <div class="lab"><b>CasterKit</b><span id="hintName">-</span><span class="src" data-t="s_srcLbl">Blizzard suggestion</span></div>
+      <div class="aoe ol">AoE</div>
+    </div>
+    <div id="remind" class="mv" data-mover="remind"></div>
+    <div id="barsWrap">
+      <div id="playerFrame" class="uf mv" data-mover="player">
+        <div class="hp"><i></i><div class="tx ol"><span class="lvl"></span><span class="nm">DinX</span><span class="hv"></span></div></div>
+        <div class="pw"><i></i></div>
+        <span class="raid" aria-hidden="true"></span>
+        <span class="status" aria-hidden="true"></span>
+      </div>
+      <div id="barsBlock" class="mv" data-mover="bars">
+        <div id="bars" class="panel"></div>
+        <div id="xp"><div class="rest"></div><div class="cur"></div><div class="xt ol"></div></div>
+      </div>
+      <div id="targetFrame" class="uf mv none" data-mover="target">
+        <div class="debuffs"></div>
+        <div class="hp"><i></i><div class="tx ol"><span class="lvl"></span><span class="nm"></span><span class="hv"></span></div></div>
+        <div class="pw"><i></i></div>
+        <span class="raid" aria-hidden="true"></span>
+        <div id="totFrame" class="tot mv none" data-mover="tot"><div class="hp"><i></i><div class="tx ol"><span class="nm"></span></div></div></div>
+        <div id="tcast" class="mv none" data-mover="tcast"><div class="tic"></div><div class="tb"><i></i><span class="tn ol"><span class="lock" aria-hidden="true"></span><span class="tnm"></span></span><span class="tt2 ol"></span></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="micro" class="panel mv" data-mover="micro">
+    <div class="mrow" id="microRow"></div>
+    <div class="mrow" id="bagRow"></div>
+  </div>
+
+  <div id="lockbar" class="panel ol">
+    <span style="color:var(--mage)">CasterKit</span><span data-t="s_lockTxt">Frames unlocked: drag the blue areas.</span>
+    <button class="sbtn" id="resetPos" type="button" data-t="s_resetPos">Reset positions</button>
+    <button class="sbtn pri" id="lockBtn" type="button" data-t="s_lock">Lock</button>
+  </div>
+
+  <div id="settings" role="dialog" aria-modal="false" aria-labelledby="setTitle">
+    <div class="hdr"><span class="ttl ol" id="setTitle">CasterKit</span><span class="ver" data-t="s_ver">v0.1.2 by DinX</span>
+      <button class="x" type="button" id="setClose" data-ta="s_close" aria-label="Close">X</button></div>
+    <div class="body">
+      <div role="tablist" aria-orientation="vertical" data-ta="s_settings" aria-label="Settings" id="tabs"></div>
+      <div role="tabpanel" id="tabpanel" tabindex="0"></div>
+    </div>
+  </div>
+
+  <div id="tt" role="tooltip"></div>
+</div>
+</main>
+
+<aside id="sim" data-ta="s_simA" aria-label="Simulation controls">
+  <h1 data-t="s_h1">CasterKit simulation</h1>
+  <p class="sub" data-th="s_sub">This panel is <b>not</b> part of WoW: use it to recreate situations and see how the addon reacts.</p>
+
+  <fieldset><legend data-t="s_lgChar">Character</legend>
+    <div class="btns" role="group" aria-label="Level">
+      <button type="button" data-lvl="13" aria-pressed="true" data-t="s_lv13">Simulate level 13</button>
+      <button type="button" data-lvl="30" aria-pressed="false" data-t="s_lv30">Simulate level 30</button>
+    </div>
+    <div class="state" id="stateBox"></div>
+  </fieldset>
+
+  <fieldset><legend data-t="s_lgTarget">Target and combat</legend>
+    <div class="btns">
+      <button type="button" id="bTarget" aria-pressed="false" data-t="s_bTarget">Target on/off</button>
+      <button type="button" id="bFight" data-t="s_bFight">Start fight</button>
+    </div>
+    <label><span data-t="s_dist">Distance</span> <input type="range" id="dist" min="0" max="45" step="1" value="25"><span id="distV">25 yd</span></label>
+    <label><input type="checkbox" id="autoNext" checked> <span data-t="s_autoNext">New enemy automatically after a kill</span></label>
+    <div class="lbl2" data-t="s_tgType">Target type</div>
+    <div class="btns" role="group" data-ta="s_tgType" aria-label="Target type">
+      <button type="button" data-tgt="hostile" aria-pressed="true" data-t="s_tHostile">Hostile</button>
+      <button type="button" data-tgt="neutral" aria-pressed="false" data-t="s_tNeutral">Neutral</button>
+      <button type="button" data-tgt="tapped" aria-pressed="false" data-t="s_tTapped">Tapped</button>
+    </div>
+    <div class="lbl2" data-t="s_tcLbl">Target casts (Heal / Shoot)</div>
+    <div class="btns">
+      <button type="button" id="bTCast" data-t="s_bTCast">Cast (interruptible)</button>
+      <button type="button" id="bTCastLock" data-t="s_bTCastLock">Cast (not interruptible)</button>
+    </div>
+  </fieldset>
+
+  <fieldset><legend data-t="s_lgSit">Situations</legend>
+    <div class="btns">
+      <button type="button" data-sit="moving" aria-pressed="false" data-t="s_moving">Moving</button>
+      <button type="button" data-sit="falling" aria-pressed="false" data-t="s_falling">Falling</button>
+      <button type="button" data-sit="rooted" aria-pressed="false" data-t="s_rooted">Rooted</button>
+      <button type="button" id="bAoe" aria-pressed="false" data-t="s_aoe">AoE mode</button>
+      <button type="button" id="bFof" data-t="s_fof">Fingers of Frost proc</button>
+      <button type="button" id="bMb" data-t="s_mb">Missile Barrage proc</button>
+      <button type="button" id="bNova" data-t="s_nova">Frost Nova on target</button>
+      <button type="button" id="bOom" data-t="s_oom">Low mana</button>
+      <button type="button" id="bLowHp" data-t="s_lowhp">Low health</button>
+      <button type="button" id="bWater" data-t="s_water">Out of water</button>
+      <button type="button" id="bBuffs" data-t="s_buffs">Buffs gone</button>
+    </div>
+  </fieldset>
+
+  <fieldset><legend data-t="s_lgNew">Addon 0.1.2: party, combat, latency</legend>
+    <div class="btns">
+      <button type="button" id="bGroup" aria-pressed="false" data-t="s_group">In party</button>
+    </div>
+    <label><input type="checkbox" id="secret"> <span data-t="s_secret">Combat: values hidden</span></label>
+    <div class="small" data-t="s_secretD">Only matters with "Own priority": in combat it then falls back to the Blizzard suggestion.</div>
+    <label><span data-t="s_latency">Latency</span> <input type="range" id="lat" min="0" max="400" step="10" value="80"><span id="latV">80 ms</span></label>
+  </fieldset>
+
+  <fieldset><legend data-t="s_lgWhy">Rotation helper says</legend>
+    <div class="why" id="why" aria-live="polite">-</div>
+  </fieldset>
+
+  <fieldset><legend data-t="s_lgWorld">World</legend>
+    <div class="btns">
+      <button type="button" id="bVendor" data-t="s_vendor">Visit vendor</button>
+      <button type="button" id="bTrainer" data-t="s_trainer">Visit trainer</button>
+      <button type="button" id="bTalent" data-t="s_talent">Spend talent point</button>
+      <button type="button" id="bLevel">+1 level</button>
+      <button type="button" id="bBags" data-t="s_bags">Bags almost full</button>
+    </div>
+  </fieldset>
+
+  <fieldset><legend>Addon</legend>
+    <div class="btns">
+      <button type="button" id="bSettings" data-t="s_openSet">Open settings</button>
+      <button type="button" id="bUnlock" aria-pressed="false" data-t="s_unlock">Unlock frames</button>
+    </div>
+  </fieldset>
+
+  <fieldset><legend data-t="s_lgKeys">Controls</legend>
+    <div class="keys" data-th="s_keys"></div>
+  </fieldset>
+</aside>
+</div>
+
+<script>
+'use strict';
+/* =========================================================================
+   CasterKit-simulatie: bootst de addon CasterKit (door DinX), versie 0.1.2, na.
+   Alles staat in dit ene bestand; enkel de iconen komen van wow.zamimg.com.
+   Taal: Engels standaard, Nederlands via Instellingen > General > Language.
+   ========================================================================= */
+const $ = s => document.querySelector(s);
+const $$ = s => Array.from(document.querySelectorAll(s));
+const T = () => performance.now() / 1000;
+const ICON = n => 'https://wow.zamimg.com/images/wow/icons/large/' + n + '.jpg';
+const QM = 'inv_misc_questionmark';
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+/* ---------- taal ---------- */
+const LANG = () => (S.cfg.lang === 'nl' ? 'nl' : 'en');
+const tx = (en, nlt) => (LANG() === 'nl' ? nlt : en);
+const pick = x => (Array.isArray(x) ? tx(x[0], x[1]) : (x == null ? '' : String(x)));
+const fmt = (s, ...a) => s.replace(/\{(\d)\}/g, (m, i) => a[+i]);
+const dec = (n, d) => { const s = n.toFixed(d); return LANG() === 'nl' ? s.replace('.', ',') : s; };
+const num = n => Math.round(n).toLocaleString(LANG() === 'nl' ? 'nl-BE' : 'en-US');
+const fmtK = n => (n >= 1000 ? dec(n / 1000, 1) + 'k' : String(Math.round(n)));
+const U = () => tx('yd', 'm');
+
+// statische teksten (data-t = textContent, data-th = vertrouwde HTML uit dit bestand, data-ta = aria-label, data-tp = placeholder)
+const STAT = {
+  s_stage: ['Simulated game screen', 'Gesimuleerd spelscherm'],
+  s_mmbtn: ['Open CasterKit settings', 'CasterKit-instellingen openen'],
+  s_chatA: ['Chat (type /ck)', 'Chat (typ /ck)'],
+  s_chatP: ['Enter = chat, /ck = settings', 'Enter = chat, /ck = instellingen'],
+  s_srcLbl: ['Blizzard suggestion', 'Blizzard-suggestie'],
+  s_lockTxt: ['Frames unlocked: drag the blue areas.', 'Kaders ontgrendeld: sleep de blauwe vlakken.'],
+  s_resetPos: ['Reset positions', 'Herstel posities'],
+  s_lock: ['Lock', 'Vergrendelen'],
+  s_ver: ['v0.1.2 by DinX', 'v0.1.2 door DinX'],
+  s_close: ['Close', 'Sluiten'],
+  s_settings: ['Settings', 'Instellingen'],
+  s_simA: ['Simulation controls', 'Simulatiebediening'],
+  s_h1: ['CasterKit simulation', 'CasterKit-simulatie'],
+  s_sub: ['This panel is <b>not</b> part of WoW: use it to recreate situations and see how the addon reacts.',
+          'Dit paneel hoort <b>niet</b> bij WoW: je bootst er situaties mee na om te zien hoe de addon reageert.'],
+  s_lgChar: ['Character', 'Personage'],
+  s_lv13: ['Simulate level 13', 'Simuleer level 13'],
+  s_lv30: ['Simulate level 30', 'Simuleer level 30'],
+  s_lgTarget: ['Target and combat', 'Doelwit en gevecht'],
+  s_bTarget: ['Target on/off', 'Doelwit aan/uit'],
+  s_bFight: ['Start fight', 'Gevecht starten'],
+  s_dist: ['Distance', 'Afstand'],
+  s_autoNext: ['New enemy automatically after a kill', 'Na een kill automatisch nieuwe vijand'],
+  s_tgType: ['Target type', 'Soort doelwit'],
+  s_tHostile: ['Hostile', 'Vijandig'],
+  s_tNeutral: ['Neutral', 'Neutraal'],
+  s_tTapped: ['Tapped', 'Tapped'],
+  s_tcLbl: ['Target casts (Heal / Shoot)', 'Doelwit cast (Heal / Shoot)'],
+  s_bTCast: ['Cast (interruptible)', 'Cast (onderbreekbaar)'],
+  s_bTCastLock: ['Cast (not interruptible)', 'Cast (niet onderbreekbaar)'],
+  s_lgSit: ['Situations', 'Situaties'],
+  s_moving: ['Moving', 'Bewegen'],
+  s_falling: ['Falling', 'Vallen'],
+  s_rooted: ['Rooted', 'Rooted'],
+  s_aoe: ['AoE mode', 'AoE-modus'],
+  s_fof: ['Fingers of Frost proc', 'Fingers of Frost-proc'],
+  s_mb: ['Missile Barrage proc', 'Missile Barrage-proc'],
+  s_nova: ['Frost Nova on target', 'Frost Nova op doelwit'],
+  s_oom: ['Low mana', 'Mana laag'],
+  s_lowhp: ['Low health', 'Leven laag'],
+  s_water: ['Out of water', 'Water op'],
+  s_buffs: ['Buffs gone', 'Buffs weg'],
+  s_lgNew: ['Addon 0.1.2: party, combat, latency', 'Addon 0.1.2: groep, gevecht, latency'],
+  s_group: ['In party', 'In groep'],
+  s_secret: ['Combat: values hidden', 'Gevecht: waarden afgeschermd'],
+  s_secretD: ['Only matters with "Own priority": in combat it then falls back to the Blizzard suggestion.',
+              'Alleen van belang bij "Eigen prioriteit": in gevecht valt die dan terug op de Blizzard-suggestie.'],
+  s_latency: ['Latency', 'Latency'],
+  s_lgWhy: ['Rotation helper says', 'Rotatiehulp zegt nu'],
+  s_lgWorld: ['World', 'Wereld'],
+  s_vendor: ['Visit vendor', 'Handelaar bezoeken'],
+  s_trainer: ['Visit trainer', 'Trainer bezoeken'],
+  s_talent: ['Spend talent point', 'Talentpunt besteden'],
+  s_bags: ['Bags almost full', 'Tassen bijna vol'],
+  s_openSet: ['Open settings', 'Instellingen openen'],
+  s_unlock: ['Unlock frames', 'Ontgrendel kaders'],
+  s_lgKeys: ['Controls', 'Bediening'],
+  s_keys: ['<kbd>1</kbd>-<kbd>=</kbd> main bar, <kbd>Shift</kbd>+key row 2, <kbd>Alt</kbd>+key row 3, <kbd>Ctrl</kbd>+key row 4 (may clash with the browser). Clicking a button works too. Click the enemy in the world to select it; hover it for the kills-to-level tooltip. <kbd>Enter</kbd> opens the chat, <kbd>Esc</kbd> closes windows. Counterspell sits on <kbd>-</kbd> (level 30 mode).',
+           '<kbd>1</kbd>-<kbd>=</kbd> hoofdbalk, <kbd>Shift</kbd>+toets rij 2, <kbd>Alt</kbd>+toets rij 3, <kbd>Ctrl</kbd>+toets rij 4 (kan botsen met de browser). Klikken op een knop werkt ook. Klik op de vijand in de wereld om hem te selecteren; ga erover voor de kills-tot-level-tooltip. <kbd>Enter</kbd> opent de chat, <kbd>Esc</kbd> sluit vensters. Counterspell staat op <kbd>-</kbd> (level 30-modus).']
+};
+const MOVERS = {castbar:['Cast bar','Castbar'], hint:['Hint','Hint'], remind:['Reminders','Herinneringen'], player:['Player','Speler'], bars:['Action bars','Actiebalken'],
+  target:['Target','Doelwit'], tot:['ToT','ToT'], tcast:['Target cast','Doelwit-cast'], group:['Party','Groep'], micro:['Menu','Menu']};
+
+function makeImg(name, cls) {
+  const i = document.createElement('img');
+  i.alt = ''; i.draggable = false; if (cls) i.className = cls;
+  i.onerror = () => { if (i.dataset.fb !== '1') { i.dataset.fb = '1'; i.src = ICON(QM); } };
+  if (name) setIcon(i, name);
+  return i;
+}
+function setIcon(i, name) {
+  if (i.dataset.n === name) return;
+  i.dataset.n = name; i.dataset.fb = '0'; i.src = ICON(name);
+}
+
+/* ---------- spreuken en voorwerpen ---------- */
+// lvl = trainerlevel; talent = enkel afhankelijk van je level; racial = altijd gekend; tip = [Engels, Nederlands]
+const SP = {
+  frostbolt:  {n:'Frostbolt', ic:'spell_frost_frostbolt02', lvl:4, cast:1.8, cost:35, range:30, dmg:[30,36], sch:'frost', tip:['Launches a bolt of frost: Frost damage and slows the target for 9 sec.','Werpt een ijsschicht: Vorstschade en vertraagt het doelwit 9 sec.']},
+  fireball:   {n:'Fireball', ic:'spell_fire_flamebolt', lvl:1, cast:2.5, cost:50, range:35, dmg:[44,54], sch:'fire', tip:['Hurls a fiery ball: Fire damage plus a burn over 6 sec.','Werpt een vuurbal: Vuurschade plus een brandeffect van 6 sec.']},
+  fireblast:  {n:'Fire Blast', ic:'spell_fire_fireball', lvl:6, cast:0, cd:8, cost:40, range:20, dmg:[30,38], sch:'fire', tip:['Instant Fire damage. Ideal while moving.','Onmiddellijke Vuurschade. Ideaal tijdens het bewegen.']},
+  frostnova:  {n:'Frost Nova', ic:'spell_frost_frostnova', lvl:10, cast:0, cd:25, cost:55, range:0, self:true, dmg:[10,12], sch:'frost', tip:['Freezes enemies within 10 yd in place for 8 sec.','Bevriest vijanden binnen 10 m 8 sec op hun plaats.']},
+  poly:       {n:'Polymorph', ic:'spell_nature_polymorph', lvl:8, cast:1.5, cost:60, range:30, sch:'arcane', tip:['Transforms the target into a sheep for up to 20 sec. Damage breaks the effect.','Verandert het doelwit tot 20 sec in een schaap. Schade verbreekt het effect.']},
+  am:         {n:'Arcane Missiles', ic:'spell_nature_starfall', lvl:8, channel:3, cost:85, range:30, dmg:[24,27], ticks:3, sch:'arcane', tip:['Channels 3 arcane missiles, one per second.','Kanaliseert 3 arcane projectielen, één per seconde.']},
+  ai:         {n:'Arcane Intellect', ic:'spell_holy_magicalsentry', lvl:1, cast:0, cost:60, self:true, buff:'ai', dur:1800, tip:['Increases Intellect for 30 min.','Verhoogt Intelligentie gedurende 30 min.']},
+  frostarmor: {n:'Frost Armor', ic:'spell_frost_frostarmor02', lvl:1, cast:0, cost:60, self:true, buff:'armor', dur:1800, tip:['Increases your armor and slows attackers. 30 min.','Verhoogt je pantser en vertraagt aanvallers. 30 min.']},
+  conjwater:  {n:'Conjure Water', ic:'inv_drink_06', lvl:4, cast:3, cost:60, self:true, makes:['water',10], tip:['Conjures 10 Conjured Fresh Water.','Tovert 10x Conjured Fresh Water.']},
+  conjfood:   {n:'Conjure Food', ic:'inv_misc_food_10', lvl:6, cast:3, cost:60, self:true, makes:['food',10], tip:['Conjures 10 Conjured Bread.','Tovert 10x Conjured Bread.']},
+  water:      {n:'Conjured Fresh Water', ic:'inv_drink_07', item:'water', lvl:1, cast:0, self:true, tip:['Use: restores mana over 18 sec. You must remain seated.','Gebruik: herstelt mana over 18 sec. Je moet blijven zitten.']},
+  food:       {n:'Conjured Bread', ic:'inv_misc_food_09', item:'food', lvl:1, cast:0, self:true, tip:['Use: restores health over 18 sec. You must remain seated.','Gebruik: herstelt leven over 18 sec. Je moet blijven zitten.']},
+  gem:        {n:'Mana Agate', ic:'inv_misc_gem_emerald_01', item:'gem', lvl:28, cast:0, cd:120, gcdFree:true, self:true, tip:['Use: instantly restores some of your mana.','Gebruik: herstelt direct een deel van je mana.']},
+  conjgem:    {n:'Conjure Mana Agate', ic:'inv_misc_gem_emerald_02', lvl:28, cast:3, cost:120, self:true, makes:['gem',1], max:{gem:1}, tip:['Conjures a Mana Agate.','Tovert een Mana Agate.']},
+  icelance:   {n:'Ice Lance', ic:'spell_frost_frostblast', lvl:20, talent:true, cast:0, cost:30, range:30, dmg:[16,20], sch:'frost', tip:['Instant Frost damage, x3 against frozen targets. (Talent, from level 20.)','Onmiddellijke Vorstschade, x3 tegen bevroren doelwitten. (Talent, vanaf level 20.)']},
+  blink:      {n:'Blink', ic:'spell_arcane_blink', lvl:20, cast:0, cd:15, cost:80, self:true, tip:['Teleports you 20 yd forward and removes stun and root effects.','Teleporteert je 20 m vooruit en verbreekt stun- en wortel-effecten.']},
+  counterspell:{n:'Counterspell', ic:'spell_frost_iceshock', lvl:24, cast:0, cd:30, cost:100, range:30, gcdFree:true, tip:['Interrupts the target\'s spellcasting.','Onderbreekt het casten van het doelwit.']},
+  arcaneexpl: {n:'Arcane Explosion', ic:'spell_nature_wispsplode', lvl:14, cast:0, cost:75, self:true, aoe:10, dmg:[32,36], sch:'arcane', tip:['Arcane damage to all enemies within 10 yd.','Arcane schade aan alle vijanden binnen 10 m.']},
+  evocation:  {n:'Evocation', ic:'spell_nature_purge', lvl:20, channel:8, cd:480, cost:0, self:true, tip:['Channels for 8 sec and restores a large part of your mana.','Kanaliseert 8 sec en herstelt een groot deel van je mana.']},
+  slowfall:   {n:'Slow Fall', ic:'spell_magic_featherfall', lvl:14, cast:0, cost:30, self:true, tip:['You fall slowly for 30 sec.','Je valt traag gedurende 30 sec.']},
+  manashield: {n:'Mana Shield', ic:'spell_shadow_detectlesserinvisibility', lvl:20, cast:0, cost:120, self:true, tip:['Damage is absorbed by your mana.','Schade wordt met mana opgevangen.']},
+  frostward:  {n:'Frost Ward', ic:'spell_frost_frostward', lvl:22, cast:0, cd:30, cost:85, self:true, tip:['Absorbs Frost damage.','Vangt Vorstschade op.']},
+  fireward:   {n:'Fire Ward', ic:'spell_fire_firearmor', lvl:20, cast:0, cd:30, cost:85, self:true, tip:['Absorbs Fire damage.','Vangt Vuurschade op.']},
+  iceblock:   {n:'Ice Block', ic:'spell_frost_frost', lvl:30, talent:true, cast:0, cd:300, cost:0, self:true, tip:['Immune for 10 sec. (Talent.)','Onkwetsbaar gedurende 10 sec. (Talent.)']},
+  coc:        {n:'Cone of Cold', ic:'spell_frost_glacier', lvl:26, cast:0, cd:10, cost:150, self:true, aoe:10, dmg:[60,70], sch:'frost', tip:['Frost damage in a cone in front of you, slows.','Vorstschade in een kegel voor je, vertraagt.']},
+  blizzard:   {n:'Blizzard', ic:'spell_frost_icestorm', lvl:20, channel:8, cost:180, self:true, aoe:30, dmg:[22,26], ticks:8, sch:'frost', tip:['Channels an ice storm on an area for 8 sec.','Kanaliseert 8 sec ijsregen op een gebied.']},
+  icebarrier: {n:'Ice Barrier', ic:'spell_ice_lament', lvl:40, talent:true, cast:0, cd:30, cost:200, self:true, tip:['Absorbs damage. (Talent, from level 40.)','Absorbeert schade. (Talent, vanaf level 40.)']},
+  walkonair:  {n:'Walk on Air', ic:'spell_nature_cyclone', racial:true, lvl:1, cast:0, cd:60, gcdFree:true, self:true, tip:['Racial (High Order Skyborne): stops your fall and lets you hover briefly. (Values simulated.)','Raciaal (High Order Skyborne): stopt je val en laat je even zweven. (Waarden gesimuleerd.)']},
+  leyline:    {n:'Read Leyline', ic:'spell_arcane_arcanetorrent', racial:true, lvl:1, cast:0, cd:180, gcdFree:true, self:true, tip:['Racial (High Order Skyborne): restores some of your mana. (Values simulated.)','Raciaal (High Order Skyborne): herstelt een deel van je mana. (Waarden gesimuleerd.)']},
+  hearth:     {n:'Hearthstone', ic:'inv_misc_rune_01', item:'hearth', lvl:1, cast:10, cd:3600, self:true, tip:['Returns you to your inn.','Brengt je terug naar je herberg.']}
+};
+// spreuken van de vijand (doelwit-castbar)
+const ENEMY = {heal:{n:'Heal', ic:'spell_holy_heal', cast:2.5}, shoot:{n:'Shoot', ic:'ability_marksmanship', cast:2.0}};
+
+/* ---------- toestand ---------- */
+const XPN = {10:7600,11:8800,12:10100,13:11400,14:12900,15:14400,16:16000,17:17700,18:19400,19:21300,20:23200,21:25200,22:27300,23:29400,24:31700,25:34000,26:36400,27:38900,28:41400,29:44300,30:47400,31:50800,32:54500,33:58600,34:62800,35:67100};
+const ROWKEYS = ['1','2','3','4','5','6','7','8','9','0','-','='];
+const CODES = ['Digit1','Digit2','Digit3','Digit4','Digit5','Digit6','Digit7','Digit8','Digit9','Digit0','Minus','Equal'];
+const MODS = [{p:'',l:''},{p:'S',l:'Shift-'},{p:'A',l:'Alt-'},{p:'C',l:'Ctrl-'}];
+const SLOTS = [
+  ['frostbolt','fireball','fireblast','frostnova','am','poly','icelance','coc','blizzard','arcaneexpl','counterspell','blink'],
+  ['water','food','conjwater','conjfood','frostarmor','ai','gem','conjgem','evocation','manashield','iceblock','icebarrier'],
+  ['walkonair','leyline','slowfall','frostward','fireward','hearth',null,null,null,null,null,null],
+  [null,null,null,null,null,null,null,null,null,null,null,null]
+];
+const DEF = {
+  lang:'en',
+  rows:3, perRow:12, size:36, gap:4, mainTop:true, bg:true, showHK:true, showCount:true, cdText:true, tintRange:true, tintMana:true,
+  rotation:true, source:'blizzard', glow:'blizzard', second:true, onlyHostile:true, aoe:false, defensive:true, hint:true, spec:'frost',
+  xpbar:true, xptext:true, reminders:true, waterMin:5, foodMin:3, trainer:true, talent:true, sellGrey:true, autoRepair:true,
+  minimap:true,
+  uf:true, ufPlayer:true, ufTarget:true, ufTot:true, ufGroup:true, classColor:true, ufScale:100, castbar:true, tcastbar:true, latency:true
+};
+function loadJSON(k, d) { try { const v = JSON.parse(localStorage.getItem(k)); return v && typeof v === 'object' ? v : d; } catch (e) { return d; } }
+function saveJSON(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* privévenster */ } }
+
+const S = {
+  cfg: Object.assign({}, DEF, loadJSON('ck-cfg', {})),
+  pos: loadJSON('ck-pos', {}),
+  unlocked: false,
+  // simulatie-instellingen die een levelwissel overleven
+  group: false, secret: false, latency: 80, tgType: 'hostile', resting: false
+};
+
+// groepsleden (klassekleuren volgens Blizzard)
+const PARTY = [
+  {n:'Thrallin', cls:['Warrior','Krijger'], col:'#C69B6D', pwc:'#C41E3A', tank:true, lv:13, hp:.92, pw:.3},
+  {n:'Lumina', cls:['Priest','Priester'], col:'#FFFFFF', pwc:'#3a6fd0', lv:14, hp:1, pw:.85},
+  {n:'Rokk', cls:['Rogue','Rogue'], col:'#FFF468', pwc:'#e0c800', lv:13, hp:.78, pw:.6},
+  {n:'Elyra', cls:['Hunter','Hunter'], col:'#AAD372', pwc:'#3a6fd0', lv:12, hp:.96, pw:.7}
+];
+PARTY.forEach(m => { m.goal = m.hp; m.next = 0; });
+
+function setupLevel(lvl) {
+  const t = T();
+  S.level = lvl;
+  S.trained = lvl === 13 ? 12 : 28;
+  S.hpMax = lvl === 13 ? 290 : 980; S.manaMax = lvl === 13 ? 430 : 1480;
+  S.hp = S.hpMax; S.mana = S.manaMax;
+  S.xp = Math.round(XPN[lvl] * 0.45); S.rested = Math.round(XPN[lvl] * 0.18);
+  S.sessionXP = 1234; S.sessionStart = t - 3600; S.lastKillXP = 0;
+  S.items = {water: 12, food: 8, gem: lvl >= 28 ? 1 : 0, hearth: 1};
+  S.buffs = {armor: t + 1500, ai: t + 1100};
+  S.bagsFree = 7; S.bagsMax = 52; S.durability = 82;
+  S.talentFree = 1;
+  S.cds = {}; S.gcdEnd = 0; S.gcdStart = 0; S.casting = null; S.lastCastEnd = -10;
+  S.procs = {fof: 0, mb: 0};
+  S.moving = false; S.falling = false; S.rooted = false;
+  S.target = null; S.combat = false; S.respawnAt = 0;
+  S.frozenFB = false; S.drink = 0; S.eat = 0;
+  S.lastHit = 0; S.lastCombatT = -99; S.ghost = 0;
+}
+setupLevel(13);
+
+const mul = () => S.level >= 30 ? 2.6 : 1;
+function known(id) {
+  const sp = SP[id]; if (!sp) return false;
+  if (sp.racial) return true;
+  if (sp.item) return S.level >= sp.lvl;
+  if (sp.talent) return S.level >= sp.lvl;
+  return S.trained >= sp.lvl;
+}
+function cdLeft(id) { return Math.max(0, (S.cds[id] || 0) - T()); }
+function gcdLeft() { return Math.max(0, S.gcdEnd - T()); }
+function hasBuff(b) { return (S.buffs[b] || 0) > T(); }
+function hostileTarget() { return S.target && !S.target.dead ? S.target : null; }
+function frozen() { const tg = hostileTarget(); return !!(tg && tg.deb.frozen > T()); }
+
+/* ---------- rotatie (Frost leveling, Forever-guide) ---------- */
+function ctxNow() {
+  const t = T(), tg = hostileTarget();
+  return {
+    used: new Set(), hostile: !!tg, dist: tg ? tg.dist : 99, poly: !!(tg && tg.deb.poly > t),
+    frozen: frozen(), frozenFB: S.frozenFB, fof: S.procs.fof > t, mb: S.procs.mb > t,
+    moving: S.moving, falling: S.falling, rooted: S.rooted,
+    manaPct: S.mana / S.manaMax * 100, hpPct: S.hp / S.hpMax * 100,
+    armor: hasBuff('armor'), ai: hasBuff('ai'), barrier: hasBuff('barrier'),
+    water: S.items.water, food: S.items.food, gem: S.items.gem,
+    spec: S.cfg.spec, aoe: S.cfg.aoe, inCombat: S.combat,
+    tcast: !!(tg && tg.cast && !tg.cast.noInt), tcastName: tg && tg.cast ? tg.cast.n : ''
+  };
+}
+function ready(c, id) {
+  if (!known(id) || c.used.has(id)) return false;
+  const sp = SP[id];
+  if (sp.item && (c[sp.item] ?? S.items[sp.item]) <= 0) return false;
+  return cdLeft(id) <= gcdLeft() + 0.1;
+}
+function applyHyp(c, id) {
+  const n = Object.assign({}, c, {used: new Set(c.used)});
+  const sp = SP[id];
+  if (sp.cd && sp.cd > 1.5) n.used.add(id);
+  if (sp.cost) n.manaPct -= sp.cost / S.manaMax * 100;
+  if (id === 'icelance') { if (n.fof) n.fof = false; else if (n.frozen) n.frozenFB = false; }
+  if (id === 'am') n.mb = false;
+  if (id === 'counterspell') n.tcast = false;
+  if (id === 'frostbolt' && n.frozen) n.frozenFB = true;
+  if (id === 'frostnova' && n.dist <= 10) { n.frozen = true; n.frozenFB = false; }
+  if (id === 'gem' || id === 'evocation' || id === 'leyline') n.manaPct = 60;
+  if (id === 'walkonair' || id === 'slowfall') n.falling = false;
+  if (id === 'blink') { n.rooted = false; n.dist += 20; }
+  if (id === 'frostarmor') n.armor = true;
+  if (id === 'ai') n.ai = true;
+  if (id === 'icebarrier') n.barrier = true;
+  if (sp.makes) n[sp.makes[0]] = (n[sp.makes[0]] || 0) + sp.makes[1];
+  return n;
+}
+const R = (id, kind, why) => ({id, kind, why});
+function rotate(c) {
+  const r = id => ready(c, id);
+  // defensief
+  if (S.cfg.defensive) {
+    if (c.falling) {
+      if (r('walkonair')) return R('walkonair', 'def', tx('Falling: racial Walk on Air', 'Je valt: raciaal Walk on Air'));
+      if (r('slowfall')) return R('slowfall', 'def', tx('Falling: Slow Fall', 'Je valt: Slow Fall'));
+    }
+    if (c.rooted && c.hostile && r('blink')) return R('blink', 'def', tx('Rooted: Blink to escape', 'Rooted: Blink om te ontsnappen'));
+    if (c.hostile && c.inCombat && c.hpPct < 30 && r('iceblock')) return R('iceblock', 'def', tx('Low health: Ice Block', 'Weinig leven: Ice Block'));
+  }
+  if (!c.hostile) {
+    if (S.cfg.onlyHostile) return R(null, null, tx('No hostile target (setting "only with hostile target")', 'Geen vijandig doelwit (instelling "alleen bij vijandig doelwit")'));
+    if (!c.armor && r('frostarmor')) return R('frostarmor', 'normal', tx('Out of combat: Frost Armor missing', 'Buiten gevecht: Frost Armor ontbreekt'));
+    if (!c.ai && r('ai')) return R('ai', 'normal', tx('Out of combat: Arcane Intellect missing', 'Buiten gevecht: Arcane Intellect ontbreekt'));
+    if (c.water < S.cfg.waterMin && r('conjwater')) return R('conjwater', 'normal', tx('Out of combat: low on water', 'Buiten gevecht: weinig water'));
+    if (c.food < S.cfg.foodMin && r('conjfood')) return R('conjfood', 'normal', tx('Out of combat: low on food', 'Buiten gevecht: weinig eten'));
+    if (known('conjgem') && c.gem < 1 && r('conjgem')) return R('conjgem', 'normal', tx('Out of combat: no mana gem', 'Buiten gevecht: geen mana gem'));
+    return R(null, null, tx('Out of combat: all good', 'Buiten gevecht: alles in orde'));
+  }
+  if (c.poly) return R(null, null, tx('Target is polymorphed: do not attack', 'Doelwit is gepolymorphed: niet aanvallen'));
+  if (c.tcast && r('counterspell')) return R('counterspell', 'normal', fmt(tx('Target is casting {0}: Counterspell', 'Doelwit cast {0}: Counterspell'), c.tcastName));
+  if (c.spec === 'frost' && known('icebarrier') && !c.barrier && r('icebarrier')) return R('icebarrier', 'normal', tx('Ice Barrier not active', 'Ice Barrier niet actief'));
+  if (c.manaPct < 20) {
+    if (c.gem > 0 && r('gem')) return R('gem', 'normal', tx('Low mana: mana gem', 'Weinig mana: mana gem'));
+    if (r('evocation') && !c.moving) return R('evocation', 'normal', tx('Low mana: Evocation', 'Weinig mana: Evocation'));
+    if (r('leyline')) return R('leyline', 'normal', tx('Low mana: racial Read Leyline', 'Weinig mana: raciaal Read Leyline'));
+  }
+  const mbTxt = tx('Missile Barrage proc: Arcane Missiles', 'Missile Barrage-proc: Arcane Missiles');
+  const noInstant = tx('Moving: no instant spell ready', 'Bewegen: geen instant spreuk klaar');
+  if (c.spec === 'fire') {
+    if (c.mb && r('am') && !c.moving) return R('am', 'proc', mbTxt);
+    if (c.aoe && c.dist <= 10 && r('arcaneexpl')) return R('arcaneexpl', 'normal', 'AoE: Arcane Explosion');
+    if (r('fireblast') && c.dist <= 20) return R('fireblast', 'normal', tx('Fire Blast is ready', 'Fire Blast is klaar'));
+    if (c.moving) return R(null, null, noInstant);
+    return R('fireball', 'normal', tx('Default: Fireball', 'Standaard: Fireball'));
+  }
+  if (c.spec === 'arcane') {
+    if (c.mb && r('am') && !c.moving) return R('am', 'proc', mbTxt);
+    if (c.aoe && c.dist <= 10 && r('arcaneexpl')) return R('arcaneexpl', 'normal', 'AoE: Arcane Explosion');
+    if (c.moving) { if (r('fireblast')) return R('fireblast', 'normal', tx('Moving: Fire Blast', 'Bewegen: Fire Blast')); return R(null, null, noInstant); }
+    if (r('am')) return R('am', 'normal', tx('Default: Arcane Missiles', 'Standaard: Arcane Missiles'));
+    return R('frostbolt', 'normal', tx('Filler: Frostbolt', 'Opvulling: Frostbolt'));
+  }
+  // Frost
+  if (c.aoe) {
+    if (c.dist <= 10 && !c.frozen && r('frostnova')) return R('frostnova', 'normal', tx('AoE: Frost Nova first', 'AoE: eerst Frost Nova'));
+    if (!c.moving && r('blizzard')) return R('blizzard', 'normal', 'AoE: Blizzard');
+    if (c.dist <= 10 && r('coc')) return R('coc', 'normal', 'AoE: Cone of Cold');
+    if (c.dist <= 10 && r('arcaneexpl')) return R('arcaneexpl', 'normal', 'AoE: Arcane Explosion');
+  }
+  if (c.fof && r('icelance')) return R('icelance', 'proc', tx('Fingers of Frost proc: Ice Lance', 'Fingers of Frost-proc: Ice Lance'));
+  if (c.frozen) {
+    if (!c.frozenFB && !c.moving && r('frostbolt')) return R('frostbolt', 'normal', tx('Target frozen: Frostbolt first', 'Doelwit bevroren: eerst Frostbolt'));
+    if (r('icelance')) return R('icelance', 'normal', tx('Target frozen: Ice Lance (shatter)', 'Doelwit bevroren: Ice Lance (shatter)'));
+  }
+  if (c.mb && !c.moving && r('am')) return R('am', 'proc', mbTxt);
+  if (c.dist <= 8 && !c.frozen && r('frostnova')) return R('frostnova', 'normal', tx('Enemy too close: Frost Nova', 'Vijand te dichtbij: Frost Nova'));
+  if (c.moving) {
+    if (r('fireblast')) return R('fireblast', 'normal', tx('Moving: Fire Blast', 'Bewegen: Fire Blast'));
+    if (r('icelance')) return R('icelance', 'normal', tx('Moving: Ice Lance', 'Bewegen: Ice Lance'));
+    return R(null, null, noInstant);
+  }
+  return R('frostbolt', 'normal', tx('Default: Frostbolt', 'Standaard: Frostbolt'));
+}
+// Nagebootste Blizzard-suggestie (Assisted Combat): één spreuk, geen "spreuk daarna", geen defensieve of buiten-gevecht-logica
+function blizzardSuggest(c) {
+  const r = id => ready(c, id);
+  if (!c.hostile) return R(null, null, tx('Assisted Combat: no hostile target', 'Assisted Combat: geen vijandig doelwit'));
+  if (c.poly) return R(null, null, tx('Assisted Combat: target is polymorphed', 'Assisted Combat: doelwit is gepolymorphed'));
+  if (S.level >= 30 && c.fof && r('icelance')) return R('icelance', 'normal', tx('Assisted Combat: Fingers of Frost, Ice Lance', 'Assisted Combat: Fingers of Frost, Ice Lance'));
+  if (c.moving && c.dist <= 20 && r('fireblast')) return R('fireblast', 'normal', tx('Assisted Combat: moving and Fire Blast is ready', 'Assisted Combat: je beweegt en Fire Blast is klaar'));
+  const fill = c.spec === 'fire' ? 'fireball' : (c.spec === 'arcane' && known('am')) ? 'am' : 'frostbolt';
+  return R(fill, 'normal', fmt(tx('Assisted Combat: {0} as filler', 'Assisted Combat: {0} als opvulling'), SP[fill].n));
+}
+function suggestion() {
+  if (!S.cfg.rotation) return {p: R(null, null, tx('Rotation helper is off', 'Rotatiehulp staat uit')), s: null, src: 'off'};
+  const c = ctxNow();
+  if (S.cfg.source !== 'guide') return {p: blizzardSuggest(c), s: null, src: 'blizzard'};
+  if (S.secret && S.combat) return {p: blizzardSuggest(c), s: null, src: 'fallback'};
+  const p = rotate(c);
+  let s = null;
+  if (p.id) s = rotate(applyHyp(c, p.id));
+  return {p, s: s && s.id ? s : null, src: 'guide'};
+}
+
+/* ---------- chat en meldingen ---------- */
+function chat(text, color, addon) {
+  const log = $('#chatlog'), d = document.createElement('div');
+  if (addon) { const p = document.createElement('span'); p.style.color = '#3FC7EB'; p.textContent = '[CasterKit] '; d.appendChild(p); }
+  const s = document.createElement('span'); s.style.color = color || '#fff'; s.textContent = text; d.appendChild(s);
+  log.appendChild(d);
+  while (log.children.length > 40) log.removeChild(log.firstChild);
+}
+let lastErr = '', lastErrT = 0;
+function uiErr(msg) {
+  const t = T(); if (msg === lastErr && t - lastErrT < 0.6) return;
+  lastErr = msg; lastErrT = t;
+  const box = $('#uierr'); box.textContent = '';
+  const d = document.createElement('div'); d.textContent = msg; box.appendChild(d);
+}
+function fct(text, cls) {
+  const host = $('#fct');
+  const d = document.createElement('div');
+  d.className = 'fct ol ' + (cls || '');
+  d.textContent = text;
+  const x = 720 + (Math.random() * 60 - 30), sc = mobScale();
+  d.style.left = x + 'px'; d.style.top = (470 - 150 * sc) + 'px';
+  host.appendChild(d);
+  setTimeout(() => d.remove(), 1350);
+}
+
+/* ---------- casten ---------- */
+function needsTarget(sp) { return !sp.self && sp.range > 0; }
+function activate(id) {
+  if (!id) return;
+  const sp = SP[id], t = T();
+  if (S.ghost) return uiErr(tx('You are dead.', 'Je bent dood.'));
+  if (!known(id)) return uiErr(tx('You don\'t know that spell yet.', 'Die spreuk ken je nog niet.'));
+  if (sp.item && S.items[sp.item] <= 0) return uiErr(tx('You don\'t have any left.', 'Je hebt er geen meer.'));
+  if (S.casting && !sp.gcdFree) return uiErr(tx('You are already doing something else.', 'Je bent al iets anders aan het doen.'));
+  if (cdLeft(id) > 0.05) return uiErr(tx('That spell is not ready yet.', 'Die spreuk is nog niet klaar.'));
+  if (!sp.gcdFree && S.gcdEnd > t) return uiErr(tx('That spell is not ready yet.', 'Die spreuk is nog niet klaar.'));
+  if (sp.cost && S.mana < sp.cost) return uiErr(tx('Not enough mana.', 'Niet genoeg mana.'));
+  if (needsTarget(sp)) {
+    if (!hostileTarget()) return uiErr(tx('You have no target.', 'Je hebt geen doelwit.'));
+    if (S.target.dist > sp.range) return uiErr(tx('Target is out of range.', 'Doelwit is buiten bereik.'));
+  }
+  if ((sp.cast > 0 || sp.channel) && S.moving) return uiErr(tx('You can\'t do that while moving.', 'Dat kan niet terwijl je beweegt.'));
+  if (sp.max && S.items[Object.keys(sp.max)[0]] >= Object.values(sp.max)[0]) return uiErr(tx('You already have one.', 'Je hebt er al een.'));
+  if (id !== 'water' && id !== 'food') { S.drink = 0; S.eat = 0; }
+  if (!sp.gcdFree) { S.gcdStart = t; S.gcdEnd = t + 1.5; }
+  pressFlash(id);
+  if (sp.cast > 0) {
+    S.casting = {id, start: t, end: t + sp.cast, ch: false};
+  } else if (sp.channel) {
+    spend(id);
+    S.casting = {id, start: t, end: t + sp.channel, ch: true, next: t + 1, ticks: 0};
+    if (id === 'am') S.procs.mb = 0;
+  } else {
+    spend(id); effect(id);
+  }
+}
+function spend(id) {
+  const sp = SP[id];
+  if (sp.cost) S.mana = Math.max(0, S.mana - sp.cost);
+  if (sp.cd) S.cds[id] = T() + sp.cd;
+  if (sp.item && id !== 'hearth') S.items[sp.item] = Math.max(0, S.items[sp.item] - 1);
+  S.lastCastEnd = T();
+}
+function dmgRoll(sp, m) { return Math.round((sp.dmg[0] + Math.random() * (sp.dmg[1] - sp.dmg[0])) * mul() * (m || 1)); }
+function hit(amount, sch, crit) {
+  const tg = hostileTarget(); if (!tg) return;
+  if (tg.deb.poly > T()) { tg.deb.poly = 0; chat(tx('Polymorph was broken by damage.', 'Polymorph is verbroken door schade.'), '#ffd100'); }
+  tg.hp = Math.max(0, tg.hp - amount);
+  fct(String(amount) + (crit ? '!' : ''), sch + (crit ? ' crit' : ''));
+  enterCombat();
+  if (tg.hp <= 0) kill();
+}
+function enterCombat() { if (!S.combat) { S.combat = true; } S.lastCombatT = T(); S.resting = false; }
+function effect(id) {
+  const sp = SP[id], t = T(), tg = hostileTarget();
+  switch (id) {
+    case 'frostbolt': {
+      if (!tg) break;
+      const fr = frozen();
+      const crit = fr || Math.random() < 0.1;
+      if (fr) S.frozenFB = true;
+      tg.deb.chill = t + 9;
+      if (S.level >= 20 && Math.random() < 0.18) procFof();
+      if (S.level >= 30 && Math.random() < 0.1) procMb();
+      hit(dmgRoll(sp, crit ? 1.5 : 1), 'frost', crit); break;
+    }
+    case 'fireball': if (!tg) break; tg.deb.fireball = t + 6; if (S.level >= 30 && Math.random() < 0.1) procMb(); hit(dmgRoll(sp), 'fire'); break;
+    case 'fireblast': hit(dmgRoll(sp), 'fire'); break;
+    case 'icelance': {
+      const fr = frozen(), fof = S.procs.fof > t;
+      if (fof) S.procs.fof = 0; else if (fr) S.frozenFB = false;
+      hit(dmgRoll(sp, (fr || fof) ? 3 : 1), 'frost', fr || fof); break;
+    }
+    case 'frostnova':
+      if (tg && tg.dist <= 10) { tg.deb.frozen = t + 8; S.frozenFB = false; hit(dmgRoll(sp), 'frost'); }
+      else chat(tx('Frost Nova hit nothing (target further than 10 yd).', 'Frost Nova raakte niets (doelwit verder dan 10 m).'), '#aaa');
+      break;
+    case 'arcaneexpl': case 'coc': if (tg && tg.dist <= (sp.aoe || 10)) { if (id === 'coc') tg.deb.coc = t + 8; hit(dmgRoll(sp), sp.sch); } break;
+    case 'poly': if (tg) { tg.deb.poly = t + 20; tg.deb.frozen = 0; tg.cast = null; S.combat = false; chat(fmt(tx('{0} is now a sheep.', '{0} is nu een schaap.'), tg.name), '#ffd100'); } break;
+    case 'ai': case 'frostarmor': S.buffs[sp.buff] = t + sp.dur; break;
+    case 'conjwater': case 'conjfood': case 'conjgem': {
+      const [k, n] = sp.makes; S.items[k] += n; if (sp.max) S.items[k] = Math.min(S.items[k], sp.max[k]);
+      chat(fmt(tx('You create: {0} x{1}.', 'Je maakt: {0} x{1}.'), k === 'water' ? 'Conjured Fresh Water' : k === 'food' ? 'Conjured Bread' : 'Mana Agate', n), '#ffff00'); break;
+    }
+    case 'water': S.drink = t + 18; S.buffs.drink = t + 18; break;
+    case 'food': S.eat = t + 18; S.buffs.food = t + 18; break;
+    case 'gem': gainMana(S.manaMax * 0.3); break;
+    case 'leyline': gainMana(S.manaMax * 0.25); break;
+    case 'walkonair': S.falling = false; S.buffs.woa = t + 10; syncSimButtons(); break;
+    case 'slowfall': S.falling = false; S.buffs.slowfall = t + 30; syncSimButtons(); break;
+    case 'blink': S.rooted = false; if (tg) tg.dist = Math.min(45, tg.dist + 20); syncSimButtons(); break;
+    case 'iceblock': S.buffs.iceblock = t + 10; break;
+    case 'manashield': S.buffs.manashield = t + 60; break;
+    case 'frostward': S.buffs.frostward = t + 30; break;
+    case 'fireward': S.buffs.fireward = t + 30; break;
+    case 'icebarrier': S.buffs.barrier = t + 60; break;
+    case 'counterspell':
+      if (tg && tg.cast) {
+        if (tg.cast.noInt) chat(fmt(tx('{0} cannot be interrupted.', '{0} kan niet onderbroken worden.'), tg.cast.n), '#aaa');
+        else {
+          chat(fmt(tx('You interrupt {0}\'s {1}.', 'Je onderbreekt {1} van {0}.'), tg.name, tg.cast.n), '#ffd100');
+          tg.castFail = {ic: tg.cast.ic, until: t + 1.2};
+          tg.cast = null; tg.nextCast = t + 6 + Math.random() * 4;
+        }
+        enterCombat();
+      } else chat(tx('Counterspell: there was nothing to interrupt.', 'Counterspell: er was niets om te onderbreken.'), '#aaa');
+      break;
+    case 'hearth': S.resting = true; chat(tx('You are home and resting. (Simulation: nothing else changes.)', 'Je bent thuis en rust. (Simulatie: verder verandert er niets.)'), '#ffd100'); break;
+  }
+}
+function gainMana(n) { S.mana = Math.min(S.manaMax, S.mana + n); fct('+' + Math.round(n) + ' mana', 'frost'); }
+function procFof() { S.procs.fof = T() + 15; }
+function procMb() { S.procs.mb = T() + 15; }
+function finishCast() {
+  const c = S.casting; S.casting = null;
+  spend(c.id); effect(c.id);
+}
+let castFail = null; // {id, until, k:'int'|'fail'}
+function interrupt(k) {
+  if (!S.casting) return;
+  const c = S.casting; S.casting = null;
+  castFail = {id: c.id, until: T() + 1.2, k: k || 'int'};
+}
+
+function kill() {
+  const tg = S.target; tg.dead = true; tg.hp = 0; tg.cast = null; S.combat = false; S.casting = null;
+  if (tg.tapped) {
+    chat(fmt(tx('{0} dies. No experience: tapped by another player.', '{0} sterft. Geen ervaring: getapt door een andere speler.'), tg.name), '#ffd100');
+  } else {
+    const base = 45 + 5 * tg.level;
+    let gained = base;
+    if (S.rested > 0) { const bonus = Math.min(base, S.rested); gained += bonus; S.rested -= bonus; }
+    S.lastKillXP = gained;
+    chat(fmt(tx('{0} dies, you gain {1} experience{2}.', '{0} sterft, je krijgt {1} ervaring{2}.'), tg.name, gained,
+      gained > base ? fmt(tx(' (+{0} rested)', ' (+{0} uitgerust)'), gained - base) : ''), '#ffd100');
+    addXP(gained);
+  }
+  S.bagsFree = Math.max(0, S.bagsFree - (Math.random() < 0.5 ? 1 : 0));
+  S.durability = Math.max(0, S.durability - 1);
+  if ($('#autoNext').checked) S.respawnAt = T() + 3;
+}
+function addXP(n) {
+  S.xp += n; S.sessionXP += n;
+  while (S.xp >= XPN[S.level]) {
+    S.xp -= XPN[S.level]; levelUp();
+  }
+}
+function levelUp() {
+  S.level++;
+  S.hpMax = Math.round(S.hpMax * 1.06); S.manaMax = Math.round(S.manaMax * 1.06);
+  S.hp = S.hpMax; S.mana = S.manaMax;
+  if (S.level >= 10) S.talentFree++;
+  chat(fmt(tx('Congratulations, you are now level {0}!', 'Gefeliciteerd, je bent nu level {0}!'), S.level), '#ffff00');
+  zoneText('Level ' + S.level);
+  if (S.level % 2 === 0) chat(tx('New spells available at your trainer.', 'Nieuwe spreuken beschikbaar bij je trainer.'), '#ffd100', true);
+  buildBars(); syncSimButtons();
+}
+function zoneText(s) { const z = $('#zonetext'); z.textContent = s; z.style.opacity = 1; setTimeout(() => { z.style.opacity = 0; }, 1800); }
+
+function spawnTarget(fight) {
+  const lv = S.level >= 30 ? 30 : 13, t = T();
+  const hpMax = lv === 13 ? 330 : 1300;
+  S.target = {name: lv === 13 ? 'Defias Pillager' : 'Syndicate Highwayman', level: lv, hp: hpMax, hpMax, mana: 1, dist: +$('#dist').value || 25, deb: {}, dead: false,
+    cast: null, castFail: null, nextCast: t + 4 + Math.random() * 4};
+  applyTargetType();
+  S.frozenFB = false;
+  if (fight) { enterCombat(); S.target.dist = 28; chat(fmt(tx('{0} attacks you!', '{0} valt je aan!'), S.target.name), '#ff6060'); }
+  $('#mob .nm').textContent = S.target.name;
+}
+function applyTargetType() {
+  if (!S.target) return;
+  S.target.react = S.tgType === 'neutral' ? 'neutral' : 'hostile';
+  S.target.tapped = S.tgType === 'tapped';
+}
+
+/* ---------- vijand cast (doelwit-castbar) ---------- */
+function startEnemyCast(tg, t, forceNoInt) {
+  const forced = forceNoInt !== undefined;
+  const heal = tg.hp < tg.hpMax * 0.7 && (forced || Math.random() < 0.7);
+  if (!heal && tg.dist <= 5 && !forced) { tg.nextCast = t + 2; return; }
+  const k = heal ? 'heal' : 'shoot', e = ENEMY[k];
+  tg.cast = {k, n: e.n, ic: e.ic, start: t, end: t + e.cast, noInt: forced ? forceNoInt : Math.random() < 0.25};
+  tg.castFail = null;
+}
+function finishEnemyCast(tg, t) {
+  const c = tg.cast; tg.cast = null; tg.nextCast = t + 6 + Math.random() * 6;
+  tg.mana = Math.max(0.1, tg.mana - 0.12);
+  if (c.k === 'heal') {
+    const amt = Math.round(tg.hpMax * 0.2); tg.hp = Math.min(tg.hpMax, tg.hp + amt); fct('+' + amt, 'heal');
+  } else if (S.group) {
+    PARTY[0].hp = Math.max(0.05, PARTY[0].hp - 0.1);
+    chat(fmt(tx('{0}\'s Shoot hits {1}.', 'Shoot van {0} raakt {1}.'), tg.name, PARTY[0].n), '#ff9090');
+  } else if (S.buffs.iceblock > t) {
+    chat(fmt(tx('{0}\'s Shoot: you are immune.', 'Shoot van {0}: je bent onkwetsbaar.'), tg.name), '#aaa');
+  } else {
+    const dmg = Math.round((14 + Math.random() * 6) * mul()); S.hp = Math.max(0, S.hp - dmg);
+    chat(fmt(tx('{0}\'s Shoot hits you for {1}.', 'Shoot van {0} raakt je voor {1}.'), tg.name, dmg), '#ff9090');
+    if (S.casting && !S.casting.ch) S.casting.end += 0.3;
+    if (S.hp <= 0) playerDeath();
+  }
+}
+function playerDeath() {
+  chat(tx('You died. (Simulation: you get back up after 3 seconds.)', 'Je bent gestorven. (Simulatie: je staat na 3 seconden terug op.)'), '#ff4040');
+  S.hp = 0; S.ghost = T() + 3; S.casting = null; S.target = null; S.combat = false; S.respawnAt = 0;
+  S.durability = Math.max(0, S.durability - 10);
+  syncSimButtons();
+}
+
+/* ---------- actiebalken opbouwen ---------- */
+const btnEls = []; // {el, id, row, col, ...}
+function rowOrder() {
+  const rows = [];
+  for (let r = 0; r < S.cfg.rows; r++) rows.push(r);
+  return S.cfg.mainTop ? rows : rows.reverse();
+}
+function buildBars() {
+  const bars = $('#bars');
+  bars.textContent = '';
+  btnEls.length = 0;
+  document.documentElement.style.setProperty('--bs', S.cfg.size + 'px');
+  document.documentElement.style.setProperty('--gap', S.cfg.gap + 'px');
+  bars.classList.toggle('nobg', !S.cfg.bg);
+  for (const r of rowOrder()) {
+    const row = document.createElement('div'); row.className = 'row';
+    for (let c = 0; c < S.cfg.perRow; c++) {
+      let id = SLOTS[r][c];
+      if (id && !known(id)) id = null;
+      const b = document.createElement('div');
+      b.className = 'ab' + (id ? '' : ' empty');
+      b.dataset.row = r; b.dataset.col = c; b.dataset.g = '';
+      b.setAttribute('role', 'button');
+      b.setAttribute('aria-label', (id ? SP[id].n : tx('Empty slot', 'Leeg vak')) + tx(', key ', ', toets ') + MODS[r].l + ROWKEYS[c]);
+      const inner = document.createElement('div'); inner.className = 'in';
+      const ref = {el: b, id, row: r, col: c, cache: {}};
+      if (id) inner.appendChild(makeImg(SP[id].ic, 'ic'));
+      const cd = document.createElement('div'); cd.className = 'cd'; inner.appendChild(cd);
+      const tint = document.createElement('div'); tint.className = 'tint'; inner.appendChild(tint);
+      b.appendChild(inner);
+      const hk = document.createElement('span'); hk.className = 'hk ol'; hk.textContent = MODS[r].p + ROWKEYS[c];
+      if (!S.cfg.showHK) hk.style.display = 'none';
+      const ct = document.createElement('span'); ct.className = 'ct ol';
+      const cdt = document.createElement('span'); cdt.className = 'cdt ol';
+      const gl = document.createElement('div'); gl.className = 'glow';
+      b.append(hk, ct, cdt, gl);
+      Object.assign(ref, {cd, ct, cdt});
+      if (id) {
+        b.addEventListener('click', () => { if (!S.unlocked) activate(id); });
+        b.addEventListener('mouseenter', () => showTip(b, spellTip(id, MODS[r].l + ROWKEYS[c])));
+        b.addEventListener('mouseleave', hideTip);
+      }
+      btnEls.push(ref);
+      row.appendChild(b);
+    }
+    bars.appendChild(row);
+  }
+}
+function pressFlash(id) {
+  for (const b of btnEls) if (b.id === id) { b.el.classList.add('down'); setTimeout(() => b.el.classList.remove('down'), 120); }
+}
+
+/* ---------- tooltip ---------- */
+let SCALE = 1;
+function showTip(el, html) {
+  const tt = $('#tt'); tt.innerHTML = html; tt.style.display = 'block';
+  const sr = $('#screen').getBoundingClientRect(), r = el.getBoundingClientRect();
+  const w = tt.offsetWidth, h = tt.offsetHeight;
+  let x = (r.left - sr.left) / SCALE + (r.width / SCALE) / 2 - w / 2;
+  let y = (r.top - sr.top) / SCALE - h - 8;
+  if (y < 4) y = (r.bottom - sr.top) / SCALE + 8;
+  x = Math.max(4, Math.min(1440 - w - 4, x));
+  tt.style.left = x + 'px'; tt.style.top = y + 'px';
+}
+function hideTip() { $('#tt').style.display = 'none'; }
+function fmtCast(sp) {
+  return sp.channel ? fmt(tx('Channeled ({0} sec)', 'Gekanaliseerd ({0} sec)'), sp.channel)
+    : sp.cast > 0 ? fmt(tx('{0} sec cast', '{0} sec cast'), dec(sp.cast, 1)) : tx('Instant', 'Onmiddellijk');
+}
+function fmtCd(s) { return s >= 60 ? Math.round(s / 60) + ' min' : s + ' sec'; }
+function spellTip(id, key) {
+  const sp = SP[id];
+  let h = '<div class="t1">' + esc(sp.n) + '</div>';
+  if (sp.racial) h += '<div class="tt-g">' + esc(tx('Racial: High Order Skyborne', 'Raciaal: High Order Skyborne')) + '</div>';
+  if (sp.item) h += '<div class="tt-g">' + esc(tx('Item', 'Voorwerp')) + (S.items[sp.item] != null && id !== 'hearth' ? esc(fmt(tx(' · {0} in your bags', ' · {0} in je tassen'), S.items[sp.item])) : '') + '</div>';
+  const left = sp.cost ? sp.cost + ' mana' : '', right = sp.range ? fmt(tx('{0} yd range', '{0} m bereik'), sp.range) : '';
+  if (left || right) h += '<div class="row2"><span class="' + (sp.cost > S.mana ? 'tt-r' : '') + '">' + esc(left) + '</span><span>' + esc(right) + '</span></div>';
+  h += '<div class="row2"><span>' + esc(fmtCast(sp)) + '</span><span>' + (sp.cd ? esc(fmtCd(sp.cd) + ' cooldown') : '') + '</span></div>';
+  h += '<div class="y">' + esc(pick(sp.tip)) + '</div>';
+  h += '<div class="tt-g">' + esc(tx('Hotkey: ', 'Sneltoets: ') + key) + '</div>';
+  return h;
+}
+// v0.1.2: kills tot level in de tooltip van het doelwit
+function killTip() {
+  const tg = S.target; if (!tg) return '';
+  const need = XPN[S.level] || 99999, remain = need - S.xp;
+  const base = 45 + 5 * tg.level, per = base + (S.rested > 0 ? Math.min(base, S.rested) : 0);
+  const kills = Math.ceil(remain / per);
+  let h = '<div class="t1">' + esc(tg.name) + '</div>';
+  h += '<div><span style="color:' + diffColor(tg.level) + '">Level ' + tg.level + '</span> · <span class="tt-b">' +
+    esc(tg.tapped ? tx('Tapped: no experience', 'Getapt: geen ervaring') : fmt(tx('±{0} kills to level {1} (estimated)', '±{0} kills tot level {1} (geschat)'), kills, S.level + 1)) + '</span></div>';
+  if (tg.dead) h += '<div class="tt-g">' + esc(tx('Dead', 'Dood')) + '</div>';
+  return h;
+}
+
+/* ---------- herinneringen ---------- */
+const REM = [
+  {k:'water', ic:'inv_drink_07', label:['Conjured Water','Conjured Water'], act:'conjwater', bad:() => S.items.water === 0, warn:() => S.items.water < S.cfg.waterMin, txt:() => String(S.items.water)},
+  {k:'food', ic:'inv_misc_food_09', label:['Conjured Food','Conjured Food'], act:'conjfood', bad:() => S.items.food === 0, warn:() => S.items.food < S.cfg.foodMin, txt:() => String(S.items.food)},
+  {k:'gem', ic:'inv_misc_gem_emerald_01', label:['Mana gem','Mana gem'], act:'conjgem', show:() => known('conjgem'), bad:() => S.items.gem === 0, warn:() => false, txt:() => String(S.items.gem)},
+  {k:'armor', ic:'spell_frost_frostarmor02', label:['Frost Armor','Frost Armor'], act:'frostarmor', bad:() => !hasBuff('armor'), warn:() => buffLeft('armor') < 300, txt:() => hasBuff('armor') ? fmtShort(buffLeft('armor')) : '!'},
+  {k:'ai', ic:'spell_holy_magicalsentry', label:['Arcane Intellect','Arcane Intellect'], act:'ai', bad:() => !hasBuff('ai'), warn:() => buffLeft('ai') < 300, txt:() => hasBuff('ai') ? fmtShort(buffLeft('ai')) : '!'},
+  {k:'bags', ic:'inv_misc_bag_08', label:['Free bag slots','Vrije tasplaatsen'], bad:() => S.bagsFree === 0, warn:() => S.bagsFree <= 3, txt:() => String(S.bagsFree)},
+  {k:'dura', ic:'inv_misc_armorkit_17', label:['Durability','Slijtage'], bad:() => S.durability < 20, warn:() => S.durability < 50, txt:() => S.durability + '%'}
+];
+function buffLeft(b) { return Math.max(0, (S.buffs[b] || 0) - T()); }
+function fmtShort(s) { return s >= 3600 ? Math.floor(s / 3600) + tx('h', 'u') : s >= 60 ? Math.ceil(s / 60) + 'm' : Math.ceil(s) + 's'; }
+const remEls = {};
+function buildReminders() {
+  const box = $('#remind'); box.querySelectorAll('.rm,.note').forEach(e => e.remove());
+  for (const r of REM) {
+    const d = document.createElement('div'); d.className = 'rm';
+    d.setAttribute('role', 'button'); d.tabIndex = -1;
+    const inner = document.createElement('div'); inner.className = 'in'; inner.appendChild(makeImg(r.ic));
+    const c = document.createElement('span'); c.className = 'rc ol';
+    d.append(inner, c);
+    d.addEventListener('mouseenter', () => showTip(d, remTip(r)));
+    d.addEventListener('mouseleave', hideTip);
+    d.addEventListener('click', () => {
+      if (S.unlocked) return;
+      // buffs and conjures can be cast in combat in WoW too (they cost a GCD and mana)
+      if (r.act) activate(r.act);
+      else if (r.k === 'bags' || r.k === 'dura') chat(r.k === 'bags'
+        ? tx('Tip: sell grey items at a vendor (happens automatically when enabled).', 'Tip: verkoop grijze spullen bij een handelaar (gebeurt automatisch als dat aanstaat).')
+        : tx('Tip: have your gear repaired at a blacksmith.', 'Tip: laat je uitrusting herstellen bij een smid.'), '#ddd', true);
+    });
+    remEls[r.k] = {el: d, c, r};
+    box.appendChild(d);
+  }
+  const tr = document.createElement('div'); tr.className = 'note tr ol';
+  tr.addEventListener('mouseenter', () => showTip(tr, '<div class="t1">Trainer</div><div class="y">' + esc(fmt(tx('You are level {0}: new ranks or spells are available.', 'Je bent level {0}: er zijn nieuwe rangen of spreuken te leren.'), S.level)) +
+    '</div><div class="tt-g">' + esc(tx('Simulation: "Visit trainer" button.', 'Simulatie: knop "Trainer bezoeken".')) + '</div>'));
+  tr.addEventListener('mouseleave', hideTip);
+  const tl = document.createElement('div'); tl.className = 'note tal ol';
+  tl.addEventListener('mouseenter', () => showTip(tl, '<div class="t1">' + esc(tx('Talents', 'Talenten')) + '</div><div class="y">' + esc(tx('Click to open your talent window.', 'Klik om je talentvenster te openen.')) + '</div>'));
+  tl.addEventListener('mouseleave', hideTip);
+  tl.addEventListener('click', () => microClick('talent'));
+  remEls.trainer = {el: tr}; remEls.talent = {el: tl};
+  box.append(tr, tl);
+}
+function remTip(r) {
+  let h = '<div class="t1">' + esc(pick(r.label)) + '</div>';
+  const st = r.bad() ? '<span class="tt-r">' + esc(tx('Out or missing!', 'Op of ontbreekt!')) + '</span>'
+    : r.warn() ? '<span class="y">' + esc(tx('Almost out', 'Bijna op')) + '</span>' : '<span class="tt-gr">' + esc(tx('OK', 'In orde')) + '</span>';
+  h += '<div>' + st + ' · ' + esc(r.txt()) + '</div>';
+  if (r.act) h += '<div class="tt-b">' + esc(tx('Click: ', 'Klik: ') + SP[r.act].n) + '</div>';
+  return h;
+}
+
+/* ---------- micro + tassen ---------- */
+const MICRO = [
+  {k:'char', ic:'inv_shirt_white_01', n:['Character (C)','Personage (C)']},
+  {k:'book', ic:'inv_misc_book_09', n:['Spellbook (P)','Spreukenboek (P)']},
+  {k:'talent', ic:'ability_marksmanship', n:['Talents (N)','Talenten (N)']},
+  {k:'quest', ic:'inv_misc_note_01', n:['Quest log (L)','Questlog (L)']},
+  {k:'social', ic:'inv_letter_15', n:['Social (O)','Sociaal (O)']},
+  {k:'map', ic:'inv_misc_map_01', n:['World map (M)','Wereldkaart (M)']},
+  {k:'shop', ic:'inv_misc_coin_01', n:['Shop','Winkel']},
+  {k:'menu', ic:'trade_engineering', n:['Game menu and settings','Spelmenu en instellingen']}
+];
+const BAGS = ['inv_misc_bag_08', 'inv_misc_bag_07', 'inv_misc_bag_07_green', 'inv_misc_bag_10_blue', 'inv_misc_bag_09'];
+function buildMicro() {
+  const mr = $('#microRow'), br = $('#bagRow');
+  for (const m of MICRO) {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'mb'; b.dataset.k = m.k;
+    const inner = document.createElement('span'); inner.className = 'in'; inner.appendChild(makeImg(m.ic)); b.appendChild(inner);
+    b.addEventListener('click', () => { if (!S.unlocked) microClick(m.k); });
+    b.addEventListener('mouseenter', () => showTip(b, '<div class="t1">' + esc(pick(m.n)) + '</div>' + (m.k === 'talent' && S.talentFree ? '<div class="tt-gr">' + esc(talentTxt()) + '</div>' : '')));
+    b.addEventListener('mouseleave', hideTip);
+    mr.appendChild(b);
+  }
+  BAGS.forEach((ic, i) => {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'mb bag'; b.dataset.bag = i;
+    const inner = document.createElement('span'); inner.className = 'in'; inner.appendChild(makeImg(ic)); b.appendChild(inner);
+    if (i === 0) { const f = document.createElement('span'); f.className = 'fr ol'; f.id = 'bagFree'; b.appendChild(f); }
+    b.addEventListener('mouseenter', () => showTip(b, i === 0
+      ? '<div class="t1">' + esc(tx('Backpack', 'Rugzak')) + '</div><div>' + esc(tx('Free slots in all bags: ', 'Vrije plaatsen in alle tassen: ')) + '<span class="' + (S.bagsFree <= 3 ? 'tt-r' : 'tt-gr') + '">' + S.bagsFree + ' / ' + S.bagsMax + '</span></div>'
+      : '<div class="t1">' + esc(tx('Bag', 'Tas')) + '</div><div class="tt-g">' + esc(tx('12 slots', '12 plaatsen')) + '</div>'));
+    b.addEventListener('mouseleave', hideTip);
+    b.addEventListener('click', () => { if (!S.unlocked) chat(tx('Bags opened (not simulated).', 'Tassen geopend (niet gesimuleerd).'), '#aaa'); });
+    br.appendChild(b);
+  });
+  labelMicro();
+}
+function labelMicro() {
+  $$('#microRow .mb').forEach(b => { const m = MICRO.find(x => x.k === b.dataset.k); b.setAttribute('aria-label', pick(m.n)); });
+  $$('#bagRow .mb').forEach(b => b.setAttribute('aria-label', +b.dataset.bag === 0 ? tx('Backpack', 'Rugzak') : tx('Bag ', 'Tas ') + b.dataset.bag));
+}
+function talentTxt() {
+  return LANG() === 'nl' ? S.talentFree + ' talentpunt' + (S.talentFree > 1 ? 'en' : '') + ' vrij'
+    : S.talentFree + ' talent point' + (S.talentFree > 1 ? 's' : '') + ' free';
+}
+function microClick(k) {
+  if (k === 'menu') return openSettings();
+  if (k === 'talent') {
+    if (S.talentFree > 0) { S.talentFree--; chat(fmt(tx('Talent point spent (simulation). Still free: {0}.', 'Talentpunt besteed (simulatie). Nog vrij: {0}.'), S.talentFree), '#7cff6b'); }
+    else chat(tx('No free talent points.', 'Geen vrije talentpunten.'), '#aaa');
+    return;
+  }
+  const m = MICRO.find(x => x.k === k);
+  chat(fmt(tx('{0} opened (not simulated).', '{0} geopend (niet gesimuleerd).'), pick(m.n).replace(/ \(.\)$/, '')), '#aaa');
+}
+
+/* ---------- instellingen ---------- */
+const TABS = [
+  {id:'alg', n:['General','Algemeen'], items:[
+    {t:'h', n:['General','Algemeen']},
+    {t:'seg', k:'lang', n:['Language','Taal'], opts:[['en','English'],['nl','Nederlands']], d:['Switches every CasterKit text live.','Schakelt alle CasterKit-teksten live om.']},
+    {t:'check', k:'minimap', n:['Show minimap button','Minimapknop tonen'], d:['Hidden? Type /ck in the chat to open this window.','Verborgen? Typ /ck in de chat om dit venster te openen.']},
+    {t:'btn', act:() => setUnlocked(!S.unlocked), label:() => S.unlocked ? tx('Lock frames', 'Vergrendel kaders') : tx('Unlock frames', 'Ontgrendel kaders'), d:['Drag each frame to another place.','Sleep elk kader naar een andere plaats.']},
+    {t:'btn', label:() => tx('Reset positions', 'Posities herstellen'), act:() => resetPositions(), d:['All frames back to their default position.','Alle kaders terug naar hun standaardplaats.']},
+    {t:'btn', label:() => tx('Reset everything to default', 'Alles terug naar standaard'), act:() => { S.cfg = Object.assign({}, DEF, {lang: S.cfg.lang}); saveCfg(); applySettings(); renderTab(); }, d:['Resets every setting (except the language).','Zet elke instelling terug (behalve de taal).']}
+  ]},
+  {id:'bar', n:['Action bars','Actiebalken'], items:[
+    {t:'h', n:['Layout','Indeling']},
+    {t:'seg', k:'rows', n:['Number of rows','Aantal rijen'], opts:[[1,'1'],[2,'2'],[3,'3'],[4,'4']]},
+    {t:'range', k:'perRow', n:['Buttons per row','Knoppen per rij'], min:6, max:12, step:1},
+    {t:'range', k:'size', n:['Button size','Knopgrootte'], min:28, max:48, step:1, u:'px'},
+    {t:'range', k:'gap', n:['Spacing','Tussenruimte'], min:0, max:8, step:1, u:'px'},
+    {t:'seg', k:'mainTop', n:['Main bar (1-=)','Hoofdbalk (1-=)'], opts:[[true,['Top','Boven']],[false,['Bottom','Onder']]]},
+    {t:'check', k:'bg', n:['Background panel','Achtergrondpaneel']},
+    {t:'h', n:['Buttons','Knoppen']},
+    {t:'check', k:'showHK', n:['Show hotkeys','Sneltoetsen tonen']},
+    {t:'check', k:'showCount', n:['Show counts','Aantallen tonen'], d:['E.g. water and food, bottom right.','Bv. water en eten rechtsonder.']},
+    {t:'check', k:'cdText', n:['Show cooldown countdown','Cooldown-aftelling tonen']},
+    {t:'check', k:'tintRange', n:['Red when out of range','Rood kleuren buiten bereik']},
+    {t:'check', k:'tintMana', n:['Blue when not enough mana','Blauw kleuren bij te weinig mana']}
+  ]},
+  {id:'rot', n:['Rotation','Rotatie'], items:[
+    {t:'h', n:['Rotation helper','Rotatiehulp']},
+    {t:'check', k:'rotation', n:['Rotation helper on','Rotatiehulp aan'], d:['Highlights the button you should press now.','Licht de knop op die je nu moet indrukken.']},
+    {t:'seg', k:'source', wide:true, n:['Suggestion source','Bron van de suggestie'], opts:[['blizzard','Blizzard (Assisted Combat)'],['guide',['Own priority (guide)','Eigen prioriteit (guide)']]],
+      d:['Blizzard hides many values from addons in combat. Blizzard\'s own suggestion always works; the own priority falls back to Blizzard when something is hidden.',
+         'Blizzard schermt in gevechten veel waarden af voor addons. De suggestie van Blizzard zelf werkt altijd; de eigen prioriteit valt terug op Blizzard als iets afgeschermd is.']},
+    {t:'seg', k:'spec', n:['Specialization','Specialisatie'], opts:[['frost','Frost'],['fire','Fire'],['arcane','Arcane']]},
+    {t:'seg', k:'glow', n:['Glow style','Glowstijl'], opts:[['blizzard','Blizzard'],['pulse',['Pulsing','Pulserend']]]},
+    {t:'check', k:'second', n:['Show second suggestion','Tweede suggestie tonen'], d:['Faint yellow border around the next spell (own priority only).','Zwakke gele rand rond de spreuk daarna (alleen bij eigen prioriteit).']},
+    {t:'check', k:'onlyHostile', n:['Only with hostile target','Alleen bij vijandig doelwit'], d:['Off: also shows buffs and conjures out of combat (own priority).','Uit: toont ook buffs en conjures buiten gevecht (eigen prioriteit).']},
+    {t:'check', k:'aoe', n:['AoE mode','AoE-modus'], d:['Frost Nova, Blizzard, Cone of Cold, Arcane Explosion.','Frost Nova, Blizzard, Cone of Cold, Arcane Explosion.']},
+    {t:'check', k:'defensive', n:['Defensive suggestions','Defensieve suggesties'], d:['Blue border: falling, rooted, low health.','Blauwe rand: vallen, rooted, weinig leven.']},
+    {t:'check', k:'hint', n:['Hint block above the bars','Hintblok boven de balken']}
+  ]},
+  {id:'lev', n:['Leveling','Levelen'], items:[
+    {t:'h', n:['Experience','Ervaring']},
+    {t:'check', k:'xpbar', n:['Show XP bar','XP-balk tonen']},
+    {t:'check', k:'xptext', n:['XP text (XP/h, time, kills)','XP-tekst (XP/u, tijd, kills)']},
+    {t:'h', n:['Reminders','Herinneringen']},
+    {t:'check', k:'reminders', n:['Show reminder strip','Herinneringsstrook tonen']},
+    {t:'range', k:'waterMin', n:['Warn when water below','Waarschuw bij water onder'], min:0, max:20, step:1},
+    {t:'range', k:'foodMin', n:['Warn when food below','Waarschuw bij eten onder'], min:0, max:20, step:1},
+    {t:'check', k:'trainer', n:['New spells notice (even levels)','Melding nieuwe spreuken (even levels)']},
+    {t:'check', k:'talent', n:['Free talent points notice','Melding vrije talentpunten']},
+    {t:'h', n:['Vendor','Handelaar']},
+    {t:'check', k:'sellGrey', n:['Auto-sell grey items','Grijze spullen automatisch verkopen']},
+    {t:'check', k:'autoRepair', n:['Auto repair','Automatisch repareren']}
+  ]},
+  {id:'frm', n:['Frames','Frames'], items:[
+    {t:'h', n:['Unit frames','Unit frames']},
+    {t:'check', k:'uf', n:['Unit frames on','Unit frames aan'], d:['ElvUI style: flat, 1px black border.','ElvUI-stijl: plat, 1px zwarte rand.']},
+    {t:'check', k:'ufPlayer', n:['Player','Speler']},
+    {t:'check', k:'ufTarget', n:['Target','Doelwit']},
+    {t:'check', k:'ufTot', n:['Target of target','Target-of-target']},
+    {t:'check', k:'ufGroup', n:['Party','Groep'], d:['Four party members on the left of the screen.','Vier groepsleden links op het scherm.']},
+    {t:'check', k:'classColor', n:['Class colour on health bar','Klassekleur op levensbalk']},
+    {t:'range', k:'ufScale', n:['Scale','Schaal'], min:60, max:150, step:5, u:'%'},
+    {t:'h', n:['Cast bars','Castbars']},
+    {t:'check', k:'castbar', n:['Cast bar on','Castbar aan']},
+    {t:'check', k:'tcastbar', n:['Target cast bar on','Doelwit-castbar aan'], d:['Orange-yellow = interruptible, grey with lock = not interruptible.','Oranje-geel = onderbreekbaar, grijs met slotje = niet onderbreekbaar.']},
+    {t:'check', k:'latency', n:['Show latency','Latency tonen'], d:['Translucent red part at the end of your cast.','Doorschijnend rood stuk aan het einde van je cast.']}
+  ]},
+  {id:'over', n:['About','Over']}
+];
+let curTab = 'alg';
+function buildTabs() {
+  const tl = $('#tabs'); tl.textContent = '';
+  for (const tb of TABS) {
+    const b = document.createElement('button'); b.type = 'button'; b.setAttribute('role', 'tab'); b.id = 'tab-' + tb.id;
+    b.setAttribute('aria-controls', 'tabpanel'); b.textContent = pick(tb.n);
+    b.addEventListener('click', () => { curTab = tb.id; renderTab(); });
+    tl.appendChild(b);
+  }
+}
+$('#tabs').addEventListener('keydown', e => {
+  const i = TABS.findIndex(x => x.id === curTab);
+  let n = -1;
+  if (e.key === 'ArrowDown') n = (i + 1) % TABS.length;
+  if (e.key === 'ArrowUp') n = (i - 1 + TABS.length) % TABS.length;
+  if (e.key === 'Home') n = 0;
+  if (e.key === 'End') n = TABS.length - 1;
+  if (n >= 0) { e.preventDefault(); curTab = TABS[n].id; renderTab(); $('#tab-' + curTab).focus(); }
+});
+function renderTab() {
+  for (const tb of TABS) {
+    const b = $('#tab-' + tb.id), on = tb.id === curTab;
+    b.setAttribute('aria-selected', on); b.tabIndex = on ? 0 : -1;
+  }
+  const p = $('#tabpanel'); p.textContent = ''; p.setAttribute('aria-labelledby', 'tab-' + curTab);
+  const tab = TABS.find(x => x.id === curTab);
+  if (tab.id === 'over') {
+    p.innerHTML = LANG() === 'nl'
+      ? '<div class="about"><div class="big ol">CasterKit</div><div>Versie 0.1.2 · door <b style="color:#fff">DinX</b></div>' +
+        '<div class="box">CasterKit toont alleen <b>welke knop je moet indrukken</b>. De addon cast nooit zelf iets en drukt nooit een knop voor je in: dat blijft altijd jouw eigen toetsaanslag of klik. Zo blijft hij binnen de regels van Blizzard.</div>' +
+        '<div>Onderdelen: compacte actiebalken (ElvUI-stijl), rotatiehulp met gloed, hintblok, castbars, unit frames, XP-balk met XP/u, herinneringen (water, eten, mana gem, buffs, tassen, slijtage), trainer- en talentmeldingen, grijs verkopen en automatisch repareren.</div>' +
+        '<div style="margin-top:8px"><b style="color:var(--gold);font-weight:normal">Nieuw in 0.1.2</b><ul>' +
+        '<li>Rotatiebron: standaard de Blizzard-suggestie (Assisted Combat), want WoW Forever schermt in gevechten waarden af voor addons. De eigen prioriteit valt daarop terug.</li>' +
+        '<li>Unit frames in ElvUI-stijl: speler, doelwit, target-of-target en groep.</li>' +
+        '<li>Nieuwe castbar met latency, en een doelwit-castbar (onderbreekbaar of niet).</li>' +
+        '<li>Kills tot level in de tooltip van het doelwit.</li></ul></div>' +
+        '<div style="margin-top:8px;color:#888">Gemaakt voor de client "WoW Forever" (1-60). Opdrachten: <span style="color:#ddd">/ck</span> opent dit venster.</div></div>'
+      : '<div class="about"><div class="big ol">CasterKit</div><div>Version 0.1.2 · by <b style="color:#fff">DinX</b></div>' +
+        '<div class="box">CasterKit only shows <b>which button to press</b>. The addon never casts anything itself and never presses a button for you: that is always your own keystroke or click. That keeps it within Blizzard\'s rules.</div>' +
+        '<div>Features: compact action bars (ElvUI style), rotation helper with glow, hint block, cast bars, unit frames, XP bar with XP/h, reminders (water, food, mana gem, buffs, bags, durability), trainer and talent notices, selling greys and auto repair.</div>' +
+        '<div style="margin-top:8px"><b style="color:var(--gold);font-weight:normal">New in 0.1.2</b><ul>' +
+        '<li>Rotation source: Blizzard\'s suggestion (Assisted Combat) by default, because WoW Forever hides values from addons in combat. The own priority falls back to it.</li>' +
+        '<li>ElvUI-style unit frames: player, target, target of target and party.</li>' +
+        '<li>New cast bar with latency, plus a target cast bar (interruptible or not).</li>' +
+        '<li>Kills to level in the target tooltip.</li></ul></div>' +
+        '<div style="margin-top:8px;color:#888">Made for the "WoW Forever" client (1-60). Commands: <span style="color:#ddd">/ck</span> opens this window.</div></div>';
+    return;
+  }
+  for (const it of tab.items) p.appendChild(renderOpt(it));
+}
+function renderOpt(it) {
+  if (it.t === 'h') { const h = document.createElement('h3'); h.className = 'ol'; h.textContent = pick(it.n); return h; }
+  const lbl = () => { const s = document.createElement('span'); s.className = 'lbl'; s.textContent = pick(it.n); if (it.d) { const sm = document.createElement('small'); sm.textContent = pick(it.d); s.appendChild(sm); } return s; };
+  if (it.t === 'check') {
+    const l = document.createElement('label'); l.className = 'opt';
+    const c = document.createElement('input'); c.type = 'checkbox'; c.className = 'ck'; c.checked = !!S.cfg[it.k];
+    c.addEventListener('change', () => setCfg(it.k, c.checked));
+    l.append(c, lbl()); return l;
+  }
+  const d = document.createElement('div'); d.className = 'opt' + (it.wide ? ' wide' : '');
+  const L = lbl(); const lid = 'l-' + (it.k || 'btn') + Math.random().toString(36).slice(2, 6); L.id = lid; d.appendChild(L);
+  if (it.t === 'seg') {
+    const g = document.createElement('div'); g.className = 'seg'; g.setAttribute('role', 'group'); g.setAttribute('aria-labelledby', lid);
+    for (const [v, n] of it.opts) {
+      const b = document.createElement('button'); b.type = 'button'; b.textContent = pick(n); b.setAttribute('aria-pressed', S.cfg[it.k] === v);
+      b.addEventListener('click', () => { setCfg(it.k, v); g.querySelectorAll('button').forEach((x, i) => x.setAttribute('aria-pressed', it.opts[i][0] === v)); });
+      g.appendChild(b);
+    }
+    d.appendChild(g);
+  } else if (it.t === 'range') {
+    const w = document.createElement('div'); w.className = 'rng';
+    const r = document.createElement('input'); r.type = 'range'; r.min = it.min; r.max = it.max; r.step = it.step; r.value = S.cfg[it.k]; r.setAttribute('aria-labelledby', lid);
+    const o = document.createElement('output'); o.textContent = S.cfg[it.k] + (it.u || '');
+    r.addEventListener('input', () => { o.textContent = r.value + (it.u || ''); setCfg(it.k, +r.value); });
+    w.append(r, o); d.appendChild(w);
+  } else if (it.t === 'btn') {
+    L.textContent = ''; const sm = document.createElement('small'); sm.textContent = pick(it.d); L.appendChild(sm);
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'sbtn'; b.textContent = it.label();
+    b.addEventListener('click', () => { it.act(); b.textContent = it.label(); });
+    d.insertBefore(b, L);
+  }
+  return d;
+}
+function saveCfg() { saveJSON('ck-cfg', S.cfg); }
+const LAYOUT = new Set(['rows', 'perRow', 'size', 'gap', 'mainTop', 'bg', 'showHK']);
+function setCfg(k, v) {
+  S.cfg[k] = v; saveCfg();
+  if (k === 'lang') { applyLang(); chat(tx('Language: English.', 'Taal: Nederlands.'), '#ddd', true); return; }
+  if (LAYOUT.has(k)) buildBars();
+  applySettings(true);
+}
+function applySettings(skipBars) {
+  if (!skipBars) buildBars();
+  $('#mmbtn').style.display = S.cfg.minimap ? '' : 'none';
+  $('#xp').style.display = S.cfg.xpbar ? '' : 'none';
+  $('#remind').style.display = S.cfg.reminders ? '' : 'none';
+  $('#bAoe').setAttribute('aria-pressed', S.cfg.aoe);
+  const sc = String(Math.max(60, Math.min(150, S.cfg.ufScale)) / 100);
+  for (const el of [$('#playerFrame'), $('#targetFrame'), $('#groupFrames')]) el.style.scale = sc;
+}
+// alle CasterKit-teksten live omschakelen
+function applyLang() {
+  document.documentElement.lang = LANG() === 'nl' ? 'nl-BE' : 'en';
+  $$('[data-t]').forEach(el => { el.textContent = pick(STAT[el.dataset.t]); });
+  $$('[data-th]').forEach(el => { el.innerHTML = pick(STAT[el.dataset.th]); }); // enkel vaste teksten uit dit bestand
+  $$('[data-ta]').forEach(el => el.setAttribute('aria-label', pick(STAT[el.dataset.ta])));
+  $$('[data-tp]').forEach(el => el.setAttribute('placeholder', pick(STAT[el.dataset.tp])));
+  $$('.mover').forEach(m => { m.firstChild.textContent = pick(MOVERS[m.parentElement.dataset.mover]); m.lastChild.textContent = tx('drag me', 'sleep mij'); });
+  buildTabs();
+  if ($('#settings').classList.contains('open')) renderTab();
+  buildBars(); labelMicro(); buildGroup(); hideTip();
+  $('#distV').textContent = (S.target ? Math.round(S.target.dist) : +$('#dist').value) + ' ' + U();
+}
+function openSettings() { $('#settings').classList.add('open'); renderTab(); hideTip(); $('#tab-' + curTab).focus(); }
+function closeSettings() { $('#settings').classList.remove('open'); }
+
+/* ---------- kaders verslepen ---------- */
+function applyPositions() {
+  $$('[data-mover]').forEach(el => {
+    const p = S.pos[el.dataset.mover];
+    el.style.transform = p ? 'translate(' + p.x + 'px,' + p.y + 'px)' : '';
+  });
+}
+function setupMovers() {
+  $$('[data-mover]').forEach(el => {
+    const m = document.createElement('div'); m.className = 'mover ol';
+    const a = document.createElement('span'), b = document.createElement('span'); b.style.opacity = '.8';
+    m.append(a, b);
+    el.appendChild(m);
+    m.addEventListener('pointerdown', e => {
+      e.preventDefault(); e.stopPropagation();
+      m.setPointerCapture(e.pointerId);
+      const k = el.dataset.mover, start = S.pos[k] || {x: 0, y: 0}, sx = e.clientX, sy = e.clientY;
+      const move = ev => { S.pos[k] = {x: Math.round(start.x + (ev.clientX - sx) / SCALE), y: Math.round(start.y + (ev.clientY - sy) / SCALE)}; applyPositions(); };
+      const up = () => { m.removeEventListener('pointermove', move); m.removeEventListener('pointerup', up); m.removeEventListener('pointercancel', up); saveJSON('ck-pos', S.pos); };
+      m.addEventListener('pointermove', move); m.addEventListener('pointerup', up); m.addEventListener('pointercancel', up);
+    });
+  });
+}
+function setUnlocked(on) {
+  S.unlocked = on; $('#screen').classList.toggle('unlocked', on);
+  $('#bUnlock').setAttribute('aria-pressed', on);
+  hideTip();
+}
+function resetPositions() { S.pos = {}; saveJSON('ck-pos', S.pos); applyPositions(); }
+
+/* settingsvenster versleepbaar via de kop */
+(function () {
+  const hdr = document.querySelector('#settings .hdr'), win = $('#settings');
+  let off = {x: 0, y: 0};
+  hdr.addEventListener('pointerdown', e => {
+    if (e.target.closest('button')) return;
+    hdr.setPointerCapture(e.pointerId);
+    const sx = e.clientX, sy = e.clientY, st = {x: off.x, y: off.y};
+    const mv = ev => { off = {x: st.x + (ev.clientX - sx) / SCALE, y: st.y + (ev.clientY - sy) / SCALE}; win.style.transform = 'translate(' + off.x + 'px,' + off.y + 'px)'; };
+    const up = () => { hdr.removeEventListener('pointermove', mv); hdr.removeEventListener('pointerup', up); };
+    hdr.addEventListener('pointermove', mv); hdr.addEventListener('pointerup', up);
+  });
+})();
+
+/* ---------- groepsframes ---------- */
+const gfEls = [];
+function buildGroup() {
+  const list = $('#groupList'); list.textContent = ''; gfEls.length = 0;
+  for (const m of PARTY) {
+    const f = document.createElement('div'); f.className = 'gf';
+    const hp = document.createElement('div'); hp.className = 'hp';
+    const hi = document.createElement('i');
+    const txb = document.createElement('div'); txb.className = 'tx ol';
+    if (m.tank) { const r = document.createElement('span'); r.className = 'role'; r.title = 'Tank'; r.appendChild(makeImg('inv_shield_06')); txb.appendChild(r); }
+    const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = m.n;
+    const hv = document.createElement('span'); hv.className = 'hv';
+    txb.append(nm, hv); hp.append(hi, txb);
+    const pw = document.createElement('div'); pw.className = 'pw'; const pi = document.createElement('i'); pi.style.background = m.pwc; pw.appendChild(pi);
+    f.append(hp, pw);
+    f.addEventListener('mouseenter', () => { if (!S.unlocked) showTip(f, '<div class="t1" style="color:' + m.col + '">' + esc(m.n) + '</div><div>Level ' + m.lv + ' ' + esc(pick(m.cls)) + (m.tank ? ' · Tank' : '') + '</div>'); });
+    f.addEventListener('mouseleave', hideTip);
+    gfEls.push({m, hi, hv, pi});
+    list.appendChild(f);
+  }
+}
+
+/* ---------- elke frame bijwerken ---------- */
+function setTxt(el, s) { if (el._t !== s) { el._t = s; el.textContent = s; } }
+function setStyle(el, k, v) { if (el['_s' + k] !== v) { el['_s' + k] = v; el.style[k] = v; } }
+function cdFmt(s) { return s >= 60 ? Math.ceil(s / 60) + 'm' : s >= 3 ? String(Math.ceil(s)) : dec(s, 1); }
+function glowFor(kind) {
+  if (kind === 'proc') return 'proc';
+  if (kind === 'def') return 'def';
+  return S.cfg.glow === 'pulse' ? 'pulse' : 'gold';
+}
+function updateButtons(sug) {
+  const tg = hostileTarget(), gl = gcdLeft();
+  const pid = sug.p.id, sid = S.cfg.second && sug.s ? sug.s.id : null;
+  const pg = pid ? glowFor(sug.p.kind) : '';
+  for (const b of btnEls) {
+    if (!b.id) continue;
+    const sp = SP[b.id];
+    const cl = cdLeft(b.id);
+    let rem = cl, total = sp.cd || 0;
+    if (!sp.gcdFree && gl > cl) { rem = gl; total = 1.5; }
+    if (b.id === 'gem' && !S.items.gem) rem = 0;
+    const bg = rem > 0.02 ? 'conic-gradient(transparent 0deg ' + ((1 - rem / total) * 360).toFixed(1) + 'deg, rgba(0,0,0,.72) 0deg)' : '';
+    setStyle(b.cd, 'background', bg);
+    setTxt(b.cdt, S.cfg.cdText && cl > 0.05 && cl >= gl ? cdFmt(cl) : '');
+    b.cdt.classList.toggle('soon', cl > 0 && cl < 3);
+    const oor = S.cfg.tintRange && !!tg && needsTarget(sp) && tg.dist > sp.range;
+    const oom = S.cfg.tintMana && !oor && sp.cost > S.mana;
+    b.el.classList.toggle('oor', oor);
+    b.el.classList.toggle('oom', oom);
+    const noItem = sp.item && b.id !== 'hearth' && S.items[sp.item] <= 0;
+    setStyle(b.el, 'opacity', noItem ? '.55' : '');
+    setTxt(b.ct, S.cfg.showCount && sp.item && b.id !== 'hearth' ? String(S.items[sp.item]) : '');
+    let g = '';
+    if (b.id === pid) g = pg; else if (b.id === sid) g = 'next';
+    if (b.el.dataset.g !== g) b.el.dataset.g = g;
+    b.el.classList.toggle('casting', !!(S.casting && S.casting.id === b.id));
+  }
+}
+const hintImgs = {};
+function updateHint(sug) {
+  const h = $('#hint');
+  const show = S.cfg.rotation && S.cfg.hint && !!sug.p.id;
+  h.classList.toggle('on', show);
+  h.classList.toggle('aoeon', S.cfg.aoe && sug.src === 'guide');
+  h.classList.toggle('fallback', sug.src === 'fallback');
+  const hb = h.querySelector('.hb'), hs = h.querySelector('.hs');
+  if (!hintImgs.b) {
+    for (const [k, el] of [['b', hb], ['s', hs]]) {
+      const inner = document.createElement('div'); inner.className = 'in';
+      hintImgs[k] = makeImg(QM, 'ic'); inner.appendChild(hintImgs[k]);
+      const hk = document.createElement('span'); hk.className = 'hk ol'; el.append(inner, hk);
+      const g = document.createElement('div'); g.className = 'glow'; el.appendChild(g);
+      hintImgs[k + 'k'] = hk;
+    }
+  }
+  if (sug.p.id) {
+    setIcon(hintImgs.b, SP[sug.p.id].ic);
+    setTxt(hintImgs.bk, keyFor(sug.p.id));
+    const g = glowFor(sug.p.kind); if (hb.dataset.g !== g) hb.dataset.g = g;
+    setTxt($('#hintName'), SP[sug.p.id].n);
+  }
+  // Blizzard-suggestie: enkel het grote icoon
+  setStyle(hs, 'display', sug.src === 'guide' ? '' : 'none');
+  const s2 = S.cfg.second && sug.s && sug.src === 'guide';
+  hs.style.visibility = s2 ? 'visible' : 'hidden';
+  if (s2) { setIcon(hintImgs.s, SP[sug.s.id].ic); setTxt(hintImgs.sk, keyFor(sug.s.id)); }
+}
+function keyFor(id) {
+  for (const b of btnEls) if (b.id === id) return MODS[b.row].p + ROWKEYS[b.col];
+  return '';
+}
+function updateCastbar() {
+  const cb = $('#castbar'), t = T();
+  cb.classList.toggle('off', !S.cfg.castbar);
+  const bar = cb.querySelector('.cb i'), lat = cb.querySelector('.lat'), nm = cb.querySelector('.cn'), tm = cb.querySelector('.ctm');
+  if (!cb._img) { cb._img = makeImg(QM); cb.querySelector('.cic').appendChild(cb._img); }
+  if (S.casting) {
+    const c = S.casting, sp = SP[c.id], dur = c.end - c.start, el = Math.max(0, t - c.start);
+    cb.classList.add('on'); cb.classList.remove('fail'); cb.classList.toggle('ch', c.ch);
+    cb.classList.toggle('showlat', S.cfg.latency && S.latency > 0);
+    setStyle(lat, 'width', Math.min(100, S.latency / 1000 / dur * 100).toFixed(2) + '%');
+    setStyle(cb, 'opacity', '');
+    setIcon(cb._img, sp.ic); setTxt(nm, sp.n);
+    const f = Math.min(1, el / dur);
+    bar.style.width = ((c.ch ? 1 - f : f) * 100) + '%';
+    setTxt(tm, dec(c.ch ? Math.max(0, dur - el) : Math.min(el, dur), 1) + ' / ' + dec(dur, 1));
+  } else if (castFail && castFail.until > t) {
+    cb.classList.add('on', 'fail'); cb.classList.remove('showlat', 'ch');
+    setStyle(cb, 'opacity', Math.min(1, (castFail.until - t) / 0.6).toFixed(2));
+    setIcon(cb._img, SP[castFail.id].ic); setTxt(nm, castFail.k === 'fail' ? tx('Failed', 'Mislukt') : tx('Interrupted', 'Onderbroken')); setTxt(tm, '');
+  } else {
+    cb.classList.remove('on', 'fail', 'ch', 'showlat'); setStyle(cb, 'opacity', '');
+    if (S.unlocked) { setTxt(nm, tx('Cast bar', 'Castbar')); setTxt(tm, ''); bar.style.width = '60%'; }
+  }
+}
+function hpCol(col) { return S.cfg.classColor ? col : '#3c9a3c'; }
+function diffColor(lv) { const d = lv - S.level; return d >= 5 ? '#ff2020' : d >= 3 ? '#ff8040' : d >= -2 ? '#ffff00' : d >= -7 ? '#40c040' : '#9d9d9d'; }
+const REACT = {hostile:'#c74040', neutral:'#d9c45c', tapped:'#8c8c8c'};
+const DEBUFFS = {frozen:['Frost Nova','spell_frost_frostnova'], chill:['Frostbolt','spell_frost_frostbolt02'], fireball:['Fireball','spell_fire_flamebolt'], poly:['Polymorph','spell_nature_polymorph'], coc:['Cone of Cold','spell_frost_glacier']};
+function updateUnitFrames() {
+  const t = T(), ufOn = S.cfg.uf;
+  // speler
+  const pf = $('#playerFrame');
+  pf.classList.toggle('off', !(ufOn && S.cfg.ufPlayer));
+  setStyle(pf.querySelector('.hp>i'), 'width', (S.hp / S.hpMax * 100).toFixed(1) + '%');
+  setStyle(pf.querySelector('.hp>i'), 'background', hpCol('#3FC7EB'));
+  setStyle(pf.querySelector('.pw>i'), 'width', (S.mana / S.manaMax * 100).toFixed(1) + '%');
+  setTxt(pf.querySelector('.hv'), S.ghost ? tx('Ghost', 'Geest') : fmtK(S.hp) + ' / ' + fmtK(S.hpMax));
+  const plv = pf.querySelector('.lvl'); setTxt(plv, String(S.level)); setStyle(plv, 'color', diffColor(S.level));
+  const st = pf.querySelector('.status');
+  if (!st._img) { st._img = makeImg('ability_dualwield'); st.appendChild(st._img); }
+  const stK = S.combat ? 'combat' : (S.resting ? 'rest' : '');
+  st.classList.toggle('on', !!stK);
+  if (stK) { setIcon(st._img, stK === 'combat' ? 'ability_dualwield' : 'spell_nature_sleep'); st.title = stK === 'combat' ? tx('In combat', 'In gevecht') : tx('Resting', 'Rusten'); }
+  // doelwit
+  const tf = $('#targetFrame'), tg = S.target;
+  tf.classList.toggle('off', !(ufOn && S.cfg.ufTarget));
+  tf.classList.toggle('none', !tg);
+  const thp = tf.querySelector('.hp>i'), tnm = tf.querySelector('.nm'), thv = tf.querySelector('.hv'), tlv = tf.querySelector('.lvl');
+  if (!tg) {
+    setTxt(tnm, tx('Target', 'Doelwit')); setTxt(thv, ''); setTxt(tlv, ''); setStyle(thp, 'width', '100%'); setStyle(thp, 'background', REACT.hostile);
+  } else {
+    setTxt(tnm, tg.name);
+    setTxt(tlv, String(tg.level)); setStyle(tlv, 'color', diffColor(tg.level));
+    setStyle(thp, 'width', (tg.hp / tg.hpMax * 100).toFixed(1) + '%');
+    setStyle(thp, 'background', tg.dead ? '#555' : tg.tapped ? REACT.tapped : REACT[tg.react || 'hostile']);
+    setStyle(tf.querySelector('.pw>i'), 'width', (tg.dead ? 0 : tg.mana * 100).toFixed(1) + '%');
+    setTxt(thv, tg.dead ? tx('Dead', 'Dood') : Math.ceil(tg.hp / tg.hpMax * 100) + '% · ' + fmtK(tg.hp));
+  }
+  tf.querySelector('.raid').classList.toggle('on', !!(tg && !tg.dead && S.group));
+  tf.querySelector('.raid').title = tx('Skull', 'Doodshoofd');
+  // debuffs van de speler (max 8)
+  const box = tf.querySelector('.debuffs');
+  const list = [];
+  if (tg && !tg.dead) for (const k in DEBUFFS) if ((tg.deb[k] || 0) > t) list.push([k, tg.deb[k] - t]);
+  list.splice(8);
+  const sig = list.map(x => x[0]).join(',');
+  if (box._sig !== sig) {
+    box._sig = sig; box.textContent = '';
+    for (const [k] of list) {
+      const d = document.createElement('div'); d.className = 'db'; d.dataset.k = k; d.appendChild(makeImg(DEBUFFS[k][1]));
+      const s = document.createElement('span'); s.className = 'ol'; d.appendChild(s);
+      d.addEventListener('mouseenter', () => showTip(d, '<div class="t1">' + esc(DEBUFFS[k][0]) + '</div><div class="tt-g">' + esc(tx('Your debuff on the target', 'Jouw debuff op het doelwit')) + '</div>'));
+      d.addEventListener('mouseleave', hideTip);
+      box.appendChild(d);
+    }
+  }
+  box.querySelectorAll('.db').forEach((d, i) => setTxt(d.lastChild, String(Math.ceil(list[i][1]))));
+  // target-of-target
+  const tot = $('#totFrame');
+  tot.classList.toggle('off', !S.cfg.ufTot);
+  let tu = null;
+  if (tg && !tg.dead && S.combat && !(tg.deb.poly > t)) tu = S.group ? {n: PARTY[0].n, col: PARTY[0].col, f: PARTY[0].hp} : {n: 'DinX', col: '#3FC7EB', f: S.hp / S.hpMax};
+  tot.classList.toggle('none', !tu);
+  setTxt(tot.querySelector('.nm'), tu ? tu.n : 'ToT');
+  setStyle(tot.querySelector('.hp>i'), 'width', ((tu ? tu.f : 1) * 100).toFixed(1) + '%');
+  setStyle(tot.querySelector('.hp>i'), 'background', hpCol(tu ? tu.col : '#3FC7EB'));
+  // doelwit-castbar
+  updateTargetCast(tg, t);
+  // groep
+  const gf = $('#groupFrames');
+  gf.classList.toggle('off', !(ufOn && S.cfg.ufGroup));
+  gf.classList.toggle('none', !S.group);
+  for (const g of gfEls) {
+    setStyle(g.hi, 'width', (g.m.hp * 100).toFixed(1) + '%');
+    setStyle(g.hi, 'background', hpCol(g.m.col));
+    setStyle(g.pi, 'width', (g.m.pw * 100).toFixed(1) + '%');
+    setTxt(g.hv, Math.round(g.m.hp * 100) + '%');
+  }
+}
+function updateTargetCast(tg, t) {
+  const tc = $('#tcast');
+  tc.classList.toggle('off', !S.cfg.tcastbar);
+  if (!tc._img) { tc._img = makeImg(QM); tc.querySelector('.tic').appendChild(tc._img); }
+  const bar = tc.querySelector('.tb i'), nm = tc.querySelector('.tnm'), tm = tc.querySelector('.tt2');
+  if (tg && !tg.dead && tg.cast) {
+    const c = tg.cast, dur = c.end - c.start, el = Math.min(dur, t - c.start);
+    tc.classList.remove('none', 'fail'); tc.classList.toggle('noint', c.noInt);
+    setStyle(tc, 'opacity', '');
+    setIcon(tc._img, c.ic); setTxt(nm, c.n);
+    bar.style.width = (el / dur * 100) + '%';
+    setTxt(tm, dec(el, 1) + ' / ' + dec(dur, 1));
+  } else if (tg && tg.castFail && tg.castFail.until > t) {
+    tc.classList.remove('none', 'noint'); tc.classList.add('fail');
+    setStyle(tc, 'opacity', Math.min(1, (tg.castFail.until - t) / 0.6).toFixed(2));
+    setIcon(tc._img, tg.castFail.ic); setTxt(nm, tx('Interrupted', 'Onderbroken')); setTxt(tm, '');
+  } else {
+    tc.classList.add('none'); tc.classList.remove('fail', 'noint'); setStyle(tc, 'opacity', '');
+    if (S.unlocked) { setTxt(nm, tx('Target cast', 'Doelwit-cast')); setTxt(tm, ''); bar.style.width = '50%'; }
+  }
+}
+function updateBuffs() {
+  const box = $('#buffs'), t = T();
+  const B = [['armor','spell_frost_frostarmor02','Frost Armor'],['ai','spell_holy_magicalsentry','Arcane Intellect'],['drink','inv_drink_07',['Drinking','Drinken']],['food','inv_misc_food_09',['Eating','Eten']],
+    ['woa','spell_nature_cyclone','Walk on Air'],['slowfall','spell_magic_featherfall','Slow Fall'],['iceblock','spell_frost_frost','Ice Block'],['manashield','spell_shadow_detectlesserinvisibility','Mana Shield'],
+    ['frostward','spell_frost_frostward','Frost Ward'],['fireward','spell_fire_firearmor','Fire Ward'],['barrier','spell_ice_lament','Ice Barrier']];
+  const list = B.filter(b => (S.buffs[b[0]] || 0) > t).map(b => [b, S.buffs[b[0]] - t, false]);
+  if (S.procs.fof > t) list.push([['fof','ability_mage_wintersgrasp','Fingers of Frost'], S.procs.fof - t, true]);
+  if (S.procs.mb > t) list.push([['mb','ability_mage_missilebarrage','Missile Barrage'], S.procs.mb - t, true]);
+  const sig = list.map(x => x[0][0]).join(',');
+  if (box._sig !== sig) {
+    box._sig = sig; box.textContent = '';
+    for (const [b, , proc] of list) {
+      const d = document.createElement('div'); d.className = 'buff' + (proc ? ' proc' : '');
+      const bi = document.createElement('div'); bi.className = 'bi'; bi.appendChild(makeImg(b[1]));
+      const bt = document.createElement('div'); bt.className = 'bt ol';
+      d.append(bi, bt);
+      d.addEventListener('mouseenter', () => showTip(d, '<div class="t1">' + esc(pick(b[2])) + '</div>' + (proc ? '<div class="tt-b">' + esc(tx('Proc: the rotation helper colours the matching button purple.', 'Proc: de rotatiehulp kleurt de bijhorende knop paars.')) + '</div>' : '')));
+      d.addEventListener('mouseleave', hideTip);
+      box.appendChild(d);
+    }
+  }
+  box.querySelectorAll('.buff').forEach((d, i) => setTxt(d.lastChild, fmtShort(list[i][1])));
+}
+function updateReminders() {
+  for (const r of REM) {
+    const e = remEls[r.k]; if (!e) continue;
+    const vis = !r.show || r.show();
+    e.el.style.display = vis ? '' : 'none';
+    if (!vis) continue;
+    setTxt(e.c, r.txt());
+    const bad = r.bad(), warn = !bad && r.warn();
+    e.el.classList.toggle('bad', bad); e.el.classList.toggle('warn', warn);
+  }
+  remEls.trainer.el.style.display = S.cfg.trainer && S.level % 2 === 0 && S.trained < S.level ? '' : 'none';
+  setTxt(remEls.trainer.el, tx('New spells at the trainer', 'Nieuwe spreuken bij de trainer'));
+  remEls.talent.el.style.display = S.cfg.talent && S.talentFree > 0 ? '' : 'none';
+  setTxt(remEls.talent.el, talentTxt());
+  const bf = $('#bagFree'); if (bf) { setTxt(bf, String(S.bagsFree)); bf.style.color = S.bagsFree <= 3 ? '#ff4040' : '#fff'; }
+  const tal = document.querySelector('.mb[data-k=talent]'); if (tal) tal.classList.toggle('alert', S.talentFree > 0);
+}
+function updateXP() {
+  const need = XPN[S.level] || 99999, x = $('#xp');
+  setStyle(x.querySelector('.cur'), 'width', (S.xp / need * 100) + '%');
+  setStyle(x.querySelector('.rest'), 'left', (S.xp / need * 100) + '%');
+  setStyle(x.querySelector('.rest'), 'width', (Math.min(need - S.xp, S.rested) / need * 100) + '%');
+  const hrs = (T() - S.sessionStart) / 3600, rate = S.sessionXP / hrs;
+  const remain = need - S.xp, mins = remain / rate * 60;
+  const per = S.lastKillXP || (45 + 5 * S.level) * (S.rested > 0 ? 2 : 1);
+  const tstr = mins >= 60 ? '±' + Math.floor(mins / 60) + tx('h ', 'u ') + String(Math.round(mins % 60)).padStart(2, '0') + 'm' : '±' + Math.max(1, Math.round(mins)) + ' min';
+  const txt = S.cfg.xptext ? 'Level ' + S.level + ' · ' + Math.floor(S.xp / need * 100) + '% · ' + num(rate) + tx(' XP/h · ', ' XP/u · ') + tstr + ' · ±' + Math.ceil(remain / per) + ' kills' : '';
+  setTxt(x.querySelector('.xt'), txt);
+}
+function mobScale() { const tg = S.target; return tg ? 1.45 - Math.min(45, tg.dist) / 45 * 0.85 : 1; }
+function updateMob() {
+  const m = $('#mob'), tg = S.target, t = T();
+  if (!tg) { m.style.display = 'none'; return; }
+  m.style.display = 'block';
+  m.style.transform = 'scale(' + mobScale().toFixed(3) + ')';
+  m.classList.toggle('frozen', !tg.dead && (tg.deb.frozen || 0) > t);
+  m.classList.toggle('poly', !tg.dead && (tg.deb.poly || 0) > t);
+  m.classList.toggle('dead', tg.dead);
+  m.classList.add('selected');
+  const col = tg.tapped ? '#aaaaaa' : tg.react === 'neutral' ? '#ffff00' : '#ff5a4a';
+  setStyle(m.querySelector('.np .nm'), 'color', col);
+  setStyle(m.querySelector('.np .bar i'), 'background', tg.tapped ? REACT.tapped : tg.react === 'neutral' ? REACT.neutral : '#c43c3c');
+  m.querySelector('.np .bar i').style.width = (tg.hp / tg.hpMax * 100) + '%';
+  setTxt(m.querySelector('.dist'), tg.dead ? tx('dead', 'dood') : Math.round(tg.dist) + ' ' + U());
+  const d = $('#dist'); if (document.activeElement !== d && +d.value !== Math.round(tg.dist)) { d.value = Math.round(tg.dist); }
+  setTxt($('#distV'), Math.round(tg.dist) + ' ' + U());
+}
+function updateSim(sug) {
+  const w = $('#why');
+  const kinds = {proc: tx('proc, purple', 'proc, paars'), def: tx('defensive, blue', 'defensief, blauw'), normal: tx('gold', 'goud')};
+  let h = sug.p.id ? '<b>' + esc(tx('Now: ', 'Nu: ') + SP[sug.p.id].n) + '</b> <span style="color:#6b7280">(' + esc(kinds[sug.p.kind]) + ')</span><br>' : '<b>' + esc(tx('No suggestion', 'Geen suggestie')) + '</b><br>';
+  h += esc(sug.p.why || '');
+  if (S.cfg.second && sug.s) h += '<br>' + esc(tx('Then: ', 'Daarna: ') + SP[sug.s.id].n);
+  const srcTxt = {blizzard: tx('Source: Blizzard (Assisted Combat)', 'Bron: Blizzard (Assisted Combat)'),
+    guide: tx('Source: own priority (guide)', 'Bron: eigen prioriteit (guide)'),
+    fallback: tx('Source: own priority, fell back to Blizzard (values hidden in combat)', 'Bron: eigen prioriteit, teruggevallen op Blizzard (waarden afgeschermd in gevecht)'),
+    off: ''}[sug.src];
+  if (srcTxt) h += '<br><span style="color:#6b7280;font-size:12px">' + esc(srcTxt) + '</span>';
+  if (w._h !== h) { w._h = h; w.innerHTML = h; }
+  const sb = $('#stateBox'), t = T(), yn = b => b ? tx('yes', 'ja') : tx('no', 'nee');
+  const parts = ['Level: ' + S.level, 'Mana: ' + Math.round(S.mana) + '/' + S.manaMax, tx('Health: ', 'Leven: ') + Math.round(S.hp) + '/' + S.hpMax,
+    tx('Combat: ', 'Gevecht: ') + yn(S.combat), tx('Frozen target: ', 'Bevroren doelwit: ') + yn(frozen()), tx('FoF proc: ', 'FoF-proc: ') + yn(S.procs.fof > t)];
+  const html = parts.map(p => '<div>' + esc(p) + '</div>').join('');
+  if (sb._h !== html) { sb._h = html; sb.innerHTML = html; }
+}
+
+/* ---------- simulatielogica per tick ---------- */
+let lastT = T();
+function tick() {
+  const t = T(), dt = Math.min(0.25, t - lastT); lastT = t;
+  if (S.ghost) { if (t >= S.ghost) { S.ghost = 0; S.hp = S.hpMax; S.mana = S.manaMax; } else return; }
+  // cast/kanaal
+  if (S.casting) {
+    const c = S.casting;
+    if (c.ch) {
+      if (t >= c.next && c.ticks < (SP[c.id].ticks || 99)) {
+        c.next += 1; c.ticks++;
+        if (c.id === 'am' || c.id === 'blizzard') { if (hostileTarget() && (c.id === 'am' || S.target.dist <= 30)) hit(dmgRoll(SP[c.id]), SP[c.id].sch); }
+        if (c.id === 'evocation') gainMana(S.manaMax * 0.075);
+      }
+      if (S.casting && t >= c.end) S.casting = null;
+      else if (S.casting && c.id !== 'evocation' && c.id !== 'blizzard' && !hostileTarget()) S.casting = null;
+    } else if (t >= c.end) {
+      const sp = SP[c.id];
+      if (needsTarget(sp) && !hostileTarget()) { S.casting = null; castFail = {id: c.id, until: t + 1.2, k: 'fail'}; }
+      else finishCast();
+    }
+  }
+  // regen
+  const fiveSec = t - S.lastCastEnd > 5;
+  if (S.drink > t) S.mana = Math.min(S.manaMax, S.mana + S.manaMax * 0.9 / 18 * dt);
+  else if (fiveSec && !S.casting) S.mana = Math.min(S.manaMax, S.mana + S.manaMax * (S.combat ? 0.006 : 0.02) * dt);
+  if (S.eat > t) S.hp = Math.min(S.hpMax, S.hp + S.hpMax * 0.9 / 18 * dt);
+  else if (!S.combat) S.hp = Math.min(S.hpMax, S.hp + S.hpMax * 0.015 * dt);
+  // vijand
+  const tg = hostileTarget();
+  if (tg && S.combat) {
+    const fr = (tg.deb.frozen || 0) > t, pol = (tg.deb.poly || 0) > t;
+    const slow = (tg.deb.chill || 0) > t || (tg.deb.coc || 0) > t;
+    // in groep houdt de tank de vijand vast; tijdens een cast staat hij stil
+    const spd = fr || pol || S.group || tg.cast ? 0 : slow ? 1.5 : 3; // trager dan in het echt, zodat je de rotatie kan volgen
+    let d = tg.dist - spd * dt + (S.moving && !S.rooted ? 7 * dt : 0);
+    tg.dist = Math.max(2, Math.min(45, d));
+    if (!S.group && tg.dist <= 3 && !fr && !pol && !tg.cast && t - S.lastHit > 2) {
+      S.lastHit = t;
+      if (S.buffs.iceblock > t) chat(fmt(tx('{0} strikes, but you are immune.', '{0} slaat, maar je bent onkwetsbaar.'), tg.name), '#aaa');
+      else { const dmg = Math.round((9 + Math.random() * 6) * mul()); S.hp = Math.max(0, S.hp - dmg); if (S.casting && !S.casting.ch) S.casting.end += 0.5; }
+      if (S.hp <= 0) playerDeath();
+    }
+    // vijandelijke casts (Heal / Shoot)
+    if (S.target === tg && !pol) {
+      if (tg.cast) { if (t >= tg.cast.end) finishEnemyCast(tg, t); }
+      else if (t >= tg.nextCast) startEnemyCast(tg, t);
+    }
+  } else if (tg && !S.combat && !(tg.deb.poly > t) && S.moving && !S.rooted) {
+    tg.dist = Math.min(45, tg.dist + 7 * dt);
+  }
+  if (tg && tg.cast && (tg.deb.poly > t || !S.combat)) tg.cast = null;
+  if (S.target && S.target.dead && S.respawnAt && t >= S.respawnAt) { S.respawnAt = 0; spawnTarget(true); }
+  if (!S.target || S.target.dead) { if (S.combat) S.combat = false; }
+  if (S.moving && S.casting) interrupt('int');
+  if (S.moving || S.combat) S.resting = false;
+  // groepsleden: wisselende levens
+  if (S.group) {
+    for (const m of PARTY) {
+      if (t >= m.next) {
+        m.next = t + 1.2 + Math.random() * 1.8;
+        m.goal = S.combat ? (m.tank ? 0.3 + Math.random() * 0.6 : 0.5 + Math.random() * 0.5) : 0.82 + Math.random() * 0.18;
+        m.pwGoal = Math.random();
+      }
+      m.hp += (m.goal - m.hp) * Math.min(1, dt * 1.2);
+      m.pw += ((m.pwGoal ?? m.pw) - m.pw) * Math.min(1, dt * 0.8);
+    }
+  }
+}
+function frame() {
+  try {
+    tick();
+    const sug = suggestion();
+    updateButtons(sug); updateHint(sug); updateCastbar(); updateUnitFrames(); updateBuffs(); updateReminders(); updateXP(); updateMob(); updateSim(sug);
+    const d = new Date(); setTxt($('#clock'), String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'));
+  } catch (e) { console.error(e); }
+  requestAnimationFrame(frame);
+}
+
+/* ---------- schalen ---------- */
+function fit() {
+  const st = $('#stage'), w = st.clientWidth, h = st.clientHeight;
+  SCALE = Math.min(w / 1440, h / 810);
+  $('#screen').style.transform = 'translate(-50%,-50%) scale(' + SCALE + ')';
+}
+window.addEventListener('resize', fit);
+
+/* ---------- invoer ---------- */
+document.addEventListener('keydown', e => {
+  const tgt = e.target;
+  if (tgt === $('#chatin')) {
+    if (e.key === 'Enter') {
+      const v = tgt.value.trim(); tgt.value = ''; tgt.blur();
+      if (/^\/(ck|casterkit)\b/i.test(v)) { openSettings(); chat(tx('Settings opened.', 'Instellingen geopend.'), '#ddd', true); }
+      else if (v) chat('[DinX]: ' + v, '#fff');
+    } else if (e.key === 'Escape') { tgt.value = ''; tgt.blur(); }
+    return;
+  }
+  if (tgt && (tgt.tagName === 'INPUT' && tgt.type !== 'checkbox' && tgt.type !== 'range')) return;
+  if (e.key === 'Escape') { if ($('#settings').classList.contains('open')) closeSettings(); else if (S.unlocked) setUnlocked(false); else if (S.casting) interrupt('int'); return; }
+  if (e.key === 'Enter' && !(tgt && tgt.closest && tgt.closest('button'))) { e.preventDefault(); $('#chatin').focus(); return; }
+  const col = CODES.indexOf(e.code);
+  if (col < 0) return;
+  if (tgt && tgt.closest && tgt.closest('#settings')) return;
+  const r = e.ctrlKey ? 3 : e.altKey ? 2 : e.shiftKey ? 1 : 0;
+  if (r >= S.cfg.rows || col >= S.cfg.perRow) return;
+  e.preventDefault();
+  if (e.repeat) return;
+  const id = SLOTS[r][col];
+  if (id && known(id)) activate(id);
+});
+
+$('#mmbtn').appendChild(makeImg('spell_frost_frostbolt02'));
+$('#mmbtn').addEventListener('click', () => { $('#settings').classList.contains('open') ? closeSettings() : openSettings(); });
+$('#mmbtn').addEventListener('mouseenter', () => showTip($('#mmbtn'), '<div class="t1 tt-b">CasterKit</div><div>' + esc(tx('Click: settings', 'Klik: instellingen')) + '</div><div class="tt-g">' + esc(pick(STAT.s_ver)) + '</div>'));
+$('#mmbtn').addEventListener('mouseleave', hideTip);
+$('#setClose').addEventListener('click', closeSettings);
+$('#lockBtn').addEventListener('click', () => setUnlocked(false));
+$('#resetPos').addEventListener('click', resetPositions);
+$('#mob').addEventListener('click', () => { if (S.target) { S.target = S.target.dead ? null : S.target; } });
+$('#mob').addEventListener('mouseenter', () => { if (S.target) showTip($('#mob .np'), killTip()); });
+$('#mob').addEventListener('mouseleave', hideTip);
+for (const part of ['#targetFrame > .hp', '#targetFrame > .pw']) {
+  $(part).addEventListener('mouseenter', () => { if (S.target && !S.unlocked) showTip($('#targetFrame'), killTip()); });
+  $(part).addEventListener('mouseleave', hideTip);
+}
+$('#xp').addEventListener('mouseenter', () => { const need = XPN[S.level]; showTip($('#xp'), '<div class="t1">' + esc(tx('Experience', 'Ervaring')) + '</div><div>' + num(S.xp) + ' / ' + num(need) + ' XP</div><div class="tt-b">' + esc(fmt(tx('Rested: {0} XP (double XP per kill)', 'Uitgerust: {0} XP (dubbele XP per kill)'), num(S.rested))) + '</div>'); });
+$('#xp').addEventListener('mouseleave', hideTip);
+
+/* simulatiebediening */
+function syncSimButtons() {
+  $$('[data-sit]').forEach(b => b.setAttribute('aria-pressed', !!S[b.dataset.sit]));
+  $$('[data-lvl]').forEach(b => b.setAttribute('aria-pressed', (+b.dataset.lvl === 13) === (S.level < 30)));
+  $$('[data-tgt]').forEach(b => b.setAttribute('aria-pressed', b.dataset.tgt === S.tgType));
+  $('#bTarget').setAttribute('aria-pressed', !!S.target);
+  $('#bAoe').setAttribute('aria-pressed', S.cfg.aoe);
+  $('#bUnlock').setAttribute('aria-pressed', S.unlocked);
+  $('#bGroup').setAttribute('aria-pressed', S.group);
+}
+$$('[data-lvl]').forEach(b => b.addEventListener('click', () => {
+  setupLevel(+b.dataset.lvl); buildBars(); syncSimButtons();
+  chat(fmt(tx('Simulation: level {0}', 'Simulatie: level {0}'), S.level) + (S.level >= 20 ? tx(' (Ice Lance, Fingers of Frost and Counterspell active).', ' (Ice Lance, Fingers of Frost en Counterspell actief).') : tx(' (Ice Lance only from 20).', ' (Ice Lance pas vanaf 20).')), '#ddd', true);
+}));
+$('#bTarget').addEventListener('click', () => { if (S.target) { S.target = null; S.combat = false; S.respawnAt = 0; } else spawnTarget(false); syncSimButtons(); });
+$('#bFight').addEventListener('click', () => { spawnTarget(true); syncSimButtons(); });
+$('#dist').addEventListener('input', e => { const v = +e.target.value; $('#distV').textContent = v + ' ' + U(); if (S.target) S.target.dist = v; });
+$$('[data-sit]').forEach(b => b.addEventListener('click', () => {
+  const k = b.dataset.sit; S[k] = !S[k];
+  if (k === 'moving' && S.moving) interrupt('int');
+  syncSimButtons();
+}));
+$$('[data-tgt]').forEach(b => b.addEventListener('click', () => { S.tgType = b.dataset.tgt; applyTargetType(); syncSimButtons(); }));
+function forceTargetCast(noInt) {
+  if (!hostileTarget()) spawnTarget(true); else enterCombat();
+  const tg = S.target; tg.deb.poly = 0;
+  startEnemyCast(tg, T(), noInt);
+  syncSimButtons();
+}
+$('#bTCast').addEventListener('click', () => forceTargetCast(false));
+$('#bTCastLock').addEventListener('click', () => forceTargetCast(true));
+$('#bGroup').addEventListener('click', () => { S.group = !S.group; syncSimButtons(); });
+$('#secret').addEventListener('change', e => { S.secret = e.target.checked; });
+$('#lat').addEventListener('input', e => { S.latency = +e.target.value; $('#latV').textContent = S.latency + ' ms'; });
+$('#bAoe').addEventListener('click', () => { setCfg('aoe', !S.cfg.aoe); syncSimButtons(); if ($('#settings').classList.contains('open')) renderTab(); });
+$('#bFof').addEventListener('click', () => { procFof(); if (S.level < 20) chat(tx('Fingers of Frost proc set, but you only know Ice Lance from level 20: choose "Simulate level 30".', 'Fingers of Frost-proc gezet, maar Ice Lance ken je pas vanaf level 20: kies "Simuleer level 30".'), '#ffb020', true); });
+$('#bMb').addEventListener('click', () => procMb());
+$('#bNova').addEventListener('click', () => { if (!hostileTarget()) spawnTarget(true); S.target.deb.frozen = T() + 8; S.target.dist = Math.min(S.target.dist, 9); S.frozenFB = false; enterCombat(); });
+$('#bOom').addEventListener('click', () => { S.mana = Math.round(S.manaMax * 0.12); S.lastCastEnd = T(); });
+$('#bLowHp').addEventListener('click', () => { S.hp = Math.round(S.hpMax * 0.22); });
+$('#bWater').addEventListener('click', () => { S.items.water = 0; });
+$('#bBuffs').addEventListener('click', () => { S.buffs.armor = 0; S.buffs.ai = 0; });
+$('#bVendor').addEventListener('click', () => {
+  chat(tx('You talk to the vendor.', 'Je spreekt de handelaar aan.'), '#aaa');
+  if (S.cfg.sellGrey) { const n = 4 + Math.floor(Math.random() * 5); S.bagsFree = Math.min(S.bagsMax, S.bagsFree + n);
+    chat(fmt(tx('{0} grey items sold for {1}s {2}c.', '{0} grijze voorwerpen verkocht voor {1}z {2}k.'), n, 1 + Math.floor(Math.random() * 3), Math.floor(Math.random() * 99)), '#ddd', true); }
+  if (S.cfg.autoRepair) { if (S.durability < 100) { chat(fmt(tx('Gear repaired for {0}s {1}c.', 'Uitrusting hersteld voor {0}z {1}k.'), Math.ceil((100 - S.durability) / 6), Math.floor(Math.random() * 99)), '#ddd', true); S.durability = 100; } }
+  if (!S.cfg.sellGrey && !S.cfg.autoRepair) chat(tx('Selling greys and repairing are off: nothing done.', 'Grijs verkopen en repareren staan uit: niets gedaan.'), '#ddd', true);
+});
+$('#bTrainer').addEventListener('click', () => { const before = btnEls.filter(b => b.id).length; S.trained = S.level; buildBars(); const n = btnEls.filter(b => b.id).length - before;
+  chat(tx('Trainer visited.', 'Trainer bezocht.') + (n > 0 ? fmt(tx(' {0} new spell(s) on your bar.', ' {0} nieuwe spreuk(en) op je balk.'), n) : ''), '#ffd100'); });
+$('#bTalent').addEventListener('click', () => microClick('talent'));
+$('#bLevel').addEventListener('click', () => { addXP(XPN[S.level] - S.xp); });
+$('#bBags').addEventListener('click', () => { S.bagsFree = 1; S.durability = 18; });
+$('#bSettings').addEventListener('click', openSettings);
+$('#bUnlock').addEventListener('click', () => setUnlocked(!S.unlocked));
+
+/* ---------- start ---------- */
+buildTabs(); buildMicro(); buildReminders(); buildGroup(); setupMovers(); applyPositions(); applySettings(); applyLang(); syncSimButtons(); fit();
+chat(tx('Welcome to WoW Forever.', 'Welkom in WoW Forever.'), '#ffd100');
+chat(tx('v0.1.2 by DinX loaded. Type /ck or click the minimap button.', 'v0.1.2 door DinX geladen. Typ /ck of klik op de minimapknop.'), '#ddd', true);
+chat(tx('You are rested: double XP per kill.', 'Je bent uitgerust: dubbele XP per kill.'), '#7fb2ff');
+requestAnimationFrame(frame);
+window.CK = {S, SP, PARTY, activate, suggestion, setCfg, spawnTarget, buildBars, startEnemyCast, killTip};
+</script>
+</body>
+</html>
