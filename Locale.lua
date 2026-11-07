@@ -211,6 +211,24 @@ add({
 	["Turning the chat off takes effect after /reload."] = "De chat uitschakelen werkt pas na /reload.",
 })
 
+add({
+	["Profiles"] = "Profielen",
+	["Save the settings of this character under a name and use them on your alts. Personal things (spec, measured XP, chat setup) stay with each character."] = "Bewaar de instellingen van dit personage onder een naam en gebruik ze op je alts. Persoonlijke dingen (spec, gemeten XP, chat-setup) blijven bij elk personage.",
+	["Current profile: %s"] = "Huidig profiel: %s",
+	["none"] = "geen",
+	["Save"] = "Bewaren",
+	["Profile name"] = "Naam van het profiel",
+	["Save current settings"] = "Huidige instellingen bewaren",
+	["Profile saved: %s"] = "Profiel bewaard: %s",
+	["Use a profile"] = "Een profiel gebruiken",
+	["Profile"] = "Profiel",
+	["Load into this character"] = "Laden op dit personage",
+	["Profile loaded: %s. Reloading the UI…"] = "Profiel geladen: %s. De interface wordt herladen…",
+	["Delete"] = "Verwijderen",
+	["Use this profile for new characters"] = "Dit profiel gebruiken voor nieuwe personages",
+	["A new alt starts with these settings at its first login."] = "Een nieuwe alt begint met deze instellingen bij de eerste login.",
+})
+
 -- Key bindings (Bindings.xml); names are read before saved settings load, so English
 BINDING_HEADER_CASTERKIT = "CasterKit"
 BINDING_NAME_CASTERKIT_AOE = "Toggle AoE mode"

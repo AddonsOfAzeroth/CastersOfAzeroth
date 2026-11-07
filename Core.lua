@@ -92,6 +92,7 @@ local charDefaults = {
 local accountDefaults = {
 	minimap = { hide = false, angle = 215 },
 	language = "enUS",
+	profiles = {},
 }
 
 local function merge(dst, src)
@@ -428,12 +429,19 @@ end
 ---------------------------------------------------------------------------
 CK:On("ADDON_LOADED", function(_, name)
 	if name ~= ADDON then return end
+	local newCharacter = CasterKitCharDB == nil
 	CasterKitCharDB = CasterKitCharDB or {}
 	CasterKitDB = CasterKitDB or {}
-	merge(CasterKitCharDB, charDefaults)
 	merge(CasterKitDB, accountDefaults)
 	CK.char = CasterKitCharDB
 	CK.db = CasterKitDB
+	-- a new alt starts from the default profile, if one is set
+	local default = CK.db.defaultProfile
+	if newCharacter and default and CK.db.profiles[default] then
+		for group, v in pairs(copy(CK.db.profiles[default])) do CasterKitCharDB[group] = v end
+		CasterKitCharDB.profile = default
+	end
+	merge(CasterKitCharDB, charDefaults)
 	CK.charDefaults = charDefaults
 	CK.playerClass = select(2, UnitClass("player"))
 	for _, m in ipairs(CK.modules) do
@@ -455,6 +463,69 @@ CK:On("PLAYER_LOGIN", function()
 end)
 
 CK:On("SPELLS_CHANGED", function() CK:ScanSpellbook() end)
+
+---------------------------------------------------------------------------
+-- Profiles: named copies of the settings, shared by all characters
+---------------------------------------------------------------------------
+-- Keys that stay with the character, never copied between profiles.
+local PERSONAL = {
+	leveling = { trainerPending = true, mobXP = true },
+	chat = { setupDone = true, channelTabs = true, prevTimestamps = true },
+	rotation = { spec = true },
+}
+
+local function profileCopy(src)
+	local out = {}
+	for group, v in pairs(src) do
+		if group ~= "profile" then
+			out[group] = type(v) == "table" and copy(v) or v
+			local skip = PERSONAL[group]
+			if skip and type(out[group]) == "table" then
+				for k in pairs(skip) do out[group][k] = nil end
+			end
+		end
+	end
+	return out
+end
+
+function CK:ProfileNames()
+	local names = {}
+	for name in pairs(self.db.profiles) do names[#names + 1] = name end
+	table.sort(names)
+	return names
+end
+
+function CK:SaveProfile(name)
+	name = strtrim(name or "")
+	if name == "" then return false end
+	self.db.profiles[name] = profileCopy(self.char)
+	self.char.profile = name
+	return true
+end
+
+-- Copies a profile into this character, keeping the personal keys.
+function CK:LoadProfile(name)
+	local p = self.db.profiles[name]
+	if not p then return false end
+	local keep = {}
+	for group, keys in pairs(PERSONAL) do
+		keep[group] = {}
+		for k in pairs(keys) do keep[group][k] = self.char[group] and self.char[group][k] end
+	end
+	for group, v in pairs(copy(p)) do self.char[group] = v end
+	for group, vals in pairs(keep) do
+		self.char[group] = self.char[group] or {}
+		for k, v in pairs(vals) do self.char[group][k] = v end
+	end
+	merge(self.char, charDefaults)
+	self.char.profile = name
+	return true
+end
+
+function CK:DeleteProfile(name)
+	self.db.profiles[name] = nil
+	if self.db.defaultProfile == name then self.db.defaultProfile = nil end
+end
 
 -- Reset a settings group to defaults.
 function CK:ResetGroup(group)

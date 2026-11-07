@@ -103,8 +103,9 @@ function Page:Slider(label, minV, maxV, step, get, set, fmt)
 	return s
 end
 
--- Cycling choice: ◀ value ▶
-function Page:Choice(label, options, get, set)
+-- Cycling choice: ◀ value ▶ (options may be a function returning the list)
+function Page:Choice(label, opts, get, set)
+	local options = opts
 	local fs = S:Font(self.frame, 12)
 	fs:SetPoint("TOPLEFT", 0, self.y)
 	fs:SetText(label)
@@ -115,6 +116,8 @@ function Page:Choice(label, options, get, set)
 	local text = S:Font(holder, 12)
 	text:SetPoint("CENTER")
 	local function step(dir)
+		if type(opts) == "function" then options = opts() end
+		if #options == 0 then return end
 		local cur = get()
 		local idx = 1
 		for i, o in ipairs(options) do if o[1] == cur then idx = i end end
@@ -133,7 +136,9 @@ function Page:Choice(label, options, get, set)
 		a:SetScript("OnClick", function() step(d[1]) end)
 	end
 	holder.refresh = function()
+		if type(opts) == "function" then options = opts() end
 		local cur = get()
+		text:SetText("-")
 		for _, o in ipairs(options) do if o[1] == cur then text:SetText(o[2]) end end
 	end
 	table.insert(self.widgets, holder)
@@ -152,6 +157,34 @@ function Page:Button(label, onClick, width)
 	b:SetScript("OnEnter", function() b:SetBackdropBorderColor(unpack(S.colors.accent)) end)
 	b:SetScript("OnLeave", function() b:SetBackdropBorderColor(0, 0, 0, 1) end)
 	b:SetScript("OnClick", onClick)
+	self.y = self.y - 30
+	return b
+end
+
+function Page:Edit(label, width)
+	local fs = S:Font(self.frame, 12)
+	fs:SetPoint("TOPLEFT", 0, self.y)
+	fs:SetText(label)
+	local e = CreateFrame("EditBox", nil, self.frame, "BackdropTemplate")
+	e:SetSize(width or 220, 20)
+	e:SetPoint("TOPLEFT", 200, self.y + 3)
+	S:Backdrop(e, 1)
+	e:SetFont(S.font, 12, "")
+	e:SetTextInsets(6, 6, 0, 0)
+	e:SetAutoFocus(false)
+	e:SetMaxLetters(32)
+	e:SetScript("OnEscapePressed", e.ClearFocus)
+	e:SetScript("OnEnterPressed", e.ClearFocus)
+	self.y = self.y - 28
+	return e
+end
+
+-- Button placed next to the previous row instead of below it.
+function Page:ButtonRight(label, onClick, x, width)
+	local b = self:Button(label, onClick, width)
+	self.y = self.y + 30
+	b:ClearAllPoints()
+	b:SetPoint("TOPLEFT", x, self.y)
 	self.y = self.y - 30
 	return b
 end
@@ -241,6 +274,7 @@ function C:CreateWindow()
 	self:BuildRotation(newPage("rotation", L["Rotation"]))
 	self:BuildLeveling(newPage("leveling", L["Leveling"]))
 	self:BuildChat(newPage("chat", "Chat"))
+	self:BuildProfiles(newPage("profiles", L["Profiles"]))
 	self:BuildAbout(newPage("about", L["About"]))
 end
 
@@ -394,6 +428,60 @@ function C:BuildLeveling(p)
 	p:Header(L["At a vendor"])
 	p:Check(L["Sell grey items automatically"], nil, setting("leveling", "sellGrey"))
 	p:Check(L["Repair automatically"], nil, setting("leveling", "repair"))
+end
+
+function C:BuildProfiles(p)
+	p:Header(L["Profiles"])
+	p:Note(L["Save the settings of this character under a name and use them on your alts. Personal things (spec, measured XP, chat setup) stay with each character."])
+	local current = p:Note("")
+	current.refresh = function()
+		current:SetText(L["Current profile: %s"]:format(CK.char.profile or L["none"]))
+	end
+	table.insert(p.widgets, current)
+	p:Gap()
+
+	p:Header(L["Save"])
+	local nameBox = p:Edit(L["Profile name"])
+	p:Button(L["Save current settings"], function()
+		local name = strtrim(nameBox:GetText() or "")
+		if name == "" then name = CK.char.profile or UnitName("player") end
+		if CK:SaveProfile(name) then
+			C.selected = name
+			nameBox:SetText("")
+			CK:Print(L["Profile saved: %s"]:format(name))
+			C:Refresh()
+		end
+	end, 200)
+	p:Gap()
+
+	p:Header(L["Use a profile"])
+	p:Choice(L["Profile"], function()
+		local opts = {}
+		for _, n in ipairs(CK:ProfileNames()) do opts[#opts + 1] = { n, n } end
+		return opts
+	end, function()
+		if not C.selected or not CK.db.profiles[C.selected] then C.selected = CK:ProfileNames()[1] end
+		return C.selected
+	end, function(v) C.selected = v; C:Refresh() end)
+	p:Button(L["Load into this character"], function()
+		if not C.selected then return end
+		CK:OutOfCombat("profile", function()
+			if CK:LoadProfile(C.selected) then
+				CK:Print(L["Profile loaded: %s. Reloading the UI…"]:format(C.selected))
+				C_Timer.After(0.5, ReloadUI)
+			end
+		end)
+	end, 200)
+	p:ButtonRight(L["Delete"], function()
+		if C.selected then
+			CK:DeleteProfile(C.selected)
+			C.selected = nil
+			C:Refresh()
+		end
+	end, 210, 100)
+	p:Check(L["Use this profile for new characters"], L["A new alt starts with these settings at its first login."],
+		function() return C.selected ~= nil and CK.db.defaultProfile == C.selected end,
+		function(v) CK.db.defaultProfile = v and C.selected or nil end)
 end
 
 function C:BuildAbout(p)
