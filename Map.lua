@@ -508,7 +508,7 @@ local function fallbackPin(i, c)
 		BuildPin(pin)
 		fallbackPins[i] = pin
 	end
-	pin:SetFrameLevel(math.min(9000, c:GetFrameLevel() + 2000))
+	pin:SetFrameLevel(math.min(9500, c:GetFrameLevel() + 6000))
 	pin.dot:SetScale(1 / canvasScale())
 	return pin
 end
@@ -544,7 +544,7 @@ local function drawNav(route)
 		recs[i] = rec
 	end
 	if count == 0 or not ensureHolder() then return end
-	lineHolder:SetFrameLevel(math.min(9000, c:GetFrameLevel() + 1999))
+	lineHolder:SetFrameLevel(math.min(9500, c:GetFrameLevel() + 5999))
 	lineHolder:Show()
 	local n = 0
 	-- player to the current stop
@@ -628,7 +628,7 @@ local function drawTarget()
 		targetPin = CreateFrame("Frame", nil, c)
 		BuildPin(targetPin)
 	end
-	targetPin:SetFrameLevel(math.min(9000, c:GetFrameLevel() + 2001))
+	targetPin:SetFrameLevel(math.min(9500, c:GetFrameLevel() + 6001))
 	targetPin.dot:SetScale(1 / canvasScale())
 	targetPin:ClearAllPoints()
 	targetPin:SetPoint("CENTER", c, "TOPLEFT", x * w, -y * h)
@@ -636,7 +636,7 @@ local function drawTarget()
 	targetPin:Show()
 	local px, py = playerPos(mapID)
 	if not px then return end
-	lineHolder:SetFrameLevel(math.min(9000, c:GetFrameLevel() + 1999))
+	lineHolder:SetFrameLevel(math.min(9500, c:GetFrameLevel() + 5999))
 	lineHolder:Show()
 	local idx = #lines + 1
 	for i, l in ipairs(lines) do
@@ -784,13 +784,36 @@ local function setArtAlpha(a)
 	fade(bf.TopTileStreaks)
 	fade(bf.InsetBorderTop)
 	fade(bf.Tutorial)
+	local function fadeTextures(frame)
+		if not frame or not frame.GetRegions then return end
+		for _, r in ipairs({ frame:GetRegions() }) do
+			if r.GetObjectType and r:GetObjectType() == "Texture" then fade(r) end
+		end
+	end
+	-- the map window itself and the quest log side panel
+	fadeTextures(WMF)
+	local qm = QuestMapFrame
+	if qm then
+		fadeTextures(qm)
+		fade(qm.VerticalSeparator)
+		fade(qm.Background)
+		local qs = QuestScrollFrame or qm.QuestsFrame and qm.QuestsFrame.ScrollFrame
+		if qs then fade(qs.BorderFrame); fade(qs.Background); fade(qs.Edge) end
+		if qm.QuestsFrame then fade(qm.QuestsFrame.Background); fade(qm.QuestsFrame.BorderFrame) end
+		if qm.DetailsFrame then fade(qm.DetailsFrame.BorderFrame) end
+		if qm.MapLegend then fade(qm.MapLegend.BorderFrame) end
+		if qm.EventsFrame then fade(qm.EventsFrame.BorderFrame) end
+		if qm.CampaignOverview then fade(qm.CampaignOverview.BorderFrame) end
+		local count = QuestLogCount or (qm.QuestsFrame and qm.QuestsFrame.QuestLogCount)
+		fadeTextures(count)
+	end
 	-- navigation bar art (its buttons stay)
 	local nav = WMF.NavBar
 	if nav then
 		for _, r in ipairs({ nav:GetRegions() }) do
 			if r.GetObjectType and r:GetObjectType() == "Texture" then fade(r) end
 		end
-		fade(nav.overlay)
+		fadeTextures(nav.overlay)
 		fade(nav.InsetBorderBottomLeft)
 		fade(nav.InsetBorderBottomRight)
 		fade(nav.InsetBorderBottom)

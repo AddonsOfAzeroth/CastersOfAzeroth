@@ -543,9 +543,11 @@ CK:On("ADDON_LOADED", function(_, name)
 	end
 	merge(CasterKitCharDB, charDefaults)
 	-- 0.2.2: the guide priority became the default rotation source (once per character)
-	if not CasterKitCharDB.rotation.customDefault then
+	if not CasterKitCharDB.rotation.customDefault2 then
 		CasterKitCharDB.rotation.source = "custom"
+		CasterKitCharDB.rotation.aoe = false -- automatic AoE does this now
 		CasterKitCharDB.rotation.customDefault = true
+		CasterKitCharDB.rotation.customDefault2 = true
 	end
 	CK.charDefaults = charDefaults
 	CK.playerClass = select(2, UnitClass("player"))
