@@ -96,6 +96,19 @@ function R:BuildContext()
 		ctx.fallTime = 0
 	end
 	ctx.control = lossOfControl()
+
+	-- what the target is casting (nil when unknown or hidden in combat)
+	ctx.targetCasting, ctx.targetInterruptible = nil, false
+	if ctx.hostile then
+		local ok, tname, _, _, _, _, _, _, notInt = pcall(UnitCastingInfo, "target")
+		if not (ok and Safe(tname)) then
+			ok, tname, _, _, _, _, _, notInt = pcall(UnitChannelInfo, "target")
+		end
+		tname = ok and Safe(tname) or nil
+		ctx.targetCasting = tname
+		-- a hidden "not interruptible" flag counts as interruptible: worst case a wasted kick
+		ctx.targetInterruptible = tname ~= nil and Safe(notInt, nil) ~= true
+	end
 	return ctx
 end
 

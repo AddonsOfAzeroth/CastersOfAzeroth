@@ -90,10 +90,16 @@ local function defensive(ctx, push)
 	end
 end
 
+-- Counterspell (silences the school) when the target casts something interruptible
+local function interrupt(ctx, push)
+	if ctx.targetInterruptible and ctx:Ready("Counterspell") then push("Counterspell", "defensive") end
+end
+
 -- Frost leveling (Warcraft Tavern / Icy Veins Forever guides, Nov 2026)
 local function frost(ctx, list, add)
 	local function push(n, k) add(list, n, k) end
 	if not ctx.hostile then return end
+	interrupt(ctx, push)
 	local lowMana = ctx.manaPct < 0.25
 	local execute = ctx.targetHealthPct and ctx.targetHealthPct < 0.2
 	local melee = inMelee()
@@ -161,6 +167,7 @@ end
 local function fire(ctx, list, add)
 	local function push(n, k) add(list, n, k) end
 	if not ctx.hostile then return end
+	interrupt(ctx, push)
 	if ctx.aoe then
 		if not ctx.moving and ctx:Ready("Flamestrike") then push("Flamestrike") end
 		if not ctx.moving and ctx:Ready("Blizzard") then push("Blizzard") end
@@ -179,6 +186,7 @@ end
 local function arcane(ctx, list, add)
 	local function push(n, k) add(list, n, k) end
 	if not ctx.hostile then return end
+	interrupt(ctx, push)
 	if ctx.aoe then
 		if ctx:Ready("Arcane Explosion") then push("Arcane Explosion") end
 		if not ctx.moving and ctx:Ready("Blizzard") then push("Blizzard") end
