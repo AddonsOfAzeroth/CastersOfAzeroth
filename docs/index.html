@@ -57,6 +57,18 @@ html,body{margin:0;height:100%;background:#0b0b0d;color:#ddd}
 .np .bar{height:6px;background:rgba(0,0,0,.8);border:1px solid #000;margin-top:2px}
 .np .bar i{display:block;height:100%;background:#c43c3c;width:100%}
 .np .dist{font-size:10px;color:#ccc}
+/* 3D world (three.js); the CSS world above stays as the fallback */
+#w3d{position:absolute;left:0;top:0;width:1440px;height:810px;display:block;touch-action:pan-y}
+#screen.w3d #world > .sun,#screen.w3d #world > .hills,#screen.w3d #world > .farm,#screen.w3d #world > .tree,#screen.w3d #world > .path{display:none}
+#screen.w3d #world .vign{pointer-events:none;background:radial-gradient(ellipse at 50% 42%,transparent 60%,rgba(0,0,0,.42))}
+#screen.w3d #mob svg,#screen.w3d #mob .shadow,#screen.w3d #mob .sel,#screen.w3d #mob .sheep,#screen.w3d #mob .ice{display:none}
+#mob .hit{display:none;position:absolute;bottom:0}
+#screen.w3d #mob .hit{display:block}
+#screen.ghost.w3d #world{filter:grayscale(.85) sepia(.3) hue-rotate(170deg) saturate(1.4) brightness(.82) contrast(1.08)}
+.xnp{position:absolute;width:110px;margin-left:-55px;text-align:center}
+.xnp .nm{font-size:11px;color:#ff5a4a}
+.xnp .bar{height:5px;background:rgba(0,0,0,.8);border:1px solid #000;margin-top:1px}
+.xnp .bar i{display:block;height:100%;background:#c43c3c;width:100%}
 #fct{position:absolute;inset:0;pointer-events:none}
 .fct{position:absolute;font-weight:bold;font-size:22px;color:#ffe066;animation:fct 1.3s ease-out forwards;white-space:nowrap;transform:translateX(-50%)}
 .fct.frost{color:#8fd8ff}.fct.fire{color:#ff9a3c}.fct.arcane{color:#ff8cff}.fct.heal{color:#7cff6b}.fct.crit{font-size:30px}
@@ -2434,7 +2446,7 @@ function updateMob() {
   const m = $('#mob'), tg = S.target, t = T();
   if (!tg) { m.style.display = 'none'; return; }
   m.style.display = 'block';
-  m.style.transform = 'scale(' + mobScale().toFixed(3) + ')';
+  if (W3.on) w3Plate(m); else m.style.transform = 'scale(' + mobScale().toFixed(3) + ')';
   m.classList.toggle('frozen', !tg.dead && (tg.deb.frozen || 0) > t);
   m.classList.toggle('poly', !tg.dead && (tg.deb.poly || 0) > t);
   m.classList.toggle('dead', tg.dead);
@@ -2557,6 +2569,7 @@ function fit() {
   const st = $('#stage'), w = st.clientWidth, h = st.clientHeight;
   SCALE = Math.min(w / 1440, h / 810);
   $('#screen').style.transform = 'translate(-50%,-50%) scale(' + SCALE + ')';
+  w3Resize();
 }
 window.addEventListener('resize', fit);
 
@@ -3163,7 +3176,7 @@ function navClear() {
 }
 // "Moving" walks the player to the current stop
 function navTick(dt) {
-  if (!S.moving || S.rooted) return;
+  if (!S.moving || S.rooted || W3.kb) return;
   const cur = navCurrent(navRoute());
   if (!cur || cur.zone) return;
   const d = ydist(S.ppos, cur);
@@ -4058,6 +4071,7 @@ function resurrect() {
 const XMOB_POS = [[600, 560], [860, 565], [540, 610], [920, 615], [660, 645], [800, 650]];
 let xmobN = -1;
 function updateExtraMobs() {
+  if (W3.on) return; // the 3D world draws its own
   const n = S.ghost ? 0 : S.nearby; if (n === xmobN) return; xmobN = n;
   const box = $('#xmobs'); box.textContent = '';
   const src = $('#mob svg');
@@ -4120,6 +4134,745 @@ function resetWorld() {
   $$('.win.open').forEach(w => w.classList.remove('open'));
 }
 
+/* ---------- world: 3D Westfall (three.js from cdnjs; the CSS world above stays as the fallback) ---------- */
+// Everything is generated in code: geometry, vertex colours and canvas textures. World units are yards.
+const THREE_URL = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
+const THREE_SRI = 'sha512-dLxUelApnYxpLt6K2iomGngnHO83iUvZytA3YjDUCjT0HDOHKXnVYdf3hU4JjM8uEhxf9nD1/ey98U3t2vZ0qQ==';
+const W3 = {on: false, keys: new Set(), kb: false, orbit: 0, pitch: 0, zoom: 1, drag: null, face: 0, cx: NaN, cz: NaN, time: 0, last: 0, run: 0, ph: 0,
+  low: matchMedia('(pointer:coarse)').matches || Math.min(screen.width, screen.height) < 700, mobScr: null, xm: [], farms: [], blades: [], sites: new Map()};
+const FARM_CELL = 300, FOG = 0xcdd5c6;
+const sstep = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+const lerpAng = (a, b, f) => a + Math.atan2(Math.sin(b - a), Math.cos(b - a)) * Math.min(1, f);
+const w3Pos = p => ({x: (p.x - PL.start.x) * ZONE.w, z: (p.y - PL.start.y) * ZONE.h});
+function w3Hash(x, z) {
+  let h = Math.imul(x | 0, 374761393) ^ Math.imul(z | 0, 668265263);
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+}
+function w3Noise(x, z, per) {
+  const xi = Math.floor(x), zi = Math.floor(z), xf = x - xi, zf = z - zi, u = xf * xf * (3 - 2 * xf), v = zf * zf * (3 - 2 * zf);
+  const m = per ? (a => ((a % per) + per) % per) : (a => a);
+  const a = w3Hash(m(xi), m(zi)), b = w3Hash(m(xi + 1), m(zi)), c = w3Hash(m(xi), m(zi + 1)), d = w3Hash(m(xi + 1), m(zi + 1));
+  return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
+}
+// a dirt road winding north-south through the start; farms sit beside it
+const roadX = z => 38 * Math.sin(z / 140) + 14 * (Math.sin(z / 47 + 1) - Math.sin(1));
+function hRaw(x, z) {
+  return 7 * Math.sin(x * 0.0105 + 1.3) * Math.cos(z * 0.0087) + 3.2 * Math.sin(x * 0.026 - z * 0.019 + 0.5)
+    + 1.4 * Math.sin(x * 0.061 + z * 0.043) + (w3Noise(x / 38, z / 38) - .5) * 6 + (w3Noise(x / 11, z / 11) - .5) * 0.9;
+}
+// farm sites: one fixed farm in view of the start, the rest deterministic per 300 yd cell
+function w3Site(i, j) {
+  const key = i + ',' + j;
+  if (W3.sites.has(key)) return W3.sites.get(key);
+  let s = null;
+  if (i === 0 && j === 0) s = {x: roadX(-118) + 76, z: -118, rot: -Math.PI / 2};
+  else if (i === 0 && j % 2 === 0 && w3Hash(j * 17 + 3, 91) < .7) {
+    const z = j * FARM_CELL + (w3Hash(j, 5) - .5) * 140, side = w3Hash(j, 7) < .5 ? -1 : 1;
+    s = {x: roadX(z) + side * (96 + w3Hash(j, 9) * 18), z, rot: side < 0 ? Math.PI / 2 : -Math.PI / 2};
+  } else if (i !== 0 && Math.abs(j % 2) === 1 && w3Hash(i * 31 + 7, j * 17 + 3) < .45) {
+    s = {x: i * FARM_CELL + (w3Hash(i * 3 + 2, j) - .5) * 80, z: j * FARM_CELL + (w3Hash(i, j * 5 + 1) - .5) * 120, rot: Math.floor(w3Hash(i, j) * 4) * Math.PI / 2};
+  }
+  if (s) s.h = hRaw(s.x, s.z);
+  W3.sites.set(key, s); return s;
+}
+function w3H(x, z) {
+  let h = hRaw(x, z);
+  const i0 = Math.round(x / FARM_CELL), j0 = Math.round(z / FARM_CELL);
+  for (let i = i0 - 1; i <= i0 + 1; i++) for (let j = j0 - 1; j <= j0 + 1; j++) {
+    const s = w3Site(i, j); if (!s) continue;
+    const d = Math.hypot(x - s.x, z - s.z); if (d < 86) h += (s.h - h) * sstep(86, 56, d);
+  }
+  const rx = roadX(z), rd = Math.abs(x - rx);
+  if (rd < 15) h += (hRaw(rx, z) - .3 - h) * sstep(15, 4, rd);
+  return h;
+}
+function w3SiteDist(x, z) {
+  let best = 1e9;
+  const i0 = Math.round(x / FARM_CELL), j0 = Math.round(z / FARM_CELL);
+  for (let i = i0 - 1; i <= i0 + 1; i++) for (let j = j0 - 1; j <= j0 + 1; j++) { const s = w3Site(i, j); if (s) best = Math.min(best, Math.hypot(x - s.x, z - s.z)); }
+  return best;
+}
+function w3Ground(x, z, h, c) {
+  const n = w3Noise(x / 45, z / 45), n2 = w3Noise(x / 13 + 40, z / 13 - 7), n3 = w3Noise(x / 4.5, z / 4.5);
+  const t = sstep(.18, .62, n); // olive green hollows -> golden dry Westfall grass
+  let r = .42 + .29 * t, g = .45 + .1 * t, b = .19 + .08 * t;
+  const n4 = w3Noise(x / 17 - 30, z / 17 + 11), v = (.88 + n3 * .16) * (.86 + n4 * .26); r *= v; g *= v; b *= v;
+  const lush = sstep(.62, .8, w3Noise(x / 70 + 5, z / 70 - 9)) * .5; r += (.3 - r) * lush; g += (.42 - g) * lush; b += (.16 - b) * lush;
+  const dp = sstep(.7, .82, n2) * .65; r += (.6 - r) * dp; g += (.47 - g) * dp; b += (.3 - b) * dp;
+  const rd = Math.abs(x - roadX(z)), w = sstep(9, 4, rd) * .7; r += (.55 - r) * w; g += (.45 - g) * w; b += (.29 - b) * w;
+  const sd = w3SiteDist(x, z), f = sstep(46, 24, sd) * .55; r += (.58 - r) * f; g += (.48 - g) * f; b += (.31 - b) * f;
+  const k = 1.22 * (1 + Math.max(-8, Math.min(10, h)) * .01);
+  c[0] = r * k; c[1] = g * k; c[2] = b * k;
+}
+
+/* canvas textures */
+function w3Canvas(w, h, fn) { const c = document.createElement('canvas'); c.width = w; c.height = h; fn(c.getContext('2d'), w, h); return c; }
+function w3Tex(c, rx, ry) {
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(rx || 1, ry || 1);
+  t.anisotropy = Math.min(W3.low ? 2 : 8, W3.r.capabilities.getMaxAnisotropy()); return t;
+}
+function w3Pixels(x, w, h, fn) {
+  const d = x.createImageData(w, h), a = d.data, o = [0, 0, 0, 255];
+  for (let y = 0; y < h; y++) for (let i = 0; i < w; i++) { fn(i, y, o); const k = (y * w + i) * 4; a[k] = o[0]; a[k + 1] = o[1]; a[k + 2] = o[2]; a[k + 3] = o[3]; }
+  x.putImageData(d, 0, 0);
+}
+function w3Strokes(x, w, h, n, fn) { // tileable strokes: draw each one wrapped around the edges
+  for (let i = 0; i < n; i++) {
+    const s = fn(i);
+    for (const ox of [-w, 0, w]) for (const oy of [-h, 0, h]) {
+      x.strokeStyle = s.c; x.lineWidth = s.lw; x.beginPath(); x.moveTo(s.x + ox, s.y + oy); x.lineTo(s.x + ox + s.dx, s.y + oy + s.dy); x.stroke();
+    }
+  }
+}
+function w3Textures() {
+  const R = (i, k) => w3Hash(i * 7 + k, k * 13 + 5);
+  const T = {};
+  T.grass = w3Tex(w3Canvas(256, 256, (x, w, h) => {
+    w3Pixels(x, w, h, (i, y, o) => { const v = Math.min(255, 168 + 62 * w3Noise(i / 16, y / 16, 16) + 30 * w3Noise(i / 5, y / 5, 51) + 14 * w3Hash(i, y)); o[0] = v; o[1] = v; o[2] = v * .93; });
+    x.lineCap = 'round';
+    w3Strokes(x, w, h, 1400, i => { const l = 3 + R(i, 1) * 6, a = -Math.PI / 2 + (R(i, 2) - .5) * 1.1, v = 150 + R(i, 3) * 105 | 0;
+      return {x: R(i, 4) * w, y: R(i, 5) * h, dx: Math.cos(a) * l, dy: Math.sin(a) * l, lw: 1 + R(i, 6), c: 'rgba(' + v + ',' + (v + 6) + ',' + (v * .82 | 0) + ',.55)'}; });
+  }));
+  T.dirt = w3Tex(w3Canvas(128, 256, (x, w, h) => {
+    w3Pixels(x, w, h, (i, y, o) => {
+      const u = i / w, n = w3Noise(i / 9, y / 9, 32), edge = sstep(0, .2 + n * .1, u) * sstep(1, .8 - n * .1, u);
+      const rut = 1 - .16 * (Math.exp(-Math.pow((u - .33) / .05, 2)) + Math.exp(-Math.pow((u - .67) / .05, 2)));
+      const v = (.82 + .2 * w3Noise(i / 4, y / 4, 64) + .08 * w3Hash(i, y)) * rut;
+      o[0] = 168 * v; o[1] = 134 * v; o[2] = 92 * v; o[3] = 255 * edge;
+    });
+    for (let i = 0; i < 90; i++) { x.fillStyle = 'rgba(90,70,50,' + (.25 + R(i, 9) * .3) + ')'; x.beginPath(); x.arc(20 + R(i, 1) * 88, R(i, 2) * h, 1 + R(i, 3) * 2.2, 0, 7); x.fill(); }
+  }));
+  T.timber = w3Tex(w3Canvas(128, 128, (x, w, h) => {
+    w3Pixels(x, w, h, (i, y, o) => { const v = .9 + .1 * w3Noise(i / 6, y / 6, 21); o[0] = 232 * v; o[1] = 218 * v; o[2] = 186 * v; });
+    x.strokeStyle = '#4a2f1c'; x.lineCap = 'square';
+    const beam = (a, b, c, d, lw) => { x.lineWidth = lw; x.beginPath(); x.moveTo(a, b); x.lineTo(c, d); x.stroke(); };
+    beam(0, 4, 128, 4, 9); beam(0, 124, 128, 124, 9); beam(4, 0, 4, 128, 9); beam(124, 0, 124, 128, 9); beam(64, 0, 64, 128, 8);
+    beam(0, 64, 128, 64, 6); beam(8, 60, 60, 8, 6); beam(68, 8, 120, 60, 6);
+    x.fillStyle = 'rgba(0,0,0,.15)'; for (let i = 0; i < 40; i++) x.fillRect(R(i, 1) * 128, R(i, 2) * 128, 2, 1);
+  }));
+  T.roof = w3Tex(w3Canvas(128, 128, (x, w, h) => {
+    for (let r = 0; r < 8; r++) for (let c = 0; c < 9; c++) {
+      const v = .78 + R(r * 9 + c, 1) * .3, ox = (r % 2) * 8;
+      x.fillStyle = 'rgb(' + (190 * v | 0) + ',' + (170 * v | 0) + ',' + (150 * v | 0) + ')'; x.fillRect(c * 16 - ox, r * 16, 15, 15);
+      x.fillStyle = 'rgba(0,0,0,.28)'; x.fillRect(c * 16 - ox, r * 16 + 12, 15, 3);
+    }
+  }), 4, 3);
+  T.plank = w3Tex(w3Canvas(128, 128, (x, w, h) => {
+    w3Pixels(x, w, h, (i, y, o) => { const p = Math.floor(i / 16), v = .78 + .16 * w3Hash(p, 3) + .1 * w3Noise(i / 2, y / 18, 64) - (i % 16 === 0 ? .35 : 0); o[0] = 225 * v; o[1] = 215 * v; o[2] = 200 * v; });
+  }), 2, 1);
+  T.stone = w3Tex(w3Canvas(128, 128, (x, w, h) => {
+    x.fillStyle = '#7b756a'; x.fillRect(0, 0, w, h);
+    for (let r = 0; r < 8; r++) for (let c = 0; c < 6; c++) {
+      const v = .85 + R(r * 6 + c, 2) * .3, ox = (r % 2) * 11;
+      x.fillStyle = 'rgb(' + (215 * v | 0) + ',' + (205 * v | 0) + ',' + (185 * v | 0) + ')'; x.fillRect(c * 22 - ox + 1, r * 16 + 1, 20, 14);
+    }
+  }), 3, 2);
+  T.wheat = w3Tex(w3Canvas(128, 128, (x, w, h) => {
+    x.lineCap = 'round';
+    for (let i = 0; i < 70; i++) {
+      const sx = R(i, 1) * w, top = 14 + R(i, 2) * 34, lean = (R(i, 3) - .5) * 10, v = .8 + R(i, 4) * .3;
+      x.strokeStyle = 'rgb(' + (196 * v | 0) + ',' + (160 * v | 0) + ',' + (70 * v | 0) + ')'; x.lineWidth = 1.6;
+      x.beginPath(); x.moveTo(sx, h); x.quadraticCurveTo(sx, top + 30, sx + lean, top); x.stroke();
+      x.fillStyle = 'rgb(' + (222 * v | 0) + ',' + (184 * v | 0) + ',' + (88 * v | 0) + ')';
+      x.beginPath(); x.ellipse(sx + lean, top - 5, 2.4, 7, lean / 40, 0, 7); x.fill();
+    }
+  }), 1, 1);
+  T.tuft = w3Tex(w3Canvas(64, 64, (x, w, h) => {
+    x.lineCap = 'round';
+    for (let i = 0; i < 26; i++) {
+      const a = (R(i, 1) - .5) * 1.4, l = 26 + R(i, 2) * 34, v = .75 + R(i, 3) * .35;
+      x.strokeStyle = 'rgb(' + (205 * v | 0) + ',' + (200 * v | 0) + ',' + (110 * v | 0) + ')'; x.lineWidth = 2 + R(i, 4) * 1.5;
+      x.beginPath(); x.moveTo(32 + a * 6, 64); x.quadraticCurveTo(32 + a * 14, 64 - l * .6, 32 + Math.sin(a) * l * .8, 64 - l); x.stroke();
+    }
+  }));
+  T.leaf = w3Tex(w3Canvas(128, 128, (x, w, h) => {
+    w3Pixels(x, w, h, (i, y, o) => { const v = 175 + 60 * w3Noise(i / 7, y / 7, 18) + 20 * w3Noise(i / 2.5, y / 2.5, 51); o[0] = v; o[1] = v; o[2] = v; });
+    for (let i = 0; i < 160; i++) { x.fillStyle = R(i, 5) < .5 ? 'rgba(255,255,230,.35)' : 'rgba(0,20,0,.25)'; x.beginPath(); x.ellipse(R(i, 1) * w, R(i, 2) * h, 2 + R(i, 3) * 4, 1.5 + R(i, 4) * 2, R(i, 6) * 3, 0, 7); x.fill(); }
+  }), 2, 2);
+  T.sail = w3Tex(w3Canvas(64, 128, (x, w, h) => {
+    x.fillStyle = 'rgba(226,212,178,.95)'; x.fillRect(4, 2, 56, 124);
+    x.strokeStyle = '#5a4026'; x.lineWidth = 3; x.strokeRect(4, 2, 56, 124);
+    x.lineWidth = 2; for (let i = 1; i < 8; i++) { x.beginPath(); x.moveTo(4, i * 16); x.lineTo(60, i * 16); x.stroke(); }
+    x.beginPath(); x.moveTo(32, 2); x.lineTo(32, 126); x.stroke();
+  }));
+  const radial = (stops) => w3Canvas(64, 64, (x) => { const g = x.createRadialGradient(32, 32, 0, 32, 32, 32); stops.forEach(s => g.addColorStop(s[0], s[1])); x.fillStyle = g; x.fillRect(0, 0, 64, 64); });
+  T.blob = new THREE.CanvasTexture(radial([[0, 'rgba(0,0,0,.55)'], [.55, 'rgba(0,0,0,.35)'], [1, 'rgba(0,0,0,0)']]));
+  T.glow = new THREE.CanvasTexture(radial([[0, 'rgba(255,255,255,1)'], [.25, 'rgba(255,255,255,.55)'], [1, 'rgba(255,255,255,0)']]));
+  T.cloud = new THREE.CanvasTexture(w3Canvas(256, 128, (x) => {
+    for (let i = 0; i < 26; i++) {
+      const cx = 40 + R(i, 1) * 176, cy = 50 + R(i, 2) * 40 - Math.abs(cx - 128) * .12, r = 16 + R(i, 3) * 26;
+      const g = x.createRadialGradient(cx, cy - r * .3, 0, cx, cy, r);
+      g.addColorStop(0, 'rgba(255,255,255,.85)'); g.addColorStop(.6, 'rgba(236,240,246,.5)'); g.addColorStop(1, 'rgba(210,220,232,0)');
+      x.fillStyle = g; x.fillRect(0, 0, 256, 128);
+    }
+  }));
+  T.beam = new THREE.CanvasTexture(w3Canvas(16, 128, (x) => { const g = x.createLinearGradient(0, 0, 0, 128); g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(.7, 'rgba(255,255,255,.35)'); g.addColorStop(1, 'rgba(255,255,255,.8)'); x.fillStyle = g; x.fillRect(0, 0, 16, 128); }));
+  return T;
+}
+
+/* geometry helpers */
+function w3Part(geo, hex, x, y, z, rx, ry, rz, sx, sy, sz) {
+  const P = THREE;
+  geo.applyMatrix4(new P.Matrix4().compose(new P.Vector3(x || 0, y || 0, z || 0), new P.Quaternion().setFromEuler(new P.Euler(rx || 0, ry || 0, rz || 0)),
+    new P.Vector3(sx || 1, sy || sx || 1, sz || sx || 1)));
+  if (hex != null) {
+    const c = new P.Color(hex), n = geo.attributes.position.count, a = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) { a[i * 3] = c.r; a[i * 3 + 1] = c.g; a[i * 3 + 2] = c.b; }
+    geo.setAttribute('color', new P.BufferAttribute(a, 3));
+  }
+  return geo;
+}
+function w3Merge(geos) {
+  const parts = geos.map(g => (g.index ? g.toNonIndexed() : g));
+  const hasCol = parts.some(g => g.attributes.color);
+  let n = 0; parts.forEach(g => { n += g.attributes.position.count; });
+  const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3), uv = new Float32Array(n * 2), col = hasCol ? new Float32Array(n * 3).fill(1) : null;
+  let o = 0;
+  for (const g of parts) {
+    if (!g.attributes.normal) g.computeVertexNormals();
+    pos.set(g.attributes.position.array, o * 3); nor.set(g.attributes.normal.array, o * 3);
+    if (g.attributes.uv) uv.set(g.attributes.uv.array, o * 2);
+    if (col && g.attributes.color) col.set(g.attributes.color.array, o * 3);
+    o += g.attributes.position.count;
+  }
+  const m = new THREE.BufferGeometry();
+  m.setAttribute('position', new THREE.BufferAttribute(pos, 3)); m.setAttribute('normal', new THREE.BufferAttribute(nor, 3)); m.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  if (col) m.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  return m;
+}
+const w3Mesh = (parts, mat) => new THREE.Mesh(w3Merge(parts), mat);
+function w3Jitter(geo, amt, seed) { // lumpy low-poly shapes: shared corners move together
+  const p = geo.attributes.position;
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
+    const f = 1 + (w3Hash(Math.round(x * 40) * 7 + Math.round(y * 40) + seed, Math.round(z * 40) * 13) - .5) * amt;
+    p.setXYZ(i, x * f, y * f, z * f);
+  }
+  geo.computeVertexNormals(); return geo;
+}
+function w3Shade(geo, lo, hi) { // vertex colour gradient from bottom to top
+  const P = THREE, p = geo.attributes.position, c0 = new P.Color(lo), c1 = new P.Color(hi), c = new P.Color(), a = new Float32Array(p.count * 3);
+  geo.computeBoundingBox(); const b = geo.boundingBox, hgt = b.max.y - b.min.y || 1;
+  for (let i = 0; i < p.count; i++) { c.copy(c0).lerp(c1, (p.getY(i) - b.min.y) / hgt); a[i * 3] = c.r; a[i * 3 + 1] = c.g; a[i * 3 + 2] = c.b; }
+  geo.setAttribute('color', new P.BufferAttribute(a, 3)); return geo;
+}
+
+/* characters (front = +z, feet at the origin) */
+function w3Limb(g, x, y, z, parts, mat) { const a = new THREE.Group(); a.position.set(x, y, z); a.add(w3Mesh(parts, mat)); g.add(a); return a; }
+function w3Mage(mat, orbMat) {
+  const P = THREE, g = new P.Group(); g.rotation.order = 'YXZ';
+  const PUR = 0x4b2379, PUR2 = 0x63319a, GOLD = 0xc9a03a, SKIN = 0xe0b08a, HOOD = 0x3c1a63;
+  const body = w3Mesh([
+    w3Part(new P.CylinderGeometry(.34, .64, 1.2, 10), PUR, 0, .6),
+    w3Part(new P.CylinderGeometry(.655, .665, .12, 10), GOLD, 0, .07),
+    w3Part(new P.BoxGeometry(.16, 1.12, .05), GOLD, 0, .62, .49, -.245),
+    w3Part(new P.CylinderGeometry(.36, .35, .62, 10), PUR2, 0, 1.45),
+    w3Part(new P.CylinderGeometry(.375, .375, .1, 10), GOLD, 0, 1.16),
+    w3Part(new P.ConeGeometry(.33, .28, 10), HOOD, 0, 1.84),
+    w3Part(new P.SphereGeometry(.2, 12, 9), SKIN, 0, 2.0),
+    w3Part(new P.SphereGeometry(.235, 12, 9), HOOD, 0, 2.05, -.07),
+    w3Part(new P.ConeGeometry(.16, .26, 8), HOOD, 0, 2.24, -.2, -.95),
+    w3Part(new P.SphereGeometry(.21, 8, 6), GOLD, -.43, 1.71, 0, 0, 0, 0, 1, .7, 1),
+    w3Part(new P.SphereGeometry(.21, 8, 6), GOLD, .43, 1.71, 0, 0, 0, 0, 1, .7, 1)
+  ], mat);
+  g.add(body);
+  const aL = w3Limb(g, -.45, 1.66, 0, [w3Part(new P.CylinderGeometry(.1, .17, .66, 7), PUR2, 0, -.32), w3Part(new P.SphereGeometry(.08, 7, 5), SKIN, 0, -.7)], mat);
+  const aR = w3Limb(g, .45, 1.66, 0, [w3Part(new P.CylinderGeometry(.1, .17, .66, 7), PUR2, 0, -.32), w3Part(new P.SphereGeometry(.08, 7, 5), SKIN, 0, -.7),
+    w3Part(new P.CylinderGeometry(.035, .045, 2.2, 5), 0x5a3a1e, 0, -.55, .12), w3Part(new P.ConeGeometry(.12, .26, 5), 0x8a6a3a, 0, .62, .12, Math.PI)], mat);
+  const orb = new P.Mesh(new P.IcosahedronGeometry(.12, 0), orbMat); orb.position.set(0, .8, .12); aR.add(orb);
+  return {g, body, aL, aR};
+}
+function w3Defias(mat, syn) {
+  const P = THREE, g = new P.Group(); g.rotation.order = 'YXZ';
+  const LEA = syn ? 0x3e3d4a : 0x6b4a2c, LEA2 = syn ? 0x2a2933 : 0x48311d, RED = syn ? 0x5b2470 : 0xb0261e, SKIN = 0xd29b74, PANTS = syn ? 0x2c2b33 : 0x3d2e1f;
+  g.add(w3Mesh([
+    w3Part(new P.BoxGeometry(.62, .72, .36), LEA, 0, 1.4),
+    w3Part(new P.BoxGeometry(.66, .13, .39), LEA2, 0, 1.06),
+    w3Part(new P.BoxGeometry(.5, .24, .32), PANTS, 0, .93),
+    w3Part(new P.BoxGeometry(.26, .14, .38), LEA2, -.39, 1.75), w3Part(new P.BoxGeometry(.26, .14, .38), LEA2, .39, 1.75),
+    w3Part(new P.SphereGeometry(.2, 10, 8), SKIN, 0, 1.98),
+    w3Part(new P.SphereGeometry(.218, 10, 6, 0, Math.PI * 2, 0, Math.PI * .5), RED, 0, 2.0),
+    w3Part(new P.CylinderGeometry(.214, .19, .15, 10), RED, 0, 1.89),
+    w3Part(new P.ConeGeometry(.1, .3, 4), RED, 0, 1.92, -.25, -1.2)
+  ], mat));
+  const legs = [-1, 1].map(s => w3Limb(g, s * .15, .95, 0, [w3Part(new P.CylinderGeometry(.11, .09, .85, 6), PANTS, 0, -.42), w3Part(new P.BoxGeometry(.19, .2, .32), 0x22160c, 0, -.86, .05)], mat));
+  const aL = w3Limb(g, -.41, 1.66, 0, [w3Part(new P.CylinderGeometry(.09, .08, .66, 6), LEA, 0, -.33), w3Part(new P.SphereGeometry(.08, 7, 5), SKIN, 0, -.68)], mat);
+  const aR = w3Limb(g, .41, 1.66, 0, [w3Part(new P.CylinderGeometry(.09, .08, .66, 6), LEA, 0, -.33), w3Part(new P.SphereGeometry(.08, 7, 5), SKIN, 0, -.68),
+    w3Part(new P.BoxGeometry(.07, .95, .025), 0xc4c8d0, 0, -.72, .52, Math.PI / 2), w3Part(new P.BoxGeometry(.26, .05, .06), 0x8a6a2a, 0, -.72, .06)], mat);
+  return {g, legs, aL, aR, h: 2.2};
+}
+function w3Golem(mat, eyeMat) { // Harvest Watcher-like construct
+  const P = THREE, g = new P.Group(); g.rotation.order = 'YXZ';
+  const RUST = 0x83552f, IRON = 0x4b433b, STRAW = 0xc9a24a, WOOD = 0x8c6a3c;
+  g.add(w3Mesh([
+    w3Part(new P.CylinderGeometry(.44, .34, .9, 8), RUST, 0, 1.72),
+    w3Part(new P.CylinderGeometry(.455, .455, .07, 8), IRON, 0, 1.98), w3Part(new P.CylinderGeometry(.4, .4, .07, 8), IRON, 0, 1.45),
+    w3Part(new P.BoxGeometry(.5, .2, .3), IRON, 0, 1.22),
+    w3Part(new P.CylinderGeometry(.06, .06, .22, 5), IRON, 0, 2.14),
+    w3Part(new P.BoxGeometry(.5, .44, .46), WOOD, 0, 2.43),
+    w3Part(new P.CylinderGeometry(.56, .56, .04, 10), STRAW, 0, 2.67),
+    w3Part(new P.ConeGeometry(.34, .44, 10), STRAW, 0, 2.9),
+    w3Part(new P.ConeGeometry(.1, .34, 4), STRAW, -.42, 2.0, 0, 0, 0, .9), w3Part(new P.ConeGeometry(.1, .34, 4), STRAW, .42, 2.0, 0, 0, 0, -.9)
+  ], mat));
+  const eyes = w3Mesh([w3Part(new P.BoxGeometry(.1, .07, .02), null, -.11, 2.47, .235), w3Part(new P.BoxGeometry(.1, .07, .02), null, .11, 2.47, .235)], eyeMat); g.add(eyes);
+  const legs = [-1, 1].map(s => w3Limb(g, s * .17, 1.2, 0, [w3Part(new P.CylinderGeometry(.06, .05, 1.1, 5), IRON, 0, -.55), w3Part(new P.BoxGeometry(.2, .08, .32), IRON, 0, -1.12, .05)], mat));
+  const aL = w3Limb(g, -.5, 1.95, 0, [w3Part(new P.CylinderGeometry(.05, .05, .95, 5), IRON, 0, -.47), w3Part(new P.ConeGeometry(.08, .22, 4), IRON, 0, -1.02, 0, Math.PI)], mat);
+  const aR = w3Limb(g, .5, 1.95, 0, [w3Part(new P.CylinderGeometry(.05, .05, .95, 5), IRON, 0, -.47),
+    w3Part(new P.CylinderGeometry(.03, .03, 2.0, 4), 0x6a4a28, 0, -.75, .15), w3Part(new P.BoxGeometry(.03, .14, .95), 0xb6bac0, 0, .2, .6, .25)], mat);
+  return {g, legs, aL, aR, h: 3.1};
+}
+function w3Sheep(mat) {
+  const P = THREE, g = new P.Group(), W = 0xf0ece2, D = 0x3a3430;
+  const parts = [w3Part(new P.SphereGeometry(.55, 10, 8), W, 0, .8, 0, 0, 0, 0, 1, .85, 1.25),
+    w3Part(new P.BoxGeometry(.3, .32, .42), D, 0, 1.0, .78), w3Part(new P.BoxGeometry(.18, .05, .09), D, -.2, 1.1, .72), w3Part(new P.BoxGeometry(.18, .05, .09), D, .2, 1.1, .72),
+    w3Part(new P.SphereGeometry(.13, 6, 5), W, 0, .88, -.7)];
+  [[0, 1.2, .1], [.3, 1.05, .35], [-.3, 1.05, .35], [.32, 1.05, -.3], [-.32, 1.05, -.3], [0, 1.15, -.38]].forEach(p => parts.push(w3Part(new P.SphereGeometry(.28, 7, 6), 0xf7f4ec, p[0], p[1], p[2])));
+  [[-.24, .38], [.24, .38], [-.24, -.38], [.24, -.38]].forEach(p => parts.push(w3Part(new P.CylinderGeometry(.06, .05, .5, 5), D, p[0], .25, p[1])));
+  g.add(w3Mesh(parts, mat)); return g;
+}
+function w3Ice() {
+  const P = THREE, g = new P.Group();
+  const m = new P.MeshLambertMaterial({color: 0xb4e8ff, emissive: 0x2a5c88, transparent: true, opacity: .78});
+  for (let i = 0; i < 9; i++) {
+    const a = i / 9 * Math.PI * 2 + w3Hash(i, 3), r = .5 + w3Hash(i, 4) * .45, hgt = .7 + w3Hash(i, 5) * .8;
+    const c = new P.Mesh(new P.ConeGeometry(.16 + w3Hash(i, 6) * .14, hgt, 5), m);
+    c.position.set(Math.sin(a) * r, hgt * .4, Math.cos(a) * r); c.rotation.set(Math.cos(a) * .35, 0, -Math.sin(a) * .35); g.add(c);
+  }
+  const disc = new P.Mesh(new P.CircleGeometry(1.35, 18), new P.MeshBasicMaterial({color: 0xd6f2ff, transparent: true, opacity: .5, depthWrite: false}));
+  disc.rotation.x = -Math.PI / 2; disc.position.y = .06; g.add(disc);
+  return g;
+}
+
+/* farm, windmill, graveyard */
+function w3House(w, d, h, rh, wallMat, roofMat) {
+  const P = THREE, g = new P.Group();
+  const walls = new P.Mesh(new P.BoxGeometry(w, h, d), wallMat); walls.position.y = h / 2; g.add(walls);
+  const gab = new P.BufferGeometry(), x = w / 2;
+  gab.setAttribute('position', new P.BufferAttribute(new Float32Array([-x, h, -d / 2, -x, h, d / 2, -x, h + rh, 0, x, h, d / 2, x, h, -d / 2, x, h + rh, 0]), 3));
+  gab.setAttribute('uv', new P.BufferAttribute(new Float32Array([0, 0, 1, 0, .5, 1, 0, 0, 1, 0, .5, 1]), 2)); gab.computeVertexNormals();
+  g.add(new P.Mesh(gab, wallMat));
+  const a = Math.atan2(rh, d / 2), L = Math.hypot(d / 2, rh) + .8;
+  for (const s of [1, -1]) {
+    const r = new P.Mesh(new P.BoxGeometry(w + 1.3, .24, L), roofMat);
+    r.rotation.x = s * a; r.position.set(0, h + rh / 2 + .1, s * (d / 4 + .2)); g.add(r);
+  }
+  return g;
+}
+function w3Farm(M) {
+  const P = THREE, g = new P.Group();
+  // farmhouse: timber frame, red shingles, stone chimney
+  const house = w3House(11, 7.5, 4.4, 3.4, M.timber, M.roof); house.position.set(-15, 0, 8); house.rotation.y = .08; g.add(house);
+  const det = w3Mesh([w3Part(new P.BoxGeometry(1.3, 2.3, .12), 0x3a2414, 0, 1.15, 3.8), w3Part(new P.BoxGeometry(1.2, 1, .1), 0x2a2018, -3.2, 2.5, 3.79),
+    w3Part(new P.BoxGeometry(1.2, 1, .1), 0x2a2018, 3.2, 2.5, 3.79), w3Part(new P.BoxGeometry(1.4, .14, .3), 0x4a2f1c, -3.2, 1.95, 3.85), w3Part(new P.BoxGeometry(1.4, .14, .3), 0x4a2f1c, 3.2, 1.95, 3.85),
+    w3Part(new P.BoxGeometry(1.2, .9, .1), 0x2a2018, 5.56, 2.5, 0, 0, Math.PI / 2)], M.vc);
+  house.add(det);
+  const chim = new P.Mesh(new P.BoxGeometry(1.1, 4, 1.1), M.stone); chim.position.set(-3.6, 6.4, -1.4); house.add(chim);
+  // barn: red planks, dark roof, white cross braces on the doors
+  const barn = w3House(13, 10, 6, 4.6, M.plankRed, M.roofDark); barn.position.set(15, 0, -7); barn.rotation.y = Math.PI / 2 + .05; g.add(barn);
+  barn.add(w3Mesh([w3Part(new P.BoxGeometry(4.4, 4.6, .14), 0x7a2a1c, 0, 2.3, 5.04), w3Part(new P.BoxGeometry(.26, 6.2, .1), 0xe8e0d0, 0, 2.3, 5.13, 0, 0, .76),
+    w3Part(new P.BoxGeometry(.26, 6.2, .1), 0xe8e0d0, 0, 2.3, 5.13, 0, 0, -.76), w3Part(new P.BoxGeometry(4.6, .26, .1), 0xe8e0d0, 0, 4.55, 5.13), w3Part(new P.BoxGeometry(1.3, 1.2, .1), 0x2a1a10, 0, 7.4, 5.04)], M.vc));
+  // windmill with turning sails
+  const wm = new P.Group(); wm.position.set(-27, 0, -16); wm.rotation.y = .5; g.add(wm);
+  const tower = new P.Mesh(new P.CylinderGeometry(2.0, 3.0, 10, 8), M.stone); tower.position.y = 5; wm.add(tower);
+  const band = new P.Mesh(new P.CylinderGeometry(2.15, 2.15, .5, 8), M.wood); band.position.y = 10; wm.add(band);
+  const cap = new P.Mesh(new P.ConeGeometry(2.8, 3.4, 8), M.roof); cap.position.y = 11.9; wm.add(cap);
+  wm.add(w3Mesh([w3Part(new P.CylinderGeometry(.35, .35, 1.4, 6), 0x4a3420, 0, 10.6, 2.5, Math.PI / 2), w3Part(new P.BoxGeometry(1.3, 2.2, .14), 0x3a2414, 0, 1.1, 2.86, -.1)], M.vc));
+  const bl = new P.Group(); bl.name = 'blades'; bl.position.set(0, 10.6, 3.25); wm.add(bl);
+  for (let k = 0; k < 4; k++) {
+    const arm = new P.Group(); arm.rotation.z = k * Math.PI / 2; bl.add(arm);
+    const spar = new P.Mesh(new P.BoxGeometry(.24, 7.6, .2), M.wood); spar.position.y = 3.8; arm.add(spar);
+    const sail = new P.Mesh(new P.PlaneGeometry(1.7, 6), M.sail); sail.position.set(.98, 4.4, .02); arm.add(sail);
+  }
+  // wheat field with a fence around it
+  const FX = 8, FZ = 24, FW = 36, FD = 20;
+  const soil = new P.Mesh(new P.PlaneGeometry(FW, FD), M.soil); soil.rotation.x = -Math.PI / 2; soil.position.set(FX, .06, FZ); g.add(soil);
+  const q = [], uv = [], idx = [], add = (x0, z0, x1, z1, hgt) => {
+    const len = Math.hypot(x1 - x0, z1 - z0) / 1.6, b = q.length / 3;
+    q.push(x0, 0, z0, x1, 0, z1, x1, hgt, z1, x0, hgt, z0); uv.push(0, 0, len, 0, len, 1, 0, 1); idx.push(b, b + 1, b + 2, b, b + 2, b + 3, b, b + 2, b + 1, b, b + 3, b + 2);
+  };
+  for (let z = -FD / 2 + .6; z < FD / 2; z += 1.05) add(FX - FW / 2 + .3, FZ + z, FX + FW / 2 - .3, FZ + z, 1.25 + w3Hash(z * 10, 1) * .2);
+  for (let x = -FW / 2 + .6; x < FW / 2; x += 1.6) add(FX + x, FZ - FD / 2 + .3, FX + x, FZ + FD / 2 - .3, 1.2);
+  const wg = new P.BufferGeometry();
+  wg.setAttribute('position', new P.BufferAttribute(new Float32Array(q), 3)); wg.setAttribute('uv', new P.BufferAttribute(new Float32Array(uv), 2));
+  wg.setAttribute('normal', new P.BufferAttribute(new Float32Array(q.length).map((v, i) => (i % 3 === 1 ? 1 : 0)), 3)); wg.setIndex(idx);
+  g.add(new P.Mesh(wg, M.wheat));
+  const fence = [], post = (x, z) => fence.push(w3Part(new P.BoxGeometry(.2, 1.4, .2), 0x6a4c30, x, .7, z));
+  const rail = (x0, z0, x1, z1) => { const len = Math.hypot(x1 - x0, z1 - z0), a = Math.atan2(x1 - x0, z1 - z0);
+    for (const y of [.5, 1.05]) fence.push(w3Part(new P.BoxGeometry(.08, .13, len), 0x7a5a3a, (x0 + x1) / 2, y, (z0 + z1) / 2, 0, a)); };
+  const fx0 = FX - FW / 2 - 1, fx1 = FX + FW / 2 + 1, fz0 = FZ - FD / 2 - 1, fz1 = FZ + FD / 2 + 1;
+  for (let x = fx0; x <= fx1 + .01; x += 3.17) { post(x, fz0); post(x, fz1); }
+  for (let z = fz0 + 3; z < fz1; z += 3.1) { post(fx0, z); post(fx1, z); }
+  rail(fx0, fz0, fx1, fz0); rail(fx0, fz1, FX - 2, fz1); rail(FX + 2, fz1, fx1, fz1); rail(fx0, fz0, fx0, fz1); rail(fx1, fz0, fx1, fz1);
+  // scarecrow, hay bales, pumpkins, a cart
+  fence.push(w3Part(new P.CylinderGeometry(.07, .07, 2.6, 5), 0x6a4c30, FX, 1.3, FZ), w3Part(new P.CylinderGeometry(.05, .05, 1.8, 5), 0x6a4c30, FX, 2.0, FZ, 0, 0, Math.PI / 2),
+    w3Part(new P.BoxGeometry(.6, .8, .34), 0x5a6a8a, FX, 1.9, FZ), w3Part(new P.SphereGeometry(.24, 8, 6), 0xd8c48a, FX, 2.55, FZ),
+    w3Part(new P.ConeGeometry(.42, .5, 8), 0x8a6a3a, FX, 2.85, FZ));
+  [[4, -15], [6.5, -16], [5.2, -13], [-2, -20]].forEach((p, i) => fence.push(w3Part(new P.CylinderGeometry(.9, .9, 1.3, 10), 0xd2b04a, p[0], .9, p[1], 0, i, Math.PI / 2)));
+  for (let i = 0; i < 14; i++) { const x = -24 + w3Hash(i, 2) * 8, z = 18 + w3Hash(i, 3) * 6, s = .35 + w3Hash(i, 4) * .25;
+    fence.push(w3Part(new P.SphereGeometry(s, 8, 6), 0xd8741e, x, s * .7, z, 0, 0, 0, 1, .75, 1), w3Part(new P.CylinderGeometry(.04, .05, .2, 4), 0x4a6a20, x, s * 1.4, z)); }
+  fence.push(w3Part(new P.BoxGeometry(2, .6, 3.2), 0x7a5a38, 2, 1.1, -3), w3Part(new P.CylinderGeometry(.6, .6, .12, 10), 0x4a3420, .9, .6, -2.2, 0, 0, Math.PI / 2),
+    w3Part(new P.CylinderGeometry(.6, .6, .12, 10), 0x4a3420, 3.1, .6, -2.2, 0, 0, Math.PI / 2), w3Part(new P.BoxGeometry(.12, .12, 2.4), 0x6a4c30, 2, .9, -5.6, .25));
+  g.add(w3Mesh(fence, M.vc));
+  return g;
+}
+function w3Graveyard(M) {
+  const P = THREE, parts = [];
+  for (let i = 0; i < 12; i++) {
+    const x = (i % 4) * 3 - 4.5 + (w3Hash(i, 1) - .5), z = Math.floor(i / 4) * 3.4 - 3.4, t = (w3Hash(i, 2) - .5) * .25;
+    parts.push(w3Part(new P.BoxGeometry(.8, 1, .22), 0x8d8a82, x, .45, z, 0, t, t * .5), w3Part(new P.CylinderGeometry(.4, .4, .22, 10, 1, false, 0, Math.PI), 0x8d8a82, x, .95, z, Math.PI / 2, t, Math.PI / 2));
+  }
+  for (const [x0, z0, x1, z1] of [[-8, -7, 8, -7], [-8, 7, -2, 7], [2, 7, 8, 7], [-8, -7, -8, 7], [8, -7, 8, 7]]) {
+    const len = Math.hypot(x1 - x0, z1 - z0); parts.push(w3Part(new P.BoxGeometry(.6, .7, len + .6), 0x77736a, (x0 + x1) / 2, .35, (z0 + z1) / 2, 0, Math.atan2(x1 - x0, z1 - z0)));
+  }
+  parts.push(w3Part(new P.CylinderGeometry(.18, .35, 4.2, 6), 0x3e3326, 6, 2.1, -4), w3Part(new P.CylinderGeometry(.06, .12, 2.2, 5), 0x3e3326, 6.7, 3.6, -4, 0, 0, -.9),
+    w3Part(new P.CylinderGeometry(.05, .1, 1.8, 5), 0x3e3326, 5.4, 3.3, -3.6, .3, 0, .8));
+  return w3Mesh(parts, M.vc);
+}
+function w3Ring(R, base, amp, freq, seed, top, bot) { // distant hills: a silhouette ring around the camera
+  const P = THREE, N = 160, pos = [], col = [], idx = [], ct = new P.Color(top), cb = new P.Color(bot);
+  for (let i = 0; i <= N; i++) {
+    const a = i / N * Math.PI * 2, n = w3Noise(Math.cos(a) * freq + seed, Math.sin(a) * freq + seed) * .75 + w3Noise(Math.cos(a) * freq * 3.1 + seed, Math.sin(a) * freq * 3.1) * .25;
+    const h = base + amp * Math.pow(n, 1.6);
+    pos.push(Math.cos(a) * R, -60, Math.sin(a) * R, Math.cos(a) * R, h, Math.sin(a) * R); col.push(cb.r, cb.g, cb.b, ct.r, ct.g, ct.b);
+    if (i < N) { const k = i * 2; idx.push(k, k + 1, k + 2, k + 1, k + 3, k + 2); }
+  }
+  const g = new P.BufferGeometry(); g.setAttribute('position', new P.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new P.Float32BufferAttribute(col, 3)); g.setIndex(idx);
+  return new P.Mesh(g, new P.MeshBasicMaterial({vertexColors: true, fog: false, side: P.DoubleSide}));
+}
+
+/* build the scene */
+function w3Init() {
+  const P = window.THREE; if (!P || !P.WebGLRenderer) return;
+  const cv = document.createElement('canvas'); cv.id = 'w3d'; cv.setAttribute('aria-hidden', 'true');
+  let r;
+  try { r = new P.WebGLRenderer({canvas: cv, antialias: !W3.low, powerPreference: 'high-performance'}); }
+  catch (e) { console.info('CasterKit: WebGL not available, the CSS world is used.'); return; }
+  try {
+    r.setClearColor(FOG); W3.r = r;
+    const scene = W3.scene = new P.Scene(); scene.fog = new P.Fog(FOG, 50, 340);
+    const cam = W3.cam = new P.PerspectiveCamera(52, 1440 / 810, .3, 2600);
+    const T = W3.tex = w3Textures();
+    const L = new P.Vector3(.5, .78, .38).normalize(); W3.L = L;
+    scene.add(new P.HemisphereLight(0xd6e2f6, 0x5e5034, .62));
+    const sun = new P.DirectionalLight(0xffecc8, .72); sun.position.copy(L).multiplyScalar(100); scene.add(sun);
+    const lam = o => new P.MeshLambertMaterial(o);
+    const M = W3.M = {
+      vc: lam({vertexColors: true}), timber: lam({map: T.timber}), roof: lam({map: T.roof, color: 0xb04a2c}), roofDark: lam({map: T.roof, color: 0x7a5844}),
+      plankRed: lam({map: T.plank, color: 0xa63c28}), wood: lam({map: T.plank, color: 0x8a6a48}), stone: lam({map: T.stone, color: 0xd8ceb6}),
+      soil: lam({map: T.grass, color: 0x8a6838}), wheat: lam({map: T.wheat, alphaTest: .45}), sail: lam({map: T.sail, alphaTest: .5, side: P.DoubleSide}),
+      canopy: lam({vertexColors: true, map: T.leaf}), tuft: lam({map: T.tuft, alphaTest: .4}),
+      blob: new P.MeshBasicMaterial({map: T.blob, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2}),
+      eye: new P.MeshBasicMaterial({color: 0xffd23a}), orb: new P.MeshBasicMaterial({color: 0x9fe4ff})
+    };
+    // sky dome: deep blue overhead to warm haze at the horizon
+    const sky = new P.SphereGeometry(2000, 32, 16), sp = sky.attributes.position, sc = new Float32Array(sp.count * 3);
+    const cZen = new P.Color(0x3a72bd), cUp = new P.Color(0x7eaad9), cHz = new P.Color(FOG).lerp(new P.Color(0xe2e2cc), .4), c = new P.Color();
+    for (let i = 0; i < sp.count; i++) {
+      const y = sp.getY(i) / 2000;
+      if (y < .02) c.copy(cHz); else if (y < .28) c.copy(cHz).lerp(cUp, (y - .02) / .26); else c.copy(cUp).lerp(cZen, Math.min(1, (y - .28) / .55));
+      sc[i * 3] = c.r; sc[i * 3 + 1] = c.g; sc[i * 3 + 2] = c.b;
+    }
+    sky.setAttribute('color', new P.BufferAttribute(sc, 3));
+    const far = W3.far = new P.Group(); scene.add(far);
+    const skyM = new P.Mesh(sky, new P.MeshBasicMaterial({vertexColors: true, side: P.BackSide, fog: false, depthWrite: false})); skyM.renderOrder = -10; far.add(skyM);
+    const glow = new P.Sprite(new P.SpriteMaterial({map: T.glow, color: 0xfff1c4, fog: false, transparent: true, depthWrite: false, blending: P.AdditiveBlending}));
+    glow.position.copy(L).multiplyScalar(1800); glow.scale.set(620, 620, 1); glow.renderOrder = -9; far.add(glow);
+    far.add(w3Ring(1500, 60, 330, 1.7, 3, 0x8a9bb0, cHz.getHex()));   // far mountains, blue haze
+    far.add(w3Ring(1050, 10, 120, 2.6, 11, 0x96a07e, cHz.getHex()));  // rolling hills
+    const clouds = W3.clouds = new P.Group(); far.add(clouds);
+    for (let i = 0; i < (W3.low ? 12 : 20); i++) {
+      const s = new P.Sprite(new P.SpriteMaterial({map: T.cloud, fog: false, transparent: true, depthWrite: false, opacity: .8 + w3Hash(i, 1) * .2}));
+      const a = w3Hash(i, 2) * Math.PI * 2, rr = 700 + w3Hash(i, 3) * 900, w = 380 + w3Hash(i, 4) * 420;
+      s.position.set(Math.cos(a) * rr, 260 + w3Hash(i, 5) * 300, Math.sin(a) * rr); s.scale.set(w, w * .45, 1); s.renderOrder = -8; clouds.add(s);
+    }
+    // terrain chunk, re-centred under the player
+    const tg = new P.PlaneGeometry(760, 760, W3.low ? 96 : 128, W3.low ? 96 : 128); tg.rotateX(-Math.PI / 2);
+    tg.setAttribute('color', new P.BufferAttribute(new Float32Array(tg.attributes.position.count * 3), 3));
+    W3.terLocal = Float32Array.from(tg.attributes.position.array);
+    W3.ter = new P.Mesh(tg, lam({vertexColors: true, map: T.grass})); scene.add(W3.ter);
+    W3.road = new P.Mesh(new P.BufferGeometry(), lam({map: T.dirt, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3}));
+    W3.road.frustumCulled = false; W3.road.renderOrder = 1; scene.add(W3.road);
+    // instanced trees, rocks, grass tufts and their blob shadows
+    const trunk = w3Part(new P.CylinderGeometry(.24, .45, 3.6, 6), 0x5a4128, 0, 1.8);
+    const blob = (rad, x, y, z, s) => w3Shade(w3Part(w3Jitter(new P.IcosahedronGeometry(rad, 1), .38, s), null, x, y, z), 0x34481a, 0x9aa848);
+    const canopy = w3Merge([blob(2.6, 0, 5.1, 0, 1), blob(1.9, 1.5, 4.2, .5, 2), blob(1.8, -1.2, 4.6, -.7, 3)]);
+    const rock = w3Shade(w3Jitter(new P.DodecahedronGeometry(1, 0), .5, 9), 0x6f675c, 0xa49c8a);
+    const tuft = new P.PlaneGeometry(1.3, .9); tuft.translate(0, .45, 0);
+    const tq = [tuft, tuft.clone().rotateY(Math.PI), tuft.clone().rotateY(Math.PI / 2), tuft.clone().rotateY(-Math.PI / 2)];
+    const tufts = w3Merge(tq); // both faces as real geometry, all normals up: evenly lit from every side tufts.attributes.normal.array.forEach((v, i, a) => { a[i] = i % 3 === 1 ? 1 : 0; });
+    const shadowG = new P.PlaneGeometry(1, 1); shadowG.rotateX(-Math.PI / 2);
+    const inst = (geo, mat, n) => { const m = new P.InstancedMesh(geo, mat, n); m.frustumCulled = false;
+      m.instanceColor = new P.InstancedBufferAttribute(new Float32Array(n * 3).fill(1), 3); m.count = 0; scene.add(m); return m; };
+    const NT = W3.low ? 240 : 420; W3.iTrunk = inst(trunk, M.vc, NT); W3.iCanopy = inst(canopy, M.canopy, NT); W3.iTShadow = inst(shadowG, M.blob, NT);
+    W3.iRock = inst(rock, M.vc, 260);
+    W3.iPost = inst(w3Part(new P.BoxGeometry(.2, 1.4, .2), 0x6a4c30, 0, .62), M.vc, 500);
+    W3.iRail = inst(w3Merge([w3Part(new P.BoxGeometry(.08, .13, 1), 0x7a5a3a, 0, .5), w3Part(new P.BoxGeometry(.08, .13, 1), 0x7a5a3a, 0, 1.02)]), M.vc, 500); W3.iTuft = inst(tufts, M.tuft, W3.low ? 1200 : 2800);
+    // farms (pooled, moved to the nearest farm sites), graveyard, signpost
+    const farm = w3Farm(M);
+    for (let i = 0; i < 4; i++) { const f = i ? farm.clone() : farm; f.visible = false; scene.add(f); W3.farms.push(f); W3.blades.push(f.getObjectByName('blades')); }
+    const gy = w3Pos(PL.gy); W3.gy = w3Graveyard(M); W3.gy.position.set(gy.x - 17, w3H(gy.x - 17, gy.z + 2) - .1, gy.z + 2); scene.add(W3.gy);
+    const sx = roadX(-30) - 6, sign = w3Mesh([w3Part(new P.CylinderGeometry(.1, .12, 3.2, 6), 0x5a4128, 0, 1.6), w3Part(new P.BoxGeometry(1.8, .4, .08), 0x8a6a40, .6, 2.7, 0, 0, 0, .05),
+      w3Part(new P.BoxGeometry(1.6, .4, .08), 0x7a5c38, -.5, 2.15, 0, 0, Math.PI / 2, -.05)], M.vc);
+    sign.position.set(sx, w3H(sx, -30), -30); sign.rotation.y = .4; scene.add(sign);
+    // player, target mob (Defias / Syndicate), sheep, ice, selection ring, extra enemies
+    const pmat = lam({vertexColors: true}); W3.pmat = pmat;
+    W3.pl = w3Mage(pmat, M.orb); scene.add(W3.pl.g);
+    const shadow = (s) => { const m = new P.Mesh(shadowG, M.blob); m.scale.set(s, 1, s); m.position.y = .06; return m; };
+    W3.pl.g.add(shadow(1.6));
+    W3.corpse = w3Mage(lam({vertexColors: true, color: 0xb0b0b0}), M.orb).g; W3.corpse.rotation.x = -Math.PI / 2; W3.corpse.visible = false; scene.add(W3.corpse);
+    W3.beam = new P.Mesh(new P.CylinderGeometry(1.5, 1.5, 90, 16, 1, true), new P.MeshBasicMaterial({map: T.beam, color: 0xcfeaff, transparent: true, depthWrite: false, fog: false, side: P.DoubleSide, blending: P.AdditiveBlending}));
+    W3.beam.visible = false; scene.add(W3.beam);
+    const mobMat = () => lam({vertexColors: true});
+    W3.mobD = w3Defias(mobMat(), false); W3.mobS = w3Defias(mobMat(), true);
+    for (const m of [W3.mobD, W3.mobS]) { m.g.visible = false; m.g.add(shadow(1.7)); scene.add(m.g); }
+    W3.sheep = w3Sheep(M.vc); W3.sheep.add(shadow(1.8)); W3.sheep.visible = false; scene.add(W3.sheep);
+    W3.ice = w3Ice(); W3.ice.visible = false; scene.add(W3.ice);
+    W3.ring = new P.Mesh(new P.RingGeometry(1.05, 1.22, 40), new P.MeshBasicMaterial({color: 0xff2a1a, transparent: true, opacity: .9, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4}));
+    W3.ring.rotation.x = -Math.PI / 2; W3.ring.visible = false; scene.add(W3.ring);
+    W3.spark = new P.Sprite(new P.SpriteMaterial({map: T.glow, color: 0xffd65a, transparent: true, depthWrite: false, blending: P.AdditiveBlending})); W3.spark.visible = false; scene.add(W3.spark);
+    const box = $('#xmobs'); box.textContent = '';
+    for (let i = 0; i < 6; i++) {
+      const m = i % 2 ? w3Golem(mobMat(), M.eye) : w3Defias(mobMat(), false);
+      m.g.add(shadow(m.h > 2.5 ? 1.9 : 1.7)); m.g.visible = false; scene.add(m.g);
+      const pl = mk('div', 'xnp ol'); pl.appendChild(mk('div', 'nm')); const bar = mk('div', 'bar'); bar.appendChild(mk('i')); pl.appendChild(bar); pl.style.display = 'none'; box.appendChild(pl);
+      m.plate = pl; m.ph = w3Hash(i, 8) * 6; W3.xm.push(m);
+    }
+    const hit = mk('i', 'hit'); $('#mob').appendChild(hit);
+    W3.v = new P.Vector3(); W3.v2 = new P.Vector3();
+    $('#world').insertBefore(cv, $('#world').firstChild);
+    W3.on = true; $('#screen').classList.add('w3d');
+    w3Resize(); w3Controls(cv);
+    W3.face = S.facing;
+    requestAnimationFrame(w3Loop);
+  } catch (e) {
+    console.info('CasterKit: 3D world failed, the CSS world is used.', e);
+    W3.on = false; $('#screen').classList.remove('w3d'); if (cv.parentNode) cv.remove();
+    try { r.dispose(); } catch (e2) { /* ignore */ }
+  }
+}
+function w3Load() {
+  if (/[?&]world=css\b/.test(location.search)) return;
+  const s = document.createElement('script');
+  s.src = THREE_URL; s.integrity = THREE_SRI; s.crossOrigin = 'anonymous'; s.referrerPolicy = 'no-referrer';
+  s.onload = () => w3Init();
+  s.onerror = () => console.info('CasterKit: three.js could not be loaded, the CSS world is used.');
+  document.head.appendChild(s);
+}
+function w3Resize() {
+  if (!W3.on) return;
+  W3.r.setPixelRatio(Math.max(.5, Math.min(1.5, (window.devicePixelRatio || 1) * SCALE)));
+  W3.r.setSize(1440, 810, false);
+}
+
+/* re-centre terrain, road and props when the player has moved far enough */
+function w3Recenter(px, pz) {
+  const P = THREE, cx = Math.round(px / 40) * 40, cz = Math.round(pz / 40) * 40; W3.cx = cx; W3.cz = cz;
+  const g = W3.ter.geometry, pos = g.attributes.position, col = g.attributes.color, uv = g.attributes.uv, L = W3.terLocal, c = [0, 0, 0];
+  for (let i = 0; i < pos.count; i++) {
+    const x = cx + L[i * 3], z = cz + L[i * 3 + 2], h = w3H(x, z);
+    pos.setXYZ(i, x, h, z); w3Ground(x, z, h, c); col.setXYZ(i, c[0], c[1], c[2]); uv.setXY(i, x / 7, -z / 7);
+  }
+  pos.needsUpdate = col.needsUpdate = uv.needsUpdate = true; g.computeVertexNormals(); g.computeBoundingSphere();
+  // road ribbon
+  const rp = [], ru = [], ri = [];
+  for (let z = cz - 380, k = 0; z <= cz + 380; z += 3, k++) {
+    const x = roadX(z), dx = (roadX(z + 1) - roadX(z - 1)) / 2, n = Math.hypot(1, dx), w = 4.2 + w3Noise(z / 23, 3) * 1.2, ox = w / n, oz = -w * dx / n;
+    rp.push(x - ox, w3H(x - ox, z - oz) + .14, z - oz, x + ox, w3H(x + ox, z + oz) + .14, z + oz); ru.push(0, z / 9, 1, z / 9);
+    if (k) { const b = (k - 1) * 2; ri.push(b, b + 2, b + 1, b + 1, b + 2, b + 3); }
+  }
+  const rg = new P.BufferGeometry(); rg.setAttribute('position', new P.Float32BufferAttribute(rp, 3)); rg.setAttribute('uv', new P.Float32BufferAttribute(ru, 2)); rg.setIndex(ri); rg.computeVertexNormals();
+  W3.road.geometry.dispose(); W3.road.geometry = rg;
+  // trees and rocks on a 24 yd grid, grass tufts scattered near the centre
+  const m4 = new P.Matrix4(), q = new P.Quaternion(), e = new P.Euler(), v = new P.Vector3(), s = new P.Vector3(), cc = new P.Color();
+  const gy = w3Pos(PL.gy), clear = (x, z, rr, sr) => Math.abs(x - roadX(z)) > rr && w3SiteDist(x, z) > sr && Math.hypot(x - gy.x + 17, z - gy.z - 2) > 13;
+  let nt = 0, nr = 0;
+  for (let i = Math.floor((cx - 370) / 24); i <= (cx + 370) / 24; i++) for (let j = Math.floor((cz - 370) / 24); j <= (cz + 370) / 24; j++) {
+    const fr = w3Noise(i / 7 + 9, j / 7 - 4), x = i * 24 + w3Hash(i, j * 3) * 22, z = j * 24 + w3Hash(i * 5, j) * 22;
+    if (w3Hash(i * 3 + 1, j * 7 + 2) < (fr > .6 ? .85 : .1) && nt < W3.iTrunk.instanceMatrix.count && Math.hypot(x - px, z - pz) < 330 && clear(x, z, 9, 60)) {
+      const y = w3H(x, z), sc = .75 + w3Hash(i, j + 9) * .7;
+      m4.compose(v.set(x, y - .2, z), q.setFromEuler(e.set(0, w3Hash(j, i) * 6.3, 0)), s.set(sc, sc * (.9 + w3Hash(i + 2, j) * .3), sc));
+      W3.iTrunk.setMatrixAt(nt, m4); W3.iCanopy.setMatrixAt(nt, m4);
+      const t = w3Hash(i + 7, j + 3); cc.setRGB(t < .2 ? 1.15 : .88 + t * .2, t < .2 ? 1.02 : .95 + t * .1, t < .2 ? .62 : .82); W3.iCanopy.setColorAt(nt, cc);
+      m4.compose(v.set(x, y + .05, z), q.identity(), s.set(7.5 * sc, 1, 7.5 * sc)); W3.iTShadow.setMatrixAt(nt, m4);
+      nt++;
+    } else if (w3Hash(i * 11 + 4, j * 5 + 9) < .1 && nr < 260 && clear(x, z, 6, 40)) {
+      const sc = .5 + w3Hash(i, j + 4) * 1.4;
+      m4.compose(v.set(x, w3H(x, z) - .3 * sc, z), q.setFromEuler(e.set(w3Hash(i, j) * 3, w3Hash(j, i) * 6, 0)), s.set(sc * 1.3, sc * .8, sc));
+      W3.iRock.setMatrixAt(nr++, m4);
+    }
+  }
+  // old fences along stretches of the road
+  let np = 0;
+  for (const side of [-1, 1]) {
+    let prev = null;
+    for (let z = Math.ceil((cz - 330) / 3.2) * 3.2; z <= cz + 330 && np < 500; z += 3.2) {
+      const on = w3Noise(z / 60 + side * 7, 2) > .52 && w3SiteDist(roadX(z) + side * 7, z) > 70;
+      if (!on) { prev = null; continue; }
+      const x = roadX(z) + side * (7 + w3Noise(z / 30, side) * 1.5), y = w3H(x, z), lean = (w3Hash(z * 10 | 0, side) - .5) * .12;
+      m4.compose(v.set(x, y, z), q.setFromEuler(e.set(lean, 0, lean)), s.set(1, 1, 1)); W3.iPost.setMatrixAt(np, m4);
+      if (prev && w3Hash(z * 7 | 0, side + 3) > .12) {
+        const dx = x - prev[0], dz = z - prev[2], len = Math.hypot(dx, dz);
+        m4.compose(v.set((x + prev[0]) / 2, (y + prev[1]) / 2, (z + prev[2]) / 2), q.setFromEuler(e.set(-Math.atan2(y - prev[1], len), Math.atan2(dx, dz), 0, 'YXZ')), s.set(1, 1, len));
+        W3.iRail.setMatrixAt(np, m4);
+      } else { m4.makeScale(0, 0, 0); W3.iRail.setMatrixAt(np, m4); }
+      prev = [x, y, z]; np++;
+    }
+  }
+  let ng = 0; const NG = W3.iTuft.instanceMatrix.count;
+  for (let k = 0; k < NG * 1.4 && ng < NG; k++) {
+    const x = cx + (w3Hash(k, cx + 17) - .5) * 360, z = cz + (w3Hash(cz - 3, k) - .5) * 360;
+    if (!clear(x, z, 5, 30)) continue;
+    const sc = .7 + w3Hash(k, 5) * .8;
+    m4.compose(v.set(x, w3H(x, z) - .05, z), q.setFromEuler(e.set(0, w3Hash(k, 6) * 6.3, 0)), s.set(sc, sc, sc)); W3.iTuft.setMatrixAt(ng, m4);
+    const t = w3Hash(k, 7); cc.setRGB(.95 + t * .25, .95 + t * .1, .62 + t * .1); W3.iTuft.setColorAt(ng, cc); ng++;
+  }
+  for (const [m, n] of [[W3.iTrunk, nt], [W3.iCanopy, nt], [W3.iTShadow, nt], [W3.iRock, nr], [W3.iTuft, ng], [W3.iPost, np], [W3.iRail, np]]) {
+    m.count = n; m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true;
+  }
+  // farms nearest to the centre
+  const sites = [], i0 = Math.round(cx / FARM_CELL), j0 = Math.round(cz / FARM_CELL);
+  for (let i = i0 - 2; i <= i0 + 2; i++) for (let j = j0 - 2; j <= j0 + 2; j++) { const st = w3Site(i, j); if (st) sites.push([Math.hypot(st.x - cx, st.z - cz), st]); }
+  sites.sort((a, b) => a[0] - b[0]);
+  W3.farms.forEach((f, k) => { const st = sites[k] && sites[k][0] < 520 ? sites[k][1] : null; f.visible = !!st; if (st) { f.position.set(st.x, st.h, st.z); f.rotation.y = st.rot; } });
+}
+
+/* input: WASD / arrows to walk (A/D turn, Q/E strafe), drag to look around, right-drag to turn, wheel to zoom */
+function w3Controls(cv) {
+  const K = {KeyW: 'f', ArrowUp: 'f', KeyS: 'b', ArrowDown: 'b', KeyA: 'l', ArrowLeft: 'l', KeyD: 'r', ArrowRight: 'r', KeyQ: 'sl', KeyE: 'sr'};
+  document.addEventListener('keydown', e => {
+    const k = K[e.code], t = e.target;
+    if (!k || !W3.on || e.ctrlKey || e.altKey || e.metaKey) return;
+    if (t && (t.tagName === 'INPUT' && t.type !== 'checkbox' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
+    if (t && t.closest && t.closest('#settings,[role=tablist],[role=listbox],[role=menu]')) return;
+    e.preventDefault(); W3.keys.add(k);
+  });
+  document.addEventListener('keyup', e => { const k = K[e.code]; if (k) W3.keys.delete(k); });
+  window.addEventListener('blur', () => W3.keys.clear());
+  cv.addEventListener('contextmenu', e => e.preventDefault());
+  cv.addEventListener('pointerdown', e => {
+    if (e.button !== 0 && e.button !== 2) return;
+    if (e.button === 2) { S.facing = Math.atan2(Math.sin(W3.face + W3.orbit), Math.cos(W3.face + W3.orbit)); W3.face = S.facing; W3.orbit = 0; }
+    W3.drag = {b: e.button, x: e.clientX, y: e.clientY}; try { cv.setPointerCapture(e.pointerId); } catch (er) { /* ignore */ }
+  });
+  cv.addEventListener('pointermove', e => {
+    const d = W3.drag; if (!d) return;
+    const dx = (e.clientX - d.x) / SCALE, dy = (e.clientY - d.y) / SCALE; d.x = e.clientX; d.y = e.clientY;
+    if (d.b === 2) { S.facing = Math.atan2(Math.sin(S.facing + dx * .006), Math.cos(S.facing + dx * .006)); W3.face = S.facing; } else W3.orbit += dx * .006;
+    W3.pitch = Math.max(-.14, Math.min(.85, W3.pitch + dy * .004));
+  });
+  const up = () => { W3.drag = null; };
+  cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
+  cv.addEventListener('wheel', e => { e.preventDefault(); W3.zoom = Math.max(.45, Math.min(2.2, W3.zoom * (e.deltaY > 0 ? 1.1 : .9))); }, {passive: false});
+  document.addEventListener('visibilitychange', () => { W3.last = 0; if (document.hidden) W3.keys.clear(); });
+}
+function w3Move(dt) {
+  const k = W3.keys, turn = (k.has('r') ? 1 : 0) - (k.has('l') ? 1 : 0);
+  if (turn) { S.facing = Math.atan2(Math.sin(S.facing + turn * 2.6 * dt), Math.cos(S.facing + turn * 2.6 * dt)); W3.face = S.facing; }
+  const fw = (k.has('f') ? 1 : 0) - (k.has('b') ? 1 : 0), st = (k.has('sr') ? 1 : 0) - (k.has('sl') ? 1 : 0);
+  if ((fw || st) && !S.rooted) {
+    if (!S.moving) { S.moving = true; W3.kb = true; syncSimButtons(); }
+    if (!W3.kb) return; // the "Moving" button is walking the GPS route
+    const f = S.facing, sp = fw < 0 ? RUN * .6 : RUN;
+    let dx = Math.sin(f) * fw + Math.cos(f) * st, dz = -Math.cos(f) * fw + Math.sin(f) * st; const n = Math.hypot(dx, dz); dx /= n; dz /= n;
+    S.ppos.x += dx * sp * dt / ZONE.w; S.ppos.y += dz * sp * dt / ZONE.h;
+  } else if (W3.kb) { W3.kb = false; S.moving = false; syncSimButtons(); }
+}
+
+/* per frame */
+function w3Loop(now) {
+  requestAnimationFrame(w3Loop);
+  if (!W3.on || document.hidden) return;
+  const dt = W3.last ? Math.min(.1, (now - W3.last) / 1000) : 0; W3.last = now; W3.time += dt;
+  try { w3Move(dt); w3Update(dt); W3.r.render(W3.scene, W3.cam); } catch (e) { console.error(e); W3.on = false; }
+}
+function w3Project(x, y, z, o) {
+  const v = W3.v.set(x, y, z).project(W3.cam);
+  o.x = (v.x + 1) * 720; o.y = (1 - v.y) * 405; o.ok = v.z < 1 && v.z > -1 && o.x > -80 && o.x < 1520 && o.y > -80 && o.y < 900;
+  return o;
+}
+function w3Update(dt) {
+  const t = W3.time, pp = w3Pos(S.ppos), cam = W3.cam;
+  if (!(Math.abs(pp.x - W3.cx) < 80 && Math.abs(pp.z - W3.cz) < 80)) w3Recenter(pp.x, pp.z);
+  const py = w3H(pp.x, pp.z);
+  // player: run cycle from the real speed (WASD or the GPS "Moving" walk)
+  const pl = W3.pl, spd = W3.prev && dt > 0 ? Math.hypot(pp.x - W3.prev.x, pp.z - W3.prev.z) / dt : 0; W3.prev = pp;
+  W3.run += ((spd > .5 && spd < 40 ? 1 : 0) - W3.run) * Math.min(1, dt * 8); W3.ph += dt * 10 * W3.run;
+  W3.face = lerpAng(W3.face, S.facing, dt * 10);
+  pl.g.position.set(pp.x, py + Math.abs(Math.sin(W3.ph)) * .09 * W3.run, pp.z); pl.g.rotation.y = Math.PI - W3.face;
+  const casting = !!S.casting;
+  pl.aL.rotation.x = Math.sin(W3.ph) * .8 * W3.run - (casting ? 1.1 : 0); pl.aR.rotation.x = -Math.sin(W3.ph) * .45 * W3.run - (casting ? .5 : 0);
+  pl.body.rotation.x = .14 * W3.run + Math.sin(t * 1.6) * .01;
+  // ghost: see-through player, corpse and a beam of light where you died
+  const gh = !!S.ghost;
+  if (W3.gh !== gh) { W3.gh = gh; const m = W3.pmat; m.transparent = gh; m.opacity = gh ? .5 : 1; m.depthWrite = !gh; m.emissive.setHex(gh ? 0x5a8ac0 : 0); }
+  const showCorpse = gh && !!S.corpse; W3.corpse.visible = W3.beam.visible = showCorpse;
+  if (showCorpse) { const cp = w3Pos(S.corpse), ch = w3H(cp.x, cp.z); W3.corpse.position.set(cp.x, ch + .25, cp.z); W3.corpse.rotation.y = .6; W3.beam.position.set(cp.x, ch + 45, cp.z); }
+  // camera: behind and above, follows the facing; drag adds an orbit that settles back while you walk
+  if (W3.kb && !W3.drag) W3.orbit *= Math.max(0, 1 - dt * 2.5);
+  const yaw = W3.face + W3.orbit, pitch = .22 + W3.pitch, dist = 11.5 * W3.zoom, fx = Math.sin(yaw), fz = -Math.cos(yaw);
+  let cx = pp.x - fx * dist * Math.cos(pitch), cz = pp.z - fz * dist * Math.cos(pitch), cy = py + 2.4 + dist * Math.sin(pitch);
+  cy = Math.max(cy, w3H(cx, cz) + 1.2);
+  cam.position.set(cx, cy, cz); cam.lookAt(pp.x + fx * 2, py + 2.6, pp.z + fz * 2);
+  W3.far.position.set(cx, 0, cz); W3.clouds.rotation.y = t * .004;
+  for (const b of W3.blades) b.rotation.z -= dt * .7;
+  // target mob: it keeps its spot, the simulation decides the distance
+  const tg = S.target, now = T();
+  if (tg !== W3.tgRef) { W3.tgRef = tg; W3.mobP = null; W3.mobAng = W3.face; W3.mobPrevD = tg ? tg.dist : 0; W3.mobFall = 0; }
+  const D = S.level >= 30 ? W3.mobS : W3.mobD; W3.mobD.g.visible = W3.mobS.g.visible = false;
+  let ax, az, aAng;
+  if (tg) {
+    if (W3.mobP && Math.hypot(W3.mobP.x - pp.x, W3.mobP.z - pp.z) > .8) W3.mobAng = Math.atan2(W3.mobP.x - pp.x, -(W3.mobP.z - pp.z));
+    const d = Math.max(1.8, tg.dist), mx = pp.x + Math.sin(W3.mobAng) * d, mz = pp.z - Math.cos(W3.mobAng) * d, my = w3H(mx, mz);
+    W3.mobP = {x: mx, z: mz}; ax = mx; az = mz; aAng = W3.mobAng;
+    const dead = tg.dead, poly = !dead && (tg.deb.poly || 0) > now, fr = !dead && (tg.deb.frozen || 0) > now;
+    const walk = !dead && !poly && !fr && dt > 0 && Math.abs(tg.dist - W3.mobPrevD) / dt > .4; W3.mobPrevD = tg.dist;
+    const look = Math.atan2(pp.x - mx, pp.z - mz);
+    D.g.visible = !poly; D.g.position.set(mx, my, mz);
+    if (!dead) D.g.rotation.y = look;
+    W3.mobFall = dead ? Math.min(1, W3.mobFall + dt * 2.5) : 0; D.g.rotation.x = -Math.PI / 2 * W3.mobFall * W3.mobFall;
+    const ph = t * 7, sw = walk ? Math.sin(ph) * .7 : 0, cast = !!tg.cast && !dead;
+    D.legs[0].rotation.x = sw; D.legs[1].rotation.x = -sw;
+    D.aL.rotation.x = cast ? -2.4 : fr ? -.3 : -sw * .8 + Math.sin(t * 1.3) * .04; D.aR.rotation.x = cast ? -2.4 : fr ? -.6 : sw * .8 - .35;
+    D.g.children[0].material.color.setRGB(fr ? .6 : 1, fr ? .85 : 1, fr ? 1.35 : 1);
+    W3.sheep.visible = poly;
+    if (poly) { W3.sheep.position.set(mx, my + Math.max(0, Math.sin(t * 5)) * .12, mz); W3.sheep.rotation.y = look + Math.sin(t * .6) * 1.4; }
+    W3.ice.visible = fr; if (fr) W3.ice.position.set(mx, my, mz);
+    W3.ring.visible = true; W3.ring.position.set(mx, my + .1, mz);
+    W3.ring.material.color.setHex(tg.tapped ? 0x9a9a9a : tg.react === 'neutral' ? 0xffe040 : 0xff2a1a);
+    W3.spark.visible = dead && !!(tg.loot && tg.loot.length);
+    if (W3.spark.visible) { const s = 1.2 + Math.sin(t * 4) * .3; W3.spark.position.set(mx, my + .6, mz); W3.spark.scale.set(s, s, 1); }
+    const hgt = poly ? 1.5 : dead ? .7 : D.h;
+    const f = w3Project(mx, my, mz, {}), h = w3Project(mx, my + hgt + .3, mz, {});
+    W3.mobScr = {x: f.x, y: f.y, h: Math.max(14, f.y - h.y), vis: f.ok && h.ok};
+  } else {
+    W3.sheep.visible = W3.ice.visible = W3.ring.visible = W3.spark.visible = false; W3.mobScr = null;
+    aAng = W3.face; ax = pp.x + Math.sin(aAng) * 24; az = pp.z - Math.cos(aAng) * 24;
+  }
+  // extra enemies around the target for the "Nearby enemies" control
+  const n = S.ghost ? 0 : S.nearby, OFF = [[-4.6, 1.6], [4.9, .8], [-7.6, -2.6], [7.9, -1.6], [-2.6, 4.6], [2.9, 5.1]];
+  const rx = Math.cos(aAng), rz = Math.sin(aAng), fx2 = Math.sin(aAng), fz2 = -Math.cos(aAng);
+  W3.xm.forEach((m, i) => {
+    const on = i < n; m.g.visible = on;
+    if (!on) { if (m.plate.style.display !== 'none') m.plate.style.display = 'none'; return; }
+    const x = ax + rx * OFF[i][0] + fx2 * OFF[i][1], z = az + rz * OFF[i][0] + fz2 * OFF[i][1], y = w3H(x, z);
+    m.g.position.set(x, y, z); m.g.rotation.y = Math.atan2(pp.x - x, pp.z - z) + Math.sin(t * .5 + m.ph) * .2;
+    const sw = Math.sin(t * 1.4 + m.ph) * .06; m.aL.rotation.x = sw; m.aR.rotation.x = -sw - .3;
+    const p = w3Project(x, y + m.h + .35, z, {});
+    setStyle(m.plate, 'display', p.ok ? '' : 'none'); setStyle(m.plate, 'left', p.x.toFixed(0) + 'px'); setStyle(m.plate, 'top', (p.y - 24).toFixed(0) + 'px');
+    setTxt(m.plate.firstChild, i % 2 ? 'Harvest Watcher' : S.level >= 30 ? 'Syndicate Thief' : 'Defias Looter');
+  });
+}
+// nameplate and click area of the target follow the 3D mob (called from updateMob)
+function w3Plate(m) {
+  const p = W3.mobScr;
+  if (!p || !p.vis) { m.style.display = 'none'; return; }
+  setStyle(m, 'transform', 'none'); setStyle(m, 'left', p.x.toFixed(1) + 'px'); setStyle(m, 'top', p.y.toFixed(1) + 'px');
+  const hit = m.querySelector('.hit'), w = Math.max(24, p.h * .55);
+  if (hit) { setStyle(hit, 'width', w.toFixed(0) + 'px'); setStyle(hit, 'height', p.h.toFixed(0) + 'px'); setStyle(hit, 'left', (-w / 2).toFixed(0) + 'px'); }
+  setStyle(m.querySelector('.np'), 'bottom', (p.h + 4).toFixed(0) + 'px');
+}
+
 /* ---------- start ---------- */
 resetWorld(); buildGps(); buildBagWin();
 buildTabs(); buildMicro(); buildReminders(); buildGroup(); setupMovers(); applyPositions(); applySettings(); applyLang(); syncSimButtons(); fit();
@@ -4127,7 +4880,8 @@ chat(tx('Welcome to WoW Forever.', 'Welkom in WoW Forever.'), '#ffd100');
 chat(tx('v0.4.9 by DinX loaded. Type /ck or click the minimap button.', 'v0.4.9 door DinX geladen. Typ /ck of klik op de minimapknop.'), '#ddd', true);
 chat(tx('You are rested: double XP per kill.', 'Je bent uitgerust: dubbele XP per kill.'), '#7fb2ff');
 requestAnimationFrame(frame);
-window.CK = {S, SP, PARTY, NAV, BAG, activate, suggestion, setCfg, spawnTarget, buildBars, startEnemyCast, killTip, navRoute, planEntries, openWin, toggleMap, toggleBags};
+w3Load();
+window.CK = {W3, S, SP, PARTY, NAV, BAG, activate, suggestion, setCfg, spawnTarget, buildBars, startEnemyCast, killTip, navRoute, planEntries, openWin, toggleMap, toggleBags};
 </script>
 </body>
 </html>
