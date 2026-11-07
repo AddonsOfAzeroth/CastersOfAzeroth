@@ -464,7 +464,7 @@ local function skinTab(frame)
 	end
 	tab:SetHeight(TAB_H)
 	if text then
-		text:SetFont(S.font, 11, "OUTLINE")
+		S:ApplyFont(text, 11)
 		text:SetShadowOffset(0, 0)
 		text:ClearAllPoints()
 		text:SetPoint("CENTER", tab, "CENTER", 0, 0)

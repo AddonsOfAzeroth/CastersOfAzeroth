@@ -325,6 +325,13 @@ function C:BuildGeneral(p)
 		function() return CK.db.language end,
 		function(v) CK.db.language = v end)
 	p:Note(L["Reload the UI to apply the language everywhere."])
+	p:Choice(L["Font"], { { "roboto", "Roboto" }, { "wow", L["Game font"] } },
+		function() return CK.db.font end,
+		function(v) CK.db.font = v end)
+	p:Check(L["Thick outline on text"], L["Off: clean text with a soft shadow, easier to read."],
+		function() return CK.db.fontOutline end,
+		function(v) CK.db.fontOutline = v end)
+	p:Note(L["Reload the UI to apply the font."])
 	p:Gap()
 	p:Header("Spec")
 	local def = CK:GetClass()

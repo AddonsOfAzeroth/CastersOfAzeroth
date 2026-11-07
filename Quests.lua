@@ -77,7 +77,7 @@ end
 
 local function setFont(fs, size)
 	if fs.ckSize ~= size then
-		fs:SetFont(S.font, size, "OUTLINE")
+		S:ApplyFont(fs, size)
 		fs.ckSize = size
 	end
 end

@@ -1,12 +1,37 @@
 -- CasterKit by DinX: shared flat look
-local _, ns = ...
+local ADDON, ns = ...
 local CK = ns.CK
 
 local S = {}
 CK.Style = S
 
 S.flat = "Interface\\Buttons\\WHITE8x8"
-S.font = STANDARD_TEXT_FONT
+-- Roboto (Apache License 2.0, see media\LICENSE-Roboto.txt) reads better than the
+-- game font at small sizes; "wow" in the settings brings the game font back.
+S.ROBOTO = "Interface\\AddOns\\" .. ADDON .. "\\media\\Roboto-Regular.ttf"
+
+-- A font file added while the game runs is only found after a restart; until
+-- then (or if it is missing) fall back to the game font so no text disappears.
+local probe
+local function usable(path)
+	probe = probe or UIParent:CreateFontString(nil, "OVERLAY")
+	local ok = pcall(probe.SetFont, probe, path, 12, "")
+	return ok and probe:GetFont() ~= nil and (probe:GetFont()):lower():find("roboto", 1, true) ~= nil
+end
+S.font = usable(S.ROBOTO) and S.ROBOTO or STANDARD_TEXT_FONT
+S.flags = "" -- "" = clean text with a soft shadow, "OUTLINE" = thick black outline
+
+function S:LoadFont(db)
+	self.font = (db and db.font == "wow" or not usable(self.ROBOTO)) and STANDARD_TEXT_FONT or self.ROBOTO
+	self.flags = (db and db.fontOutline) and "OUTLINE" or ""
+end
+
+-- Font, flags and a soft shadow in one go (flags: nil = the chosen style).
+function S:ApplyFont(fs, size, flags)
+	fs:SetFont(self.font, size or 12, flags or self.flags)
+	fs:SetShadowColor(0, 0, 0, 1)
+	fs:SetShadowOffset(1, -1)
+end
 S.colors = {
 	bg = { 0.04, 0.05, 0.08, 0.85 },
 	border = { 0, 0, 0, 1 },
@@ -32,7 +57,7 @@ end
 
 function S:Font(parent, size, layer)
 	local fs = parent:CreateFontString(nil, layer or "OVERLAY")
-	fs:SetFont(self.font, size or 12, "OUTLINE")
+	self:ApplyFont(fs, size)
 	fs:SetTextColor(unpack(self.colors.text))
 	return fs
 end

@@ -179,6 +179,8 @@ local charDefaults = {
 local accountDefaults = {
 	minimap = { hide = false, angle = 215 },
 	language = "enUS",
+	font = "roboto",     -- "roboto" or "wow" (the game font)
+	fontOutline = false, -- thick outline instead of a soft shadow
 	profiles = {},
 }
 
@@ -535,6 +537,7 @@ CK:On("ADDON_LOADED", function(_, name)
 	merge(CasterKitDB, accountDefaults)
 	CK.char = CasterKitCharDB
 	CK.db = CasterKitDB
+	CK.Style:LoadFont(CK.db)
 	-- a new alt starts from the default profile, if one is set
 	local default = CK.db.defaultProfile
 	if newCharacter and default and CK.db.profiles[default] then

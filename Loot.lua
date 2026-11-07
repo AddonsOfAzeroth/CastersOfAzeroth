@@ -599,7 +599,7 @@ function M:FeedRender()
 		local r = self:FeedRow(i)
 		local big = e.kind == "warn"
 		local h = big and FEED_ROW + 4 or FEED_ROW
-		r.text:SetFont(S.font, big and 15 or 12, "OUTLINE")
+		S:ApplyFont(r.text, big and 15 or 12)
 		if big then
 			r.text:SetTextColor(unpack(S.colors.warn))
 		else

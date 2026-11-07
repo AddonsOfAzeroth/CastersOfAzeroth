@@ -278,7 +278,7 @@ local function skinClose(btn)
 	local px, py = math.max(0, (w - 16) / 2), math.max(0, (h - 16) / 2)
 	panel(btn, { 0.10, 0.12, 0.17, 0.95 }, BLACK, { px, -py, -px, py })
 	local x = btn:CreateFontString(nil, "OVERLAY")
-	x:SetFont(S.font, 12, "OUTLINE")
+	S:ApplyFont(x, 12)
 	x:SetPoint("CENTER", btn, "CENTER", 0.5, 1)
 	x:SetText("x")
 	local c = S.colors.text
