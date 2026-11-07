@@ -11,6 +11,22 @@ local QL = C_QuestLog
 local PAD, INDENT, GAP, BAR = 6, 10, 2, 3
 local GREEN = { 0.30, 0.90, 0.30 }
 local RED = { 1.00, 0.25, 0.25 }
+local ORANGE = { 1.00, 0.55, 0.25 }
+
+-- Sort modes in click order, with their label keys
+local MODES = { "smart", "distance", "xp", "xpmin", "level", "progress", "zone" }
+local MODE_NAMES = {
+	smart = "Smart route", distance = "Distance", xp = "XP reward", xpmin = "XP per minute",
+	level = "Level", progress = "Almost done", zone = "Zone",
+}
+
+-- Skip suggestions from the plan: tag text and tooltip (label keys)
+local SKIP = {
+	grey = { "Skip?", "Gives little XP at your level." },
+	elite = { "Skip?", "Group or elite quest: hard solo." },
+	far = { "Skip?", "Far away or on another continent." },
+	red = { "Later", "Much higher level: come back later." },
+}
 
 local hider = CreateFrame("Frame")
 hider:Hide()
@@ -206,6 +222,50 @@ local function sorter(a, b)
 	return a.id < b.id
 end
 
+-- Route plan (QuestPlan.lua): every call is guarded, nil means "use the built-in sort"
+local function planList(mode)
+	local QP = CK.QuestPlan
+	if not (QP and QP.Get) then return end
+	Q.inPlan = true
+	local ok, res = pcall(QP.Get, QP, mode)
+	Q.inPlan = false
+	if ok and type(res) == "table" then return res end
+end
+
+local function nextStop()
+	local QP = CK.QuestPlan
+	if not (QP and QP.NextStop) then return end
+	Q.inPlan = true
+	local ok, res = pcall(QP.NextStop, QP)
+	Q.inPlan = false
+	if ok and type(res) == "table" then return res end
+end
+
+-- Plan order first; quests the plan does not know follow in the built-in order.
+local function planSorter(a, b)
+	local pa, pb = a.planPos, b.planPos
+	if pa and pb then return pa < pb end
+	if pa or pb then return pa ~= nil end
+	return sorter(a, b)
+end
+
+-- Links each quest in `list` to its plan entry; returns true when a plan was used.
+local planIndex = {}
+local function applyPlan(mode)
+	local plan = planList(mode)
+	if not plan then return false end
+	wipe(planIndex)
+	for pos, e in ipairs(plan) do
+		local id = type(e) == "table" and num(e.questID) or nil
+		if id and not planIndex[id] then planIndex[id] = pos end
+	end
+	for _, q in ipairs(list) do
+		local pos = planIndex[q.id]
+		q.planPos, q.plan = pos, pos and plan[pos] or nil
+	end
+	return true
+end
+
 -- Fills `list`; returns number of quests in the log and how many are tracked.
 function Q:Collect()
 	for i = #list, 1, -1 do
@@ -250,7 +310,9 @@ function Q:Collect()
 			end
 		end
 	end
-	table.sort(list, sorter)
+	for _, q in ipairs(list) do q.planPos, q.plan = nil, nil end
+	self.usingPlan = applyPlan(cfg.sortMode or "smart")
+	table.sort(list, self.usingPlan and planSorter or sorter)
 	if total < #list then total = #list end
 	return total, #list
 end
@@ -272,7 +334,7 @@ local function openQuest(questID, index)
 	end
 end
 
--- Position of a quest from Blizzard's map data (as TomTom does).
+-- Position of a quest from Blizzard's map data.
 local function questPosition(questID)
 	if QL and QL.GetNextWaypoint then
 		local m, x, y = try(QL.GetNextWaypoint, questID)
@@ -296,12 +358,54 @@ local function questPosition(questID)
 	end
 end
 
+-- Right-click: point the CasterKit arrow at this quest (stays until arrival or cleared).
 local function setWaypoint(questID, title)
-	local tt = _G.TomTom
-	if not (tt and tt.AddWaypoint) then return end
+	local A = CK.Arrow
+	if not (A and A.SetTarget) then return end
 	local m, x, y = questPosition(questID)
 	if m then
-		try(tt.AddWaypoint, tt, m, x, y, { title = title, persistent = false })
+		local ok = pcall(A.SetTarget, A, m, x, y, title)
+		if ok then
+			Q.manualArrow = true
+			Q.arrowKey = nil
+		end
+	end
+end
+
+-- Keep the CasterKit arrow on the plan's next stop (display only).
+function Q:UpdateArrow()
+	local A = CK.Arrow
+	if not (A and A.SetTarget and A.Clear) then return end
+	-- a target the player picked with right-click wins until reached or cleared
+	if self.manualArrow then
+		local m = A.GetTarget and try(A.GetTarget, A)
+		if m then return end
+		self.manualArrow = false
+	end
+	local cfg = CK.char.quests
+	local stop = cfg.enabled and cfg.arrow and nextStop()
+	local m, x, y = stop and num(stop.mapID), stop and num(stop.x), stop and num(stop.y)
+	if not (m and x and y) then
+		if self.arrowKey then
+			pcall(A.Clear, A)
+			self.arrowKey = nil
+		end
+		return
+	end
+	local key = string.format("%d:%.4f:%.4f", m, x, y)
+	if key == self.arrowKey then return end
+	local title
+	local ids = stop.questIDs
+	local first = type(ids) == "table" and num(ids[1]) or nil
+	if first then
+		for _, q in ipairs(list) do
+			if q.id == first then title = q.title break end
+		end
+		if not title and QL and QL.GetTitleForQuestID then title = str(try(QL.GetTitleForQuestID, first)) end
+		if title and #ids > 1 then title = title .. " (+" .. (#ids - 1) .. ")" end
+	end
+	if pcall(A.SetTarget, A, m, x, y, title or L["Next stop"]) then
+		self.arrowKey = key
 	end
 end
 
@@ -326,6 +430,24 @@ local function onTitleClick(self, button)
 	end)
 end
 
+-- Tooltip on a skip suggestion
+local function onTitleEnter(self)
+	guard(function()
+		local s = self.skip and SKIP[self.skip]
+		if not (s and GameTooltip) then return end
+		GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+		GameTooltip:SetText(L[s[1]], 1, 0.82, 0)
+		GameTooltip:AddLine(L[s[2]], 1, 1, 1, true)
+		GameTooltip:Show()
+	end)
+end
+
+local function onTitleLeave(self)
+	guard(function()
+		if GameTooltip and GameTooltip:IsOwned(self) then GameTooltip:Hide() end
+	end)
+end
+
 function Q:TitleRow(i)
 	local t = titles[i]
 	if t then return t end
@@ -335,9 +457,13 @@ function Q:TitleRow(i)
 	local hl = t:CreateTexture(nil, "HIGHLIGHT")
 	hl:SetAllPoints()
 	hl:SetColorTexture(1, 1, 1, 0.06)
+	t:SetScript("OnEnter", onTitleEnter)
+	t:SetScript("OnLeave", onTitleLeave)
+	t.tag = S:Font(t, 10)
+	t.tag:SetPoint("RIGHT", -12, 0)
 	t.text = S:Font(t, 12)
 	t.text:SetPoint("LEFT", 0, 0)
-	t.text:SetPoint("RIGHT", -12, 0)
+	t.text:SetPoint("RIGHT", t.tag, "LEFT", -3, 0)
 	t.text:SetJustifyH("LEFT")
 	t.text:SetWordWrap(false)
 	t.mark = S:Font(t, 12)
@@ -388,6 +514,51 @@ function Q:CreatePanel()
 	h.mark:SetTextColor(unpack(S.colors.muted))
 	self.header = h
 
+	-- Sort mode label in the header: left-click cycles the mode
+	local m = CreateFrame("Button", nil, h)
+	m:RegisterForClicks("LeftButtonUp")
+	m:SetPoint("LEFT", h.text, "RIGHT", 4, 0)
+	local mhl = m:CreateTexture(nil, "HIGHLIGHT")
+	mhl:SetAllPoints()
+	mhl:SetColorTexture(1, 1, 1, 0.06)
+	m.text = S:Font(m, 10)
+	m.text:SetPoint("LEFT", 0, 0)
+	m.text:SetTextColor(unpack(S.colors.muted))
+	m:SetScript("OnClick", function()
+		guard(function()
+			local cfg = CK.char.quests
+			local cur = 1
+			for i, mode in ipairs(MODES) do
+				if mode == cfg.sortMode then cur = i end
+			end
+			cfg.sortMode = MODES[cur % #MODES + 1]
+			CK:Fire("SETTINGS", "quests")
+		end)
+	end)
+	m:SetScript("OnEnter", function(btn)
+		guard(function()
+			if not GameTooltip then return end
+			GameTooltip:SetOwner(btn, "ANCHOR_LEFT")
+			GameTooltip:SetText(L["Sort by"], 1, 0.82, 0)
+			GameTooltip:AddLine(L["Click to change the sort order."], 1, 1, 1, true)
+			GameTooltip:Show()
+		end)
+	end)
+	m:SetScript("OnLeave", function(btn)
+		guard(function()
+			if GameTooltip and GameTooltip:IsOwned(btn) then GameTooltip:Hide() end
+		end)
+	end)
+	self.modeButton = m
+
+	-- Accent bar left of the next stop
+	local bar = p:CreateTexture(nil, "ARTWORK")
+	local a = S.colors.accent
+	bar:SetColorTexture(a[1], a[2], a[3], 0.7)
+	bar:SetWidth(2)
+	bar:Hide()
+	self.nextBar = bar
+
 	S:RegisterMover(p, "quests", L["Quests"], function(f)
 		-- under the minimap
 		f:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -10, -230)
@@ -406,6 +577,65 @@ local function levelColor(level)
 	local c = fn and try(fn, level)
 	if type(c) == "table" and c.r then return c.r, c.g, c.b end
 	return 1, 0.82, 0
+end
+
+local function hex(c)
+	return string.format("%02x%02x%02x", c[1] * 255, c[2] * 255, c[3] * 255)
+end
+
+-- 12345 -> "12,345" (separator from the locale)
+local function groupDigits(n)
+	local s = tostring(math.floor(n + 0.5))
+	local sign, digits = s:match("^(-?)(%d+)$")
+	if not digits then return s end
+	local sep = L["thousands"]
+	local out = digits:reverse():gsub("(%d%d%d)", "%1" .. sep):reverse()
+	if out:sub(1, #sep) == sep then out = out:sub(#sep + 1) end
+	return sign .. out
+end
+
+-- 4200 -> "4.2k", 950 -> "950"
+local function shortNum(n)
+	local suffix, v = "", n
+	if n >= 999950 then
+		suffix, v = "M", n / 1000000
+	elseif n >= 100000 then
+		return groupDigits(n / 1000) .. "k"
+	elseif n >= 1000 then
+		suffix, v = "k", n / 1000
+	else
+		return groupDigits(n)
+	end
+	local s = string.format("%.1f", v):gsub("%.0$", "")
+	s = s:gsub("%.", L["decimal"])
+	return s .. suffix
+end
+
+-- "~6 min · 4.2k XP/h · 120 yd" from a plan entry; nil when nothing is known
+local parts = {}
+local function estimateString(e)
+	wipe(parts)
+	local m = num(e.minutes)
+	if m and m > 0 and m < 100000 then
+		if m < 1 then
+			parts[#parts + 1] = "<1 min"
+		elseif m < 60 then
+			parts[#parts + 1] = "~" .. math.floor(m + 0.5) .. " min"
+		else
+			local r = math.floor(m + 0.5)
+			parts[#parts + 1] = "~" .. string.format(L["%dh%02d"], math.floor(r / 60), r % 60)
+		end
+	end
+	local xph = num(e.xpPerHour)
+	if xph and xph > 0 and xph < 1e9 then
+		parts[#parts + 1] = string.format(L["%s XP/h"], shortNum(xph))
+	end
+	local d = num(e.distance)
+	if d and d >= 0 and d < 1e6 then
+		parts[#parts + 1] = groupDigits(d) .. " yd"
+	end
+	if #parts == 0 then return end
+	return table.concat(parts, " · ")
 end
 
 -- One text line under a quest; returns the new y.
@@ -460,7 +690,17 @@ function Q:Render(total, tracked)
 	h.text:SetText(L["Quests"] .. "  " .. tracked .. "/" .. total)
 	h.mark:SetText(cfg.allCollapsed and "+" or "-")
 	h:SetHeight(size + 4)
+	local mode = cfg.sortMode or "smart"
+	local mb = self.modeButton
+	setFont(mb.text, math.max(8, size - 2))
+	mb.text:SetText("· " .. L[MODE_NAMES[mode] or MODE_NAMES.smart])
+	mb:SetSize((mb.text:GetStringWidth() or 40) + 4, size + 4)
 	local y = -PAD - (size + 6)
+
+	local smart = mode == "smart" and self.usingPlan
+	local accentHex = hex(S.colors.accent)
+	local small = math.max(8, size - 2)
+	self.nextBar:Hide()
 
 	local ti
 	ti, lineCount = 0, 0
@@ -468,13 +708,28 @@ function Q:Render(total, tracked)
 		local text = S.colors.text
 		for qi = 1, math.min(#list, maxQ) do
 			local q = list[qi]
+			local plan = q.plan
+			local top = y
 			ti = ti + 1
 			local t = self:TitleRow(ti)
 			setFont(t.text, size)
 			setFont(t.mark, size)
+			setFont(t.tag, small)
 			t.questID, t.logIndex, t.questTitle = q.id, q.index, q.title
-			t.text:SetText(titleString(q))
+			local rank = smart and plan and num(plan.rank)
+			local s = titleString(q)
+			if rank then s = "|cff" .. accentHex .. rank .. ".|r " .. s end
+			t.text:SetText(s)
 			t.text:SetTextColor(levelColor(q.level))
+			local skip = plan and Safe(plan.skip, nil)
+			t.skip = SKIP[skip] and skip or nil
+			if t.skip then
+				t.tag:SetText(L[SKIP[t.skip][1]])
+				local c = t.skip == "red" and ORANGE or S.colors.muted
+				t.tag:SetTextColor(c[1], c[2], c[3])
+			else
+				t.tag:SetText("")
+			end
 			local collapsed = cfg.collapsed[q.id]
 			t.mark:SetText(collapsed and "+" or "")
 			t:ClearAllPoints()
@@ -482,6 +737,11 @@ function Q:Render(total, tracked)
 			t:SetSize(inner, size + 4)
 			t:Show()
 			y = y - (size + 4)
+
+			if not collapsed and plan and cfg.showEstimates then
+				local est = estimateString(plan)
+				if est then y = placeLine(self, y, inner, small, est, S.colors.muted) end
+			end
 
 			if not collapsed then
 				if q.failed then
@@ -496,6 +756,14 @@ function Q:Render(total, tracked)
 						end
 					end
 				end
+			end
+			-- the next stop of the smart route gets an accent bar on the left
+			if smart and qi == 1 then
+				local bar = self.nextBar
+				bar:ClearAllPoints()
+				bar:SetPoint("TOPLEFT", p, "TOPLEFT", PAD - 4, top)
+				bar:SetHeight(math.max(1, top - y - GAP))
+				bar:Show()
 			end
 			y = y - GAP * 2
 		end
@@ -580,6 +848,7 @@ function Q:Redraw()
 	local cfg = CK.char.quests
 	if not cfg.enabled then
 		self.panel:Hide()
+		guard(self.UpdateArrow, self)
 		return
 	end
 	guard(function()
@@ -587,6 +856,7 @@ function Q:Redraw()
 		self:Render(total, tracked)
 		self.panel:Show()
 	end)
+	guard(self.UpdateArrow, self)
 	if self:QuestieMissing() then self:ApplyHiding() end
 end
 
@@ -627,6 +897,15 @@ function Q:OnEnable()
 	end)
 	CK:Listen("SETTINGS", function(group)
 		if group == "quests" then guard(self.Refresh, self) end
+	end)
+	-- the route changed (ignored while we are asking the plan ourselves: no redraw loops)
+	CK:Listen("QUESTPLAN", function()
+		if not self.inPlan then guard(self.Schedule, self) end
+	end)
+	-- arrived at the arrow's target: point at the plan's next stop when it changed
+	CK:Listen("ARROW_ARRIVED", function()
+		self.manualArrow = false
+		guard(self.Schedule, self)
 	end)
 	self:Refresh()
 end

@@ -278,6 +278,61 @@ add({
 	["Type /reload to bring back the other quest trackers."] = "Typ /reload om de andere questtrackers terug te halen.",
 })
 
+add({
+	["Sort by"] = "Sorteren op",
+	["Smart route (fastest leveling)"] = "Slimme route (snelst levelen)",
+	["Distance"] = "Afstand",
+	["XP reward"] = "XP-beloning",
+	["XP per minute"] = "XP per minuut",
+	["Level"] = "Level",
+	["Almost done"] = "Bijna klaar",
+	["Zone"] = "Zone",
+	["Show time and XP per hour estimates"] = "Geschatte tijd en XP per uur tonen",
+	["Estimates get better as CasterKit learns your kill speed and drop rates."] = "De schattingen worden beter naarmate CasterKit je killtempo en drop-kansen leert.",
+})
+
+add({
+	["Arrow to the next stop"] = "Pijl naar de volgende stop",
+	["CasterKit's own navigation arrow. Unlock the frames to move it."] = "De eigen navigatiepijl van CasterKit. Ontgrendel de kaders om hem te verplaatsen.",
+	["Map"] = "Kaart",
+	["World map"] = "Wereldkaart",
+	["CasterKit map upgrade"] = "CasterKit-kaartupgrade",
+	["Show the quest route on the map"] = "Questroute op de kaart tonen",
+	["Numbered stops in the fastest order, with lines between them."] = "Genummerde stops in de snelste volgorde, met lijnen ertussen.",
+	["Coordinates (player and cursor)"] = "Coördinaten (speler en cursor)",
+	["Fade the map while moving"] = "Kaart doorzichtig tijdens het lopen",
+	["Opacity while moving"] = "Dekking tijdens het lopen",
+	["Map size"] = "Kaartgrootte",
+	["Navigation arrow"] = "Navigatiepijl",
+	["Use the CasterKit arrow"] = "CasterKit-pijl gebruiken",
+	["Arrow size"] = "Pijlgrootte",
+	["Arrived within"] = "Aangekomen binnen",
+})
+
+add({
+	["Arrived"] = "Aangekomen",
+	["Other zone"] = "Andere zone",
+	["Right-click to clear"] = "Rechtsklik om te wissen",
+})
+
+add({
+	["Smart route"] = "Slimme route",
+	["Skip?"] = "Overslaan?",
+	["Gives little XP at your level."] = "Geeft weinig XP op jouw level.",
+	["Group or elite quest: hard solo."] = "Groeps- of elitequest: moeilijk alleen.",
+	["Far away or on another continent."] = "Ver weg of op een ander continent.",
+	["Much higher level: come back later."] = "Veel hoger level: kom later terug.",
+	["Click to change the sort order."] = "Klik om de sorteervolgorde te wijzigen.",
+	["Next stop"] = "Volgende stop",
+})
+
+add({
+	["Low level, little XP"] = "Laag level, weinig XP",
+	["Group quest"] = "Groepsquest",
+	["Level too high"] = "Level te hoog",
+	["Far away"] = "Ver weg",
+})
+
 -- Key bindings (Bindings.xml); names are read before saved settings load, so English
 BINDING_HEADER_CASTERKIT = "CasterKit"
 BINDING_NAME_CASTERKIT_AOE = "Toggle AoE mode"

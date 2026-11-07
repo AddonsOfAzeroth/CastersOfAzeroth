@@ -25,7 +25,10 @@ Leveling.lua
 UnitFrames.lua
 Castbar.lua
 Tooltip.lua
+Arrow.lua
+QuestPlan.lua
 Quests.lua
+Map.lua
 Chat.lua
 Classes\Mage.lua
 Config.lua

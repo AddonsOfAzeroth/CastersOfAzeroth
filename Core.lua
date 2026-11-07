@@ -96,11 +96,28 @@ local charDefaults = {
 		fontSize = 12,
 		collapsed = {},
 		allCollapsed = false,
+		sortMode = "smart", -- smart, distance, xp, xpmin, level, progress, zone
+		showEstimates = true,
+		arrow = false, -- CasterKit arrow (Arrow.lua) to the next stop
 	},
 	tooltip = {
 		anchor = true,
 		hideInCombat = false,
 	},
+	map = {
+		enabled = true,
+		route = true,
+		coords = true,
+		fadeMoving = true,
+		fadeAlpha = 0.5,
+		scale = 1,
+	},
+	arrow = {
+		enabled = true,
+		scale = 1,
+		arriveYards = 15,
+	},
+	questLearn = {}, -- learned kill time, drop rates, run speed (QuestPlan.lua)
 	points = {}, -- saved positions of movable frames, by key
 	class = {},
 }
@@ -493,7 +510,8 @@ local PERSONAL = {
 local function profileCopy(src)
 	local out = {}
 	for group, v in pairs(src) do
-		if group ~= "profile" then
+		-- learned play data stays with the character
+		if group ~= "profile" and group ~= "questLearn" then
 			out[group] = type(v) == "table" and copy(v) or v
 			local skip = PERSONAL[group]
 			if skip and type(out[group]) == "table" then
