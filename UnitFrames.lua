@@ -303,8 +303,7 @@ end
 local function hideBlizzard(frame)
 	if not frame then return end
 	frame:UnregisterAllEvents()
-	frame:Hide()
-	frame:SetParent(hider)
+	CK.HideBlizzardFrame(frame, hider)
 	for _, child in ipairs({ "healthbar", "manabar", "powerBarAlt", "spellbar", "HealthBar", "ManaBar" }) do
 		if frame[child] and frame[child].UnregisterAllEvents then frame[child]:UnregisterAllEvents() end
 	end

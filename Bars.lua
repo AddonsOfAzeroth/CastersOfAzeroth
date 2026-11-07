@@ -49,8 +49,7 @@ hider:Hide()
 local function hideFrame(frame, clearEvents)
 	if not frame then return end
 	if clearEvents then frame:UnregisterAllEvents() end
-	if frame.HideBase then frame:HideBase() else frame:Hide() end
-	frame:SetParent(hider)
+	CK.HideBlizzardFrame(frame, hider)
 end
 
 local function hideBlizzardButton(btn)
@@ -58,6 +57,7 @@ local function hideBlizzardButton(btn)
 	btn:Hide()
 	btn:UnregisterAllEvents()
 	btn:SetAttribute("statehidden", true)
+	btn.bar = nil
 end
 
 local hiddenRows = {}

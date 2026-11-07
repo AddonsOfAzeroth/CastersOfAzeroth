@@ -135,8 +135,7 @@ function LV:HideBlizzardXP()
 		local f = _G[name]
 		if f then
 			f:UnregisterAllEvents()
-			f:Hide()
-			f:SetParent(hider)
+			CK.HideBlizzardFrame(f, hider)
 		end
 	end
 end

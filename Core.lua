@@ -601,3 +601,40 @@ function CK:ToggleAoE()
 	self:Fire("SETTINGS", "rotation")
 end
 
+
+-- Remove a key we may have tainted and make the table slot secure again
+-- (same trick Bartender4 uses for Edit Mode frames).
+function CK.PurgeKey(t, k)
+	t[k] = nil
+	local c = 42
+	repeat
+		if t[c] == nil then t[c] = nil end
+		c = c + 1
+	until issecurevariable(t, k)
+end
+
+-- Hide a Blizzard (Edit Mode) frame without tainting it: Edit Mode replaces
+-- Hide() with its own version, so use HideBase and clear its show state.
+function CK.HideBlizzardFrame(frame, parent)
+	if not frame then return end
+	if frame.system then pcall(CK.PurgeKey, frame, "isShownExternal") end
+	if frame.HideBase then frame:HideBase() else frame:Hide() end
+	if parent then frame:SetParent(parent) end
+end
+
+-- Report which function Blizzard blocked (taint), so it can be fixed.
+do
+	local f = CreateFrame("Frame")
+	f:RegisterEvent("ADDON_ACTION_BLOCKED")
+	f:RegisterEvent("ADDON_ACTION_FORBIDDEN")
+	f:SetScript("OnEvent", function(_, event, addon, func)
+		if addon ~= ADDON then return end
+		local line = date("%H:%M:%S") .. " " .. event .. " " .. tostring(func)
+		if type(CasterKitDB) == "table" then
+			CasterKitDB.blocked = CasterKitDB.blocked or {}
+			table.insert(CasterKitDB.blocked, line)
+			while #CasterKitDB.blocked > 20 do table.remove(CasterKitDB.blocked, 1) end
+		end
+		C_Timer.After(3, function() CK:Print("|cffff5555blocked:|r " .. tostring(func)) end)
+	end)
+end

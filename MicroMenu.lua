@@ -146,8 +146,7 @@ function M:HideContainers()
 	if CK.char.micro.bags then
 		local bb = _G.BagsBar
 		if bb then
-			if bb.HideBase then bb:HideBase() else bb:Hide() end
-			bb:SetParent(hider)
+			CK.HideBlizzardFrame(bb, hider)
 		end
 		if _G.BagBarExpandToggle then _G.BagBarExpandToggle:SetParent(hider) end
 	end

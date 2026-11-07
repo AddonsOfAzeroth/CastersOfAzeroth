@@ -473,8 +473,7 @@ local function killFrame(f)
 	if not f or f.__ckHidden then return end
 	pcall(function()
 		f:UnregisterAllEvents()
-		f:Hide()
-		f:SetParent(hider)
+		CK.HideBlizzardFrame(f, hider)
 	end)
 	f.__ckHidden = true
 	CB.blizzHidden = true

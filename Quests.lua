@@ -781,10 +781,10 @@ local function keepHidden(frame)
 	if not frame.ckQuestHidden then
 		frame.ckQuestHidden = true
 		frame:HookScript("OnShow", function(f)
-			if f.ckQuestHidden then f:Hide() end
+			if f.ckQuestHidden then CK.HideBlizzardFrame(f) end
 		end)
 	end
-	frame:Hide()
+	CK.HideBlizzardFrame(frame)
 end
 
 local BLIZZARD = { "ObjectiveTrackerFrame", "QuestWatchFrame", "WatchFrame" }
