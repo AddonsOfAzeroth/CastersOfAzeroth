@@ -558,6 +558,10 @@ add({
 	["Click: next, right-click: previous. The route is planned again."] = "Klik: volgende, rechtsklik: vorige. De route wordt opnieuw gepland.",
 })
 
+add({
+	["Needs the Enchanting profession (Disenchant)."] = "Vereist het beroep Enchanting (Disenchant).",
+})
+
 -- Key bindings (Bindings.xml); names are read before saved settings load, so English
 BINDING_HEADER_CASTERKIT = "CasterKit"
 BINDING_NAME_CASTERKIT_AOE = "Toggle AoE mode"

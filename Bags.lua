@@ -534,7 +534,11 @@ local function disenchantName()
 	return n
 end
 
+-- profession spells are not always in the scanned spellbook lines: ask by ID too
 local function knowsDisenchant()
+	if IsPlayerSpell and IsPlayerSpell(DISENCHANT_ID) then return true end
+	if C_SpellBook and C_SpellBook.IsSpellKnown and C_SpellBook.IsSpellKnown(DISENCHANT_ID) then return true end
+	if IsSpellKnown and IsSpellKnown(DISENCHANT_ID) then return true end
 	local n = disenchantName()
 	return n ~= nil and CK:Known(n)
 end
@@ -898,8 +902,8 @@ function B:UpdateBar()
 	if f.deBtn then
 		local known = knowsDisenchant()
 		if not known then B.deMode = false end
-		f.deBtn:SetShown(known)
-		self:SetButtonEnabled(f.deBtn, not InCombatLockdown())
+		f.deBtn:Show()
+		self:SetButtonEnabled(f.deBtn, known and not InCombatLockdown())
 		f.deBtn:SetBackdropBorderColor(unpack(B.deMode and { 0.64, 0.21, 0.93, 1 } or { 0, 0, 0, 1 }))
 	end
 	self:SetButtonEnabled(f.sellBtn, self:MerchantOpen() and not self.selling and self:JunkCount() > 0)
@@ -1240,7 +1244,7 @@ function B:CreateWindow()
 	f.sortBtn:SetPoint("RIGHT", f.sellBtn, "LEFT", -3, 0)
 
 	f.deBtn = iconButton(f, "Interface\\Icons\\INV_Enchant_Disenchant", function()
-		if InCombatLockdown() then return end
+		if InCombatLockdown() or not knowsDisenchant() then return end
 		B.deMode = not B.deMode
 		if not B.deMode then hideDisenchant() end
 		B:ApplySearch()
@@ -1248,6 +1252,7 @@ function B:CreateWindow()
 	end, function()
 		GameTooltip:AddLine(L["Disenchant mode"], 1, 1, 1)
 		GameTooltip:AddLine(L["Highlights what you can disenchant. Click an item to disenchant it, one per click."], 0.6, 0.65, 0.71, true)
+		if not knowsDisenchant() then GameTooltip:AddLine(L["Needs the Enchanting profession (Disenchant)."], 1, 0.3, 0.3, true) end
 		if InCombatLockdown() then GameTooltip:AddLine(L["Not in combat."], 1, 0.3, 0.3) end
 	end)
 	f.deBtn:SetPoint("RIGHT", f.sortBtn, "LEFT", -3, 0)
