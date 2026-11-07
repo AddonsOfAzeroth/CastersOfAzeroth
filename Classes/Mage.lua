@@ -285,8 +285,9 @@ CK:AddReminderProvider(function(add)
 
 	-- Eat and drink with one click (out of combat, when you need it)
 	if not inCombat and (bags.bestWater or bags.bestFood) then
-		local hp = UnitHealth("player") / math.max(1, UnitHealthMax("player"))
-		local mp = UnitPower("player", 0) / math.max(1, UnitPowerMax("player", 0))
+		local Safe = CK.Safe
+		local hp = (Safe(UnitHealth("player"), 1) or 1) / math.max(1, Safe(UnitHealthMax("player"), 1) or 1)
+		local mp = (Safe(UnitPower("player", 0), 1) or 1) / math.max(1, Safe(UnitPowerMax("player", 0), 1) or 1)
 		if (mp < 0.7 and bags.bestWater) or (hp < 0.7 and bags.bestFood) then
 			local lines = {}
 			if hp < 0.95 and bags.bestFood then lines[#lines + 1] = "/use item:" .. bags.bestFood end

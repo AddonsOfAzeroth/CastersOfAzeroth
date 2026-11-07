@@ -200,7 +200,13 @@ end
 function LV:CollectEntries()
 	local list = {}
 	local function add(e) list[#list + 1] = e end
-	for _, fn in ipairs(CK.reminderProviders) do pcall(fn, add) end
+	for i, fn in ipairs(CK.reminderProviders) do
+		local ok, err = pcall(fn, add)
+		if not ok and not LV.reportedProvider then
+			LV.reportedProvider = true
+			CK:Print("|cffff5555reminder error:|r " .. tostring(err))
+		end
+	end
 	local out = {}
 	for _, e in ipairs(list) do
 		if e.always or e.warn then out[#out + 1] = e end
