@@ -81,6 +81,10 @@ local charDefaults = {
 		height = 190,
 		fontSize = 13,
 	},
+	tooltip = {
+		anchor = true,
+		hideInCombat = false,
+	},
 	points = {}, -- saved positions of movable frames, by key
 	class = {},
 }

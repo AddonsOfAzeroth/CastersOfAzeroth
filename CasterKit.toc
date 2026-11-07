@@ -18,11 +18,13 @@ Core.lua
 Locale.lua
 Style.lua
 Bars.lua
+Keybind.lua
 MicroMenu.lua
 Rotation.lua
 Leveling.lua
 UnitFrames.lua
 Castbar.lua
+Tooltip.lua
 Chat.lua
 Classes\Mage.lua
 Config.lua

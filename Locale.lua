@@ -26,6 +26,9 @@ CK.AddTranslations = add
 
 add({
 	["%dh%02d"] = "%du%02d",
+	["Keybind mode"] = "Keybind-modus",
+	["Shift-click: keybind mode"] = "Shift-klik: keybind-modus",
+	["Hover a button and press a key (Shift, Alt, Ctrl work too). Or use the Blizzard key bindings: row 1 = Action Bar, row 2 = Bottom Left, row 3 = Bottom Right, row 4 = Right."] = "Ga met de muis over een knop en druk een toets (ook met Shift, Alt, Ctrl). Of gebruik de Blizzard-sneltoetsen: rij 1 = Action Bar, rij 2 = Bottom Left, rij 3 = Bottom Right, rij 4 = Right.",
 	["%d free bag slots left."] = "Nog %d vrije plaatsen in je tassen.",
 	["%d talent point(s) available. Click to open your talents."] = "%d talentpunt(en) vrij. Klik om je talenten te openen.",
 	["%s XP/h"] = "%s XP/u",
@@ -165,6 +168,47 @@ add({
 	["on"] = "aan",
 	["|cffff5050%s currently manages the action bars.|r Disable it to use the CasterKit bars; meanwhile the rotation helper works on those buttons."] = "|cffff5050%s beheert nu de actiebalken.|r Zet dat uit om de CasterKit-balken te gebruiken; de rotatiehulp werkt intussen op die knoppen.",
 	["±%d kills to level %d (%s%s)"] = "±%d kills tot level %d (%s%s)",
+})
+
+add({
+	["Hover a button and press a key. Shift, Alt and Ctrl work too. Delete clears. Esc to finish."] = "Ga met de muis over een knop en druk een toets. Shift, Alt en Ctrl werken ook. Delete wist. Esc om te stoppen.",
+	["Save for this character only"] = "Alleen voor dit personage opslaan",
+	["Done"] = "Klaar",
+	["Mouse buttons 4/5, middle click and the mouse wheel work too."] = "Muisknoppen 4/5, middelste klik en het muiswiel werken ook.",
+	["Keys: %s"] = "Toetsen: %s",
+	["No key bound"] = "Geen toets ingesteld",
+	["%s is already bound to %s."] = "%s is al gekoppeld aan %s.",
+	["Could not bind %s."] = "Kon %s niet koppelen.",
+	["%s replaced: %s"] = "%s vervangen: %s",
+	["%s bound to %s."] = "%s gekoppeld aan %s.",
+	["Keys cleared: %s"] = "Toetsen gewist: %s",
+	["Keybind mode is not available in combat."] = "Keybind-modus is niet beschikbaar in gevecht.",
+	["No CasterKit action buttons to bind."] = "Geen CasterKit-actieknoppen om te koppelen.",
+	["Keybind mode closed: you entered combat."] = "Keybind-modus gesloten: je bent in gevecht.",
+})
+
+add({
+})
+
+add({
+	["Tooltips"] = "Tooltips",
+	["Show tooltips at a fixed spot"] = "Tooltips op een vaste plek tonen",
+	["Spell explanations and unit info appear in a corner instead of over your screen. Unlock the frames to move the spot."] = "Uitleg van spreuken en info over personages komt in een hoek in plaats van over je beeld. Ontgrendel de kaders om de plek te verplaatsen.",
+	["No action bar tooltips in combat"] = "Geen tooltips van actieknoppen in gevecht",
+	["Guild"] = "Gilde",
+	["Whisper"] = "Fluister",
+	["Trade"] = "Handel",
+	["Copy chat"] = "Kopieer chat",
+	["Shows the last 100 lines of this tab, ready to copy."] = "Toont de laatste 100 regels van dit tabblad, klaar om te kopiëren.",
+	["Select all with Ctrl+A, copy with Ctrl+C."] = "Alles selecteren met Ctrl+A, kopiëren met Ctrl+C.",
+	["%d protected lines were left out."] = "%d beschermde regels zijn weggelaten.",
+	["Press Enter to chat"] = "Druk op Enter om te chatten",
+	["Scroll to the bottom"] = "Naar de nieuwste regel",
+	["CasterKit will set up your chat with one tab per channel. Continue?"] = "CasterKit zet je chat op met een tabblad per kanaal. Doorgaan?",
+	["Chat tabs are set up."] = "Chattabbladen zijn ingesteld.",
+	["No free chat window left for more tabs."] = "Geen vrij chatvenster meer voor extra tabbladen.",
+	["%s already manages the chat; the CasterKit chat stays off."] = "%s beheert de chat al; de CasterKit-chat blijft uit.",
+	["Turning the chat off takes effect after /reload."] = "De chat uitschakelen werkt pas na /reload.",
 })
 
 -- Key bindings (Bindings.xml); names are read before saved settings load, so English

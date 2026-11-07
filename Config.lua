@@ -168,7 +168,7 @@ end
 
 function C:CreateWindow()
 	local f = CreateFrame("Frame", "CasterKitConfig", UIParent, "BackdropTemplate")
-	f:SetSize(640, 480)
+	f:SetSize(680, 600)
 	f:SetPoint("CENTER")
 	f:SetFrameStrata("DIALOG")
 	f:SetMovable(true)
@@ -315,7 +315,10 @@ function C:BuildBars(p)
 	p:Slider(L["Scale"], 0.6, 1.5, 0.05, getS, setS, function(v) return ("%d%%"):format(v * 100 + 0.5) end)
 	p:Check(L["Main bar (1 to =) on top"], nil, setting("bars", "mainOnTop"))
 	p:Check(L["Background behind the bars"], nil, setting("bars", "background"))
-	p:Note(L["Set key bindings in the normal Blizzard menu (Keybindings). Row 1 = Action Bar, row 2 = Bottom Left, row 3 = Bottom Right, row 4 = Right."])
+	p:Button(L["Keybind mode"], function()
+		if CK.ToggleKeybindMode then C.frame:Hide(); CK:ToggleKeybindMode() end
+	end)
+	p:Note(L["Hover a button and press a key (Shift, Alt, Ctrl work too). Or use the Blizzard key bindings: row 1 = Action Bar, row 2 = Bottom Left, row 3 = Bottom Right, row 4 = Right."])
 end
 
 function C:BuildMicro(p)
@@ -343,6 +346,10 @@ function C:BuildUnits(p)
 	p:Check(L["Target cast bar"], L["Orange = interruptible (Counterspell), grey with lock = not."], setting("units", "targetCastbar"))
 	p:Check(L["Show latency at the end"], L["The red part: from there you can already press your next spell."], setting("units", "castbarLatency"))
 	p:Check(L["Hide Blizzard cast bar"], nil, setting("units", "hideBlizzardCastbar"))
+	p:Gap()
+	p:Header(L["Tooltips"])
+	p:Check(L["Show tooltips at a fixed spot"], L["Spell explanations and unit info appear in a corner instead of over your screen. Unlock the frames to move the spot."], setting("tooltip", "anchor"))
+	p:Check(L["No action bar tooltips in combat"], nil, setting("tooltip", "hideInCombat"))
 	p:Note(L["Hidden Blizzard frames only come back after a reload. Unlock the frames (General) to drag them."])
 end
 
@@ -444,7 +451,9 @@ function C:CreateMinimapButton()
 	end)
 	b:SetScript("OnDragStop", function(self) self:SetScript("OnUpdate", nil) end)
 	b:SetScript("OnClick", function(_, button)
-		if button == "RightButton" then
+		if button == "LeftButton" and IsShiftKeyDown() and CK.ToggleKeybindMode then
+			CK:ToggleKeybindMode()
+		elseif button == "RightButton" then
 			CK.char.bars.locked = not CK.char.bars.locked
 			changed("bars"); changed("micro")
 		elseif button == "MiddleButton" then
@@ -459,6 +468,7 @@ function C:CreateMinimapButton()
 		GameTooltip:AddLine(L["Click: settings"], 1, 1, 1)
 		GameTooltip:AddLine(L["Right-click: lock/unlock frames"], 1, 1, 1)
 		GameTooltip:AddLine(L["Middle-click: AoE mode"], 1, 1, 1)
+		GameTooltip:AddLine(L["Shift-click: keybind mode"], 1, 1, 1)
 		local spec = CK:GetSpec()
 		if spec then GameTooltip:AddLine(L["Rotation: "] .. spec.name .. (CK.char.rotation.aoe and " (AoE)" or ""), 0.41, 0.8, 0.94) end
 		GameTooltip:Show()
