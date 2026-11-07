@@ -81,12 +81,12 @@ local function manaTools(ctx, push)
 	if ctx.manaPct < 0.15 then
 		local gem = gemReady()
 		if gem then push(gem, "hint") end
-		if ctx:Ready("Evocation") and not ctx.targetingMe then push("Evocation", "hint") end
+		if ctx:Ready("Evocation") and ctx.targetingMe == false then push("Evocation", "hint") end
 	end
 end
 
 local function defensive(ctx, push)
-	if ctx.targetingMe and ctx.inCombat and ctx:Ready("Frost Nova") and inMelee() then
+	if ctx.targetingMe ~= false and ctx.inCombat and ctx:Ready("Frost Nova") and inMelee() then
 		push("Frost Nova", "defensive")
 	end
 end
@@ -103,6 +103,8 @@ local function frost(ctx, list, add)
 	interrupt(ctx, push)
 	local lowMana = ctx.manaPct < 0.25
 	local execute = ctx.targetHealthPct and ctx.targetHealthPct < 0.2
+	-- target health hidden in combat: the guides say Fire Blast on cooldown then
+	local fireBlastNow = execute or (ctx.inCombat and ctx.targetHealthPct == nil)
 	local melee = inMelee()
 
 	if ctx.aoe then
@@ -132,18 +134,18 @@ local function frost(ctx, list, add)
 	-- 1. Ice Barrier up (absorb, no pushback, more Frost damage)
 	if ctx:Ready("Ice Barrier") and ctx:Missing("Ice Barrier") then push("Ice Barrier") end
 	-- 2. in trouble: Mana Shield when low on health and the mob is on you
-	if ctx.targetingMe and ctx.healthPct < 0.4 and ctx:Missing("Ice Barrier")
+	if ctx.targetingMe ~= false and ctx.healthPct < 0.4 and ctx:Missing("Ice Barrier")
 		and ctx:Missing("Mana Shield") and ctx:Ready("Mana Shield") then
 		push("Mana Shield", "defensive")
 	end
 	-- 3. Frost Nova in melee (then step back yourself); Cold Snap resets it
 	defensive(ctx, push)
-	if ctx.targetingMe and melee and frozen(ctx) == 0 and ctx:Known("Frost Nova")
+	if ctx.targetingMe ~= false and melee and frozen(ctx) == 0 and ctx:Known("Frost Nova")
 		and not ctx:Ready("Frost Nova") and ctx:Ready("Cold Snap") then
 		push("Cold Snap", "defensive")
 	end
 	-- 4. finisher: Fire Blast on a nearly dead target
-	if execute and ctx:Ready("Fire Blast") then push("Fire Blast") end
+	if fireBlastNow and ctx:Ready("Fire Blast") then push("Fire Blast") end
 	-- 5. Fingers of Frost: spend it on Ice Lance
 	if ctx:Buff("Fingers of Frost") and ctx:Ready("Ice Lance") then push("Ice Lance", "proc") end
 	-- 6. frozen target: Frostbolt, then Ice Lance so both shatter

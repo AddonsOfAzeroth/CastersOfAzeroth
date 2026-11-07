@@ -64,7 +64,9 @@ local function OverlayGlow_OnUpdate(self, elapsed)
 	local cooldown = self:GetParent().cooldown
 	-- we need some threshold to avoid dimming the glow during the gdc
 	-- (using 1500 exactly seems risky, what if casting speed is slowed or something?)
-	if not Midnight and cooldown and cooldown:IsShown() and cooldown:GetCooldownDuration() > 3000 then
+	-- CasterKit: the duration can be a secret value in combat (WoW Forever); never compare it then
+	local dur = not Midnight and cooldown and cooldown:IsShown() and cooldown:GetCooldownDuration()
+	if dur and not (issecretvalue and issecretvalue(dur)) and dur > 3000 then
 		self:SetAlpha(0.5)
 	else
 		self:SetAlpha(1.0)

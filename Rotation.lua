@@ -126,7 +126,8 @@ function R:BuildContext()
 	-- AoE: your own toggle, or automatically with 3+ enemies close by
 	ctx.autoAoe = CK.char.rotation.autoAoe ~= false and ctx.nearby >= 3
 	ctx.aoe = CK.char.rotation.aoe or ctx.autoAoe
-	ctx.targetingMe = ctx.hostile and Safe(UnitIsUnit("targettarget", "player"), false)
+	-- nil when hidden in combat: rotations treat "unknown" as "maybe"
+	ctx.targetingMe = ctx.hostile and Safe(UnitIsUnit("targettarget", "player"), nil)
 
 	local name, _, _, _, endMS = UnitCastingInfo("player")
 	ctx.channeling = false
