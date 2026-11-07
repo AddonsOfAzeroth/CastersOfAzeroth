@@ -1,9 +1,9 @@
-## Interface: 16001
+﻿## Interface: 16001
 ## Title: CasterKit
 ## Notes: Caster UI: all action bars in one frame, rotation helper and leveling helpers.
-## Notes-nlNL: Caster-UI: actiebalken in één kader, rotatiehulp en levelhulpjes.
+## Notes-nlNL: Caster-UI: actiebalken in Ã©Ã©n kader, rotatiehulp en levelhulpjes.
 ## Author: DinX
-## Version: 0.1.3
+## Version: 0.1.4
 ## IconTexture: Interface\Icons\Spell_Frost_FrostBolt02
 ## SavedVariables: CasterKitDB
 ## SavedVariablesPerCharacter: CasterKitCharDB
