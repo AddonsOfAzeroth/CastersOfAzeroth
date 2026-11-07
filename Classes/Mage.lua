@@ -243,12 +243,30 @@ CK:AddReminderProvider(function(add)
 		end
 	end
 
-	local armor = (IsInInstance() and CK:Known("Mage Armor") and "Mage Armor") or firstKnown({ "Ice Armor", "Frost Armor" })
-	if armor and not hasAnyBuff(ARMORS) then
-		add({ key = "armor", icon = CK:SpellTexture(armor), warn = true, tooltip = L["No armor buff active."], spell = armor })
+	-- buffs: always shown with time left, red when missing or under 5 minutes
+	local function buff(key, names, spell, missingText)
+		local found
+		for _, n in ipairs(names) do
+			if CK:FindAura("player", n, "HELPFUL") then found = n break end
+		end
+		local left = found and CK:AuraRemaining("player", found, "HELPFUL")
+		local text = not found and "!" or ""
+		if left and left ~= math.huge and left ~= 1 then
+			text = left >= 3600 and ("%dh"):format(left / 3600) or (left >= 60 and ("%dm"):format(left / 60) or ("%ds"):format(left))
+		end
+		local low = not found or (left and left ~= 1 and left < 300)
+		add({ key = key, icon = CK:SpellTexture(spell), count = text, always = true,
+			warn = not inCombat and low, spell = spell,
+			tooltip = found and found or missingText })
 	end
-	if CK:Known("Arcane Intellect") and not hasAnyBuff({ "Arcane Intellect", "Arcane Brilliance" }) then
-		add({ key = "intellect", icon = CK:SpellTexture("Arcane Intellect"), warn = true,
-			tooltip = L["Arcane Intellect is missing."], spell = "Arcane Intellect" })
+
+	local armor = (IsInInstance() and CK:Known("Mage Armor") and "Mage Armor") or firstKnown({ "Ice Armor", "Frost Armor" })
+	if armor then buff("armor", ARMORS, armor, L["No armor buff active."]) end
+	if CK:Known("Arcane Intellect") then
+		buff("intellect", { "Arcane Intellect", "Arcane Brilliance" }, "Arcane Intellect", L["Arcane Intellect is missing."])
+	end
+	-- Dampen Magic only solo: it also lowers healing you receive
+	if CK:Known("Dampen Magic") and not IsInGroup() then
+		buff("dampen", { "Dampen Magic", "Amplify Magic" }, "Dampen Magic", L["Dampen Magic is missing (solo: less magic damage taken)."])
 	end
 end)

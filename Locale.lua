@@ -237,6 +237,10 @@ add({
 	["Right-click: "] = "Rechtsklik: ",
 })
 
+add({
+	["Dampen Magic is missing (solo: less magic damage taken)."] = "Dampen Magic ontbreekt (solo: minder magische schade).",
+})
+
 -- Key bindings (Bindings.xml); names are read before saved settings load, so English
 BINDING_HEADER_CASTERKIT = "CasterKit"
 BINDING_NAME_CASTERKIT_AOE = "Toggle AoE mode"
