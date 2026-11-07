@@ -471,10 +471,28 @@ function Q:TitleRow(i)
 	return t
 end
 
+-- Lines under a title open that quest in the quest log (right-click: waypoint)
+local function onLineClick(self, button)
+	guard(function()
+		local id = self.questID
+		if not id then return end
+		if button == "RightButton" then
+			setWaypoint(id, self.questTitle)
+		else
+			openQuest(id, self.logIndex)
+		end
+	end)
+end
+
 function Q:LineRow(i)
 	local o = lines[i]
 	if o then return o end
-	o = CreateFrame("Frame", nil, self.panel)
+	o = CreateFrame("Button", nil, self.panel)
+	o:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+	o:SetScript("OnClick", onLineClick)
+	local hl = o:CreateTexture(nil, "HIGHLIGHT")
+	hl:SetAllPoints()
+	hl:SetColorTexture(1, 1, 1, 0.06)
 	o.text = S:Font(o, 12)
 	o.text:SetPoint("TOPLEFT", 0, 0)
 	o.text:SetJustifyH("LEFT")
@@ -638,9 +656,11 @@ end
 
 -- One text line under a quest; returns the new y.
 local lineCount = 0
+local lineQuest -- quest the next lines belong to
 local function placeLine(self, y, inner, size, text, color, have, need, pct)
 	lineCount = lineCount + 1
 	local o = self:LineRow(lineCount)
+	o.questID, o.logIndex, o.questTitle = lineQuest and lineQuest.id, lineQuest and lineQuest.index, lineQuest and lineQuest.title
 	setFont(o.text, size)
 	local w = inner - INDENT
 	o.text:SetWidth(w)
@@ -714,6 +734,7 @@ function Q:Render(total, tracked)
 			setFont(t.mark, size)
 			setFont(t.tag, small)
 			t.questID, t.logIndex, t.questTitle = q.id, q.index, q.title
+			lineQuest = q
 			local rank = smart and plan and num(plan.rank)
 			local s = titleString(q)
 			if rank then s = "|cff" .. accentHex .. rank .. ".|r " .. s end
