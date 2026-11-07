@@ -36,6 +36,7 @@ local charDefaults = {
 		onlyHostile = true,
 		hint = true,
 		aoe = false,
+		autoAoe = true, -- AoE priority by itself with 3+ enemies close by (nameplates)
 		point = nil,
 	},
 	leveling = {

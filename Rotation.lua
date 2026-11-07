@@ -55,6 +55,47 @@ end
 
 local Safe = CK.Safe
 
+---------------------------------------------------------------------------
+-- Distance: official range checks only (no positions)
+---------------------------------------------------------------------------
+local AUTO_ATTACK = 6603 -- melee range spell, fallback when the 10 yd check is unavailable
+
+-- true when the unit is within about 10 yards (Arcane Explosion / Frost Nova range)
+local function isClose(unit)
+	local ok, r = pcall(CheckInteractDistance, unit, 3)
+	if ok and r ~= nil and not CK.IsSecret(r) then return r and true or false end
+	if C_Spell and C_Spell.IsSpellInRange then
+		local ok2, r2 = pcall(C_Spell.IsSpellInRange, AUTO_ATTACK, unit)
+		if ok2 and r2 ~= nil and not CK.IsSecret(r2) then return r2 == true or r2 == 1 end
+	end
+	return false
+end
+R.IsClose = isClose
+
+-- true / false, or nil when unknown (no target, spell without range, hidden value)
+function ctx:InRange(name, unit)
+	if not (C_Spell and C_Spell.IsSpellInRange) then return end
+	local ok, r = pcall(C_Spell.IsSpellInRange, name, unit or "target")
+	if not ok or r == nil or CK.IsSecret(r) then return end
+	return r == true or r == 1
+end
+
+-- Enemies near you and enemies attacking you, from the visible nameplates.
+local function countEnemies()
+	local near, attackers = 0, 0
+	if not (C_NamePlate and C_NamePlate.GetNamePlates) then return near, attackers end
+	local ok, plates = pcall(C_NamePlate.GetNamePlates)
+	if not ok or type(plates) ~= "table" then return near, attackers end
+	for _, plate in ipairs(plates) do
+		local u = Safe(plate.namePlateUnitToken or (plate.UnitFrame and plate.UnitFrame.unit))
+		if type(u) == "string" and Safe(UnitCanAttack("player", u), false) and not Safe(UnitIsDead(u), false) then
+			if isClose(u) then near = near + 1 end
+			if Safe(UnitIsUnit(u .. "target", "player"), false) then attackers = attackers + 1 end
+		end
+	end
+	return near, attackers
+end
+
 -- a / b, or default when either side is secret or b is 0
 local function ratio(a, b, default)
 	a, b = Safe(a), Safe(b)
@@ -74,7 +115,12 @@ function R:BuildContext()
 	ctx.healthPct = ratio(UnitHealth("player"), UnitHealthMax("player"), 1)
 	ctx.manaPct = ratio(UnitPower("player", 0), UnitPowerMax("player", 0), 1)
 	ctx.moving = (Safe(GetUnitSpeed("player"), 0) or 0) > 0
-	ctx.aoe = CK.char.rotation.aoe
+	local okCount, near, attackers = pcall(countEnemies)
+	ctx.nearby = okCount and near or 0
+	ctx.attackers = okCount and attackers or 0
+	-- AoE: your own toggle, or automatically with 3+ enemies close by
+	ctx.autoAoe = CK.char.rotation.autoAoe ~= false and ctx.nearby >= 3
+	ctx.aoe = CK.char.rotation.aoe or ctx.autoAoe
 	ctx.targetingMe = ctx.hostile and Safe(UnitIsUnit("targettarget", "player"), false)
 
 	local name, _, _, _, endMS = UnitCastingInfo("player")

@@ -339,6 +339,11 @@ add({
 	["Unlock the frames to move them."] = "Ontgrendel de kaders om ze te verplaatsen.",
 })
 
+add({
+	["Automatic AoE with 3+ enemies close by"] = "Automatisch AoE bij 3+ vijanden dichtbij",
+	["Counts enemies within about 10 yards from their nameplates. Turn enemy nameplates on (V)."] = "Telt vijanden binnen ongeveer 10 yards via hun naamplaatjes. Zet vijandelijke naamplaatjes aan (V).",
+})
+
 -- Key bindings (Bindings.xml); names are read before saved settings load, so English
 BINDING_HEADER_CASTERKIT = "CasterKit"
 BINDING_NAME_CASTERKIT_AOE = "Toggle AoE mode"

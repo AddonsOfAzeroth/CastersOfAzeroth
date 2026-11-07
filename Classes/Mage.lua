@@ -68,9 +68,10 @@ local function frozen(ctx)
 	return best
 end
 
+-- target within about 10 yards (official range checks, see Rotation.lua)
 local function inMelee()
-	local ok, res = pcall(CheckInteractDistance, "target", 3)
-	return ok and res
+	local R = CK.Rotation
+	return R and R.IsClose and R.IsClose("target") or false
 end
 
 ---------------------------------------------------------------------------
@@ -107,16 +108,25 @@ local function frost(ctx, list, add)
 	if ctx.aoe then
 		-- Nova the pack, Cone of Cold for Fingers of Frost, Ice Lance the frozen,
 		-- Arcane Explosion in melee, Flamestrike / Blizzard from range
+		-- close = enemies within ~10 yd (nameplates), or at least the target
+		local close = ctx.nearby >= 2 or melee
 		if ctx:Ready("Ice Barrier") and not ctx:Buff("Ice Barrier") then push("Ice Barrier") end
-		if melee and ctx:Ready("Frost Nova") then push("Frost Nova", "defensive") end
-		if melee and ctx:Ready("Cone of Cold") then push("Cone of Cold") end
-		if (ctx:Buff("Fingers of Frost") or frozen(ctx) > 0) and ctx:Ready("Ice Lance") then push("Ice Lance", "proc") end
-		if melee and ctx:Ready("Arcane Explosion") then push("Arcane Explosion") end
+		if close and ctx:Ready("Frost Nova") then push("Frost Nova", "defensive") end
+		if close and ctx:Ready("Cone of Cold") then push("Cone of Cold") end
+		if (ctx:Buff("Fingers of Frost") or frozen(ctx) > 0) and ctx:Ready("Ice Lance")
+			and ctx:InRange("Ice Lance") ~= false then
+			push("Ice Lance", "proc")
+		end
+		if close and ctx:Ready("Arcane Explosion") then push("Arcane Explosion") end
+		-- nothing close yet: ground AoE from range
+		if not ctx.moving and not close and ctx:Ready("Blizzard") then push("Blizzard") end
 		if not ctx.moving and ctx:Ready("Flamestrike") then push("Flamestrike") end
 		if not ctx.moving and ctx:Ready("Blizzard") then push("Blizzard") end
-		if ctx.moving and ctx:Ready("Arcane Explosion") then push("Arcane Explosion") end
-		manaTools(ctx, push)
-		return
+		-- AoE mode with a single enemy left: fall through to the single-target priority
+		if ctx.autoAoe or ctx.nearby >= 2 or #list > 0 then
+			manaTools(ctx, push)
+			return
+		end
 	end
 
 	-- 1. Ice Barrier up (absorb, no pushback, more Frost damage)

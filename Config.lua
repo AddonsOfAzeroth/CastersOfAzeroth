@@ -449,6 +449,7 @@ function C:BuildRotation(p)
 	p:Check(L["Hint box above the bars"], nil, setting("rotation", "hint"))
 	p:Check(L["Only with a hostile target"], nil, setting("rotation", "onlyHostile"))
 	p:Check(L["AoE mode (multiple enemies)"], L["Also via /ck aoe, middle-click on the minimap button or your own key binding."], setting("rotation", "aoe"))
+	p:Check(L["Automatic AoE with 3+ enemies close by"], L["Counts enemies within about 10 yards from their nameplates. Turn enemy nameplates on (V)."], setting("rotation", "autoAoe"))
 	p:Gap()
 	p:Note(L["Colors: gold = press now, purple = proc (e.g. Fingers of Frost), blue = defensive (falling, rooted, too close)."])
 end
