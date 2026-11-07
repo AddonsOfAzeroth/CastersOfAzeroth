@@ -1,4 +1,4 @@
--- CasterKit by DinX: keybind mode
+-- Casters of Azeroth by DinX: keybind mode
 local _, ns = ...
 local CK = ns.CK
 local L = CK.L
@@ -194,7 +194,7 @@ function KB:PaintOverlay(o)
 	end
 end
 
--- Show an overlay on every visible CasterKit button; returns how many.
+-- Show an overlay on every visible Casters of Azeroth button; returns how many.
 function KB:ShowOverlays()
 	local n = 0
 	for _, o in pairs(self.overlays) do o:Hide() end
@@ -310,7 +310,7 @@ function KB:Enter()
 	end
 	if not self.panel then self:CreatePanel() end
 	if self:ShowOverlays() == 0 then
-		CK:Print(L["No CasterKit action buttons to bind."])
+		CK:Print(L["No Casters of Azeroth action buttons to bind."])
 		return
 	end
 	self.active = true

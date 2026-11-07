@@ -1,9 +1,10 @@
--- CasterKit by DinX
+-- Casters of Azeroth by DinX
 local ADDON, ns = ...
 
 local CK = CreateFrame("Frame", "CasterKitCore")
 ns.CK = CK
 _G.CasterKit = CK
+_G.CastersOfAzeroth = CK -- the new name; the old global stays for other add-ons
 
 CK.version = (C_AddOns and C_AddOns.GetAddOnMetadata or GetAddOnMetadata)(ADDON, "Version") or "?"
 CK.modules = {}
@@ -13,18 +14,6 @@ CK.classes = {}
 -- Defaults
 ---------------------------------------------------------------------------
 local charDefaults = {
-	nav = {
-		enabled = true,
-		followQuests = true, -- smart quest route (QuestPlan) after the own stops
-		useFlights = true,   -- suggest known flight paths when they save > 60 s
-		showPanel = true,    -- GPS panel (mover "nav"); off = the small arrow frame
-		panelScale = 1,
-		mapList = true,      -- route list docked to the world map
-		minimap = true,      -- current stop + next 3 on the minimap, with lines
-		autoAdvance = true,  -- own custom waypoints leave the route on arrival
-		queue = {},          -- own stops {mapID, x, y, title, kind, questID}
-		taxiKnown = {},      -- flight path node IDs (and "n:<name>") seen at flight masters
-	},
 	skins = {
 		enabled = true,
 		character = true,
@@ -134,31 +123,12 @@ local charDefaults = {
 		height = 190,
 		fontSize = 13,
 	},
-	quests = {
-		enabled = true,
-		hideBlizzard = true,
-		hideQuestieTracker = true,
-		zoneFirst = true,
-		hideDone = true,
-		maxQuests = 12,
-		width = 260,
-		fontSize = 12,
-		collapsed = {},
-		allCollapsed = false,
-		sortMode = "smart", -- smart, distance, xp, xpmin, level, progress, zone
-		routeStrategy = "balanced", -- balanced, turnin, quest, nearest
-		lockRoute = true, -- keep the smart route until "Recalculate route" is clicked
-		frozenRoute = nil, -- saved stop order (quest keys) while the route is locked
-		showEstimates = true,
-		arrow = true, -- CasterKit arrow (Arrow.lua) to the next stop
-	},
 	tooltip = {
 		anchor = true,
 		hideInCombat = false,
 	},
 	map = {
 		enabled = true,
-		route = true,
 		coords = true,
 		minimapCoords = true,
 		skin = true, -- flat look: Blizzard's frame art hidden
@@ -166,12 +136,6 @@ local charDefaults = {
 		fadeAlpha = 0.5,
 		scale = 1,
 	},
-	arrow = {
-		enabled = true,
-		scale = 1,
-		arriveYards = 15,
-	},
-	questLearn = {}, -- learned kill time, drop rates, run speed (QuestPlan.lua)
 	points = {}, -- saved positions of movable frames, by key
 	class = {},
 }
@@ -569,9 +533,15 @@ CK:On("PLAYER_LOGIN", function()
 		if m.OnEnable then m:OnEnable() end
 	end
 	CK.where = "PLAYER_LOGIN"
+	-- 0.5.0: the quest list, route, GPS and arrow moved to Roads of Azeroth (told once)
+	local loaded = C_AddOns and C_AddOns.IsAddOnLoaded or IsAddOnLoaded
+	if not CK.db.roadsHint and not (loaded and loaded("RoadsOfAzeroth")) then
+		CK.db.roadsHint = true
+		CK:Print(CK.L["The quest list, quest route, GPS and arrow are now a separate add-on: Roads of Azeroth. Install it to keep them; your settings move over by themselves."])
+	end
 	local conflict = CK:BarConflict()
 	if conflict and CK.char.bars.enabled then
-		CK:Print(CK.L["%s already manages the action bars. CasterKit bars are off; the rotation helper still lights up those buttons. Type /ck for settings."]:format(conflict))
+		CK:Print(CK.L["%s already manages the action bars. Casters of Azeroth bars are off; the rotation helper still lights up those buttons. Type /ck for settings."]:format(conflict))
 	end
 end)
 
@@ -656,6 +626,8 @@ end
 ---------------------------------------------------------------------------
 SLASH_CASTERKIT1 = "/ck"
 SLASH_CASTERKIT2 = "/casterkit"
+SLASH_CASTERKIT3 = "/coa"
+SLASH_CASTERKIT4 = "/castersofazeroth"
 SlashCmdList.CASTERKIT = function(msg)
 	msg = strtrim(msg or ""):lower()
 	if msg == "lock" or msg == "unlock" then

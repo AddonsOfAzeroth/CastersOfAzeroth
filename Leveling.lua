@@ -1,4 +1,4 @@
--- CasterKit by DinX: leveling helpers (XP bar, reminders, merchant)
+-- Casters of Azeroth by DinX: leveling helpers (XP bar, reminders, merchant)
 local _, ns = ...
 local CK = ns.CK
 local L = CK.L

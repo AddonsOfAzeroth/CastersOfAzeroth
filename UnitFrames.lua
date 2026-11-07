@@ -1,4 +1,4 @@
--- CasterKit by DinX: unit frames (player, target, target of target, party)
+-- Casters of Azeroth by DinX: unit frames (player, target, target of target, party)
 local _, ns = ...
 local CK = ns.CK
 local L = CK.L

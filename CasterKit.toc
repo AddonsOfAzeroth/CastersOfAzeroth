@@ -1,9 +1,9 @@
-﻿## Interface: 16001
-## Title: CasterKit
-## Notes: Caster UI: all action bars in one frame, rotation helper and leveling helpers.
-## Notes-nlNL: Caster-UI: actiebalken in Ã©Ã©n kader, rotatiehulp en levelhulpjes.
+## Interface: 16001
+## Title: Casters of Azeroth
+## Notes: Caster UI: all action bars in one frame, a rotation helper, leveling helpers, bags, loot and chat.
+## Notes-nlNL: Caster-UI: alle actiebalken in één kader, een rotatiehulp, levelhulpjes, tassen, loot en chat.
 ## Author: DinX
-## Version: 0.4.11
+## Version: 0.5.0
 ## IconTexture: Interface\Icons\Spell_Frost_FrostBolt02
 ## SavedVariables: CasterKitDB
 ## SavedVariablesPerCharacter: CasterKitCharDB
@@ -27,10 +27,6 @@ Loot.lua
 UnitFrames.lua
 Castbar.lua
 Tooltip.lua
-Arrow.lua
-QuestPlan.lua
-Nav.lua
-Quests.lua
 Map.lua
 Chat.lua
 Skins.lua

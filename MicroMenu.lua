@@ -1,4 +1,4 @@
--- CasterKit by DinX: micro menu and bags in one tidy panel
+-- Casters of Azeroth by DinX: micro menu and bags in one tidy panel
 local _, ns = ...
 local CK = ns.CK
 local S = CK.Style

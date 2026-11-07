@@ -1,4 +1,4 @@
--- CasterKit by DinX: chat
+-- Casters of Azeroth by DinX: chat
 --
 -- Flat, IRC-like restyle of the default Blizzard chat (no ElvUI/Prat needed).
 --
@@ -182,7 +182,7 @@ local function shortChannels(msg)
 end
 
 local function urlLink(url)
-	return "|c" .. hex(S.colors.accent) .. "|Haddon:CasterKit:url:" .. url .. "|h[" .. url .. "]|h|r"
+	return "|c" .. hex(S.colors.accent) .. "|Haddon:Casters of Azeroth:url:" .. url .. "|h[" .. url .. "]|h|r"
 end
 
 local function linkWord(word)
@@ -276,7 +276,7 @@ end
 
 local function onLink(link)
 	if issecret(link) or type(link) ~= "string" then return end
-	local url = link:match("^addon:CasterKit:url:(.+)$")
+	local url = link:match("^addon:Casters of Azeroth:url:(.+)$")
 	if url then toEditBox(url) end
 end
 
@@ -809,7 +809,7 @@ function Chat:CheckNewChannels()
 end
 
 StaticPopupDialogs["CASTERKIT_CHAT_SETUP"] = {
-	text = "CasterKit will set up your chat with one tab per channel. Continue?",
+	text = "Casters of Azeroth will set up your chat with one tab per channel. Continue?",
 	button1 = YES or "Yes",
 	button2 = NO or "No",
 	OnAccept = function()
@@ -834,7 +834,7 @@ function Chat:MaybeAskSetup()
 	end
 	if not StaticPopup_Show then return end
 	-- language is chosen at runtime, so set the text right before showing
-	StaticPopupDialogs["CASTERKIT_CHAT_SETUP"].text = L["CasterKit will set up your chat with one tab per channel. Continue?"]
+	StaticPopupDialogs["CASTERKIT_CHAT_SETUP"].text = L["Casters of Azeroth will set up your chat with one tab per channel. Continue?"]
 	StaticPopup_Show("CASTERKIT_CHAT_SETUP")
 end
 
@@ -1038,7 +1038,7 @@ function Chat:Start()
 	if self.started then return end
 	local other = conflict()
 	if other then
-		CK:Print(L["%s already manages the chat; the CasterKit chat stays off."]:format(other))
+		CK:Print(L["%s already manages the chat; the Casters of Azeroth chat stays off."]:format(other))
 		return
 	end
 	self.started = true

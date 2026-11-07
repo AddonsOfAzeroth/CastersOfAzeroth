@@ -1,5 +1,5 @@
--- CasterKit by DinX: skins
--- Gives Blizzard's windows the CasterKit look: flat dark panels, 1px borders and
+-- Casters of Azeroth by DinX: skins
+-- Gives Blizzard's windows the Casters of Azeroth look: flat dark panels, 1px borders and
 -- the accent colour instead of the gold and stone frame art.
 --
 -- Visual only, written to stay out of taint:
@@ -61,7 +61,7 @@ local function guard(tag, fn, ...)
 		if not reported[tag] then
 			reported[tag] = true
 			local handler = geterrorhandler and geterrorhandler()
-			if handler then handler("CasterKit skins (" .. tostring(tag) .. "): " .. tostring(err)) end
+			if handler then handler("Casters of Azeroth skins (" .. tostring(tag) .. "): " .. tostring(err)) end
 		end
 	end
 	return ok

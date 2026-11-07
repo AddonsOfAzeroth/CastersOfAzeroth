@@ -1,4 +1,4 @@
--- CasterKit by DinX: translations. Code uses English strings as keys: L["Text"].
+-- Casters of Azeroth by DinX: translations. Code uses English strings as keys: L["Text"].
 local _, ns = ...
 local CK = ns.CK
 
@@ -32,7 +32,7 @@ add({
 	["%d free bag slots left."] = "Nog %d vrije plaatsen in je tassen.",
 	["%d talent point(s) available. Click to open your talents."] = "%d talentpunt(en) vrij. Klik om je talenten te openen.",
 	["%s XP/h"] = "%s XP/u",
-	["%s already manages the action bars. CasterKit bars are off; the rotation helper still lights up those buttons. Type /ck for settings."] = "%s beheert al de actiebalken. CasterKit-balken staan uit; de rotatiehulp licht wel op op die knoppen. Typ /ck voor instellingen.",
+	["%s already manages the action bars. Casters of Azeroth bars are off; the rotation helper still lights up those buttons. Type /ck for settings."] = "%s beheert al de actiebalken. Casters of Azeroth-balken staan uit; de rotatiehulp licht wel op op die knoppen. Typ /ck voor instellingen.",
 	[", solo value"] = ", solo-waarde",
 	["/ck  settings\n/ck unlock  and  /ck lock  drag frames\n/ck aoe  toggle AoE mode\n/ck reset  reset positions"] = "/ck  instellingen\n/ck unlock  en  /ck lock  kaders verslepen\n/ck aoe  AoE-modus wisselen\n/ck reset  posities terugzetten",
 	["A caster interface for WoW Forever: all action bars in one frame, a rotation helper that lights up the right button, and leveling helpers."] = "Een caster-interface voor WoW Forever: alle actiebalken in één kader, een rotatiehulp die de juiste knop laat oplichten, en hulpjes voor het levelen.",
@@ -51,10 +51,10 @@ add({
 	["Button size"] = "Knopgrootte",
 	["Buttons per row"] = "Knoppen per rij",
 	["Cast bar"] = "Castbar",
-	["CasterKit bars: drag me\n/ck lock to lock"] = "CasterKit-balken: sleep mij\n/ck lock om te vergrendelen",
-	["CasterKit chat (IRC style)"] = "CasterKit-chat (IRC-stijl)",
-	["CasterKit only shows which button to press. You press it yourself: nothing is ever cast automatically."] = "CasterKit toont alleen welke knop je best indrukt. Jij drukt zelf: er wordt nooit iets automatisch gecast.",
-	["CasterKit only uses the official addon API. It shows information and lights up buttons, but never casts anything itself, never sends chat messages and does not work with external programs."] = "CasterKit gebruikt alleen de officiële addon-API. Het toont informatie en laat knoppen oplichten, maar cast nooit zelf iets, verstuurt geen chatberichten en werkt niet samen met externe programma's.",
+	["Casters of Azeroth bars: drag me\n/ck lock to lock"] = "Casters of Azeroth-balken: sleep mij\n/ck lock om te vergrendelen",
+	["Casters of Azeroth chat (IRC style)"] = "Casters of Azeroth-chat (IRC-stijl)",
+	["Casters of Azeroth only shows which button to press. You press it yourself: nothing is ever cast automatically."] = "Casters of Azeroth toont alleen welke knop je best indrukt. Jij drukt zelf: er wordt nooit iets automatisch gecast.",
+	["Casters of Azeroth only uses the official addon API. It shows information and lights up buttons, but never casts anything itself, never sends chat messages and does not work with external programs."] = "Casters of Azeroth gebruikt alleen de officiële addon-API. Het toont informatie en laat knoppen oplichten, maar cast nooit zelf iets, verstuurt geen chatberichten en werkt niet samen met externe programma's.",
 	["Character, spellbook, talents, quests… tidy in one panel."] = "Personage, spreukenboek, talenten, quests… netjes in één kader.",
 	["Class color on the health bar"] = "Klassekleur op de levensbalk",
 	["Click: "] = "Klik: ",
@@ -82,7 +82,7 @@ add({
 	["Hide Blizzard XP bar"] = "Blizzard-XP-balk verbergen",
 	["Hide Blizzard bars"] = "Blizzard-balken verbergen",
 	["Hide Blizzard cast bar"] = "Blizzard-castbar verbergen",
-	["Hides the default bars that CasterKit replaces."] = "Verbergt de standaardbalken die CasterKit vervangt.",
+	["Hides the default bars that Casters of Azeroth replaces."] = "Verbergt de standaardbalken die Casters of Azeroth vervangt.",
 	["Hint box above the bars"] = "Hintblokje boven de balken",
 	["In combat Blizzard hides many values from addons. Blizzard's own suggestion always works; the own priority falls back to Blizzard when something is hidden."] = "Blizzard schermt in gevechten veel waarden af voor addons. De suggestie van Blizzard zelf werkt altijd; de eigen prioriteit valt terug op Blizzard als iets afgeschermd is.",
 	["Interrupted"] = "Onderbroken",
@@ -95,7 +95,7 @@ add({
 	["Main bar (1 to =) on top"] = "Hoofdbalk (1 t/m =) bovenaan",
 	["Micro menu"] = "Micromenu",
 	["Micro menu and bags"] = "Micromenu en tassen",
-	["Micro menu in a CasterKit panel"] = "Micromenu in een CasterKit-paneel",
+	["Micro menu in a Casters of Azeroth panel"] = "Micromenu in een Casters of Azeroth-paneel",
 	["Middle-click: AoE mode"] = "Middelklik: AoE-modus",
 	["Names in class color"] = "Namen in klassekleur",
 	["No armor buff active."] = "Geen armor-buff actief.",
@@ -106,7 +106,7 @@ add({
 	["Notify: talent points available"] = "Melding: talentpunten vrij",
 	["One tab per channel"] = "Tabblad per kanaal",
 	["Only with a hostile target"] = "Alleen bij een vijandig doelwit",
-	["Open CasterKit settings"] = "Open CasterKit-instellingen",
+	["Open Casters of Azeroth settings"] = "Open Casters of Azeroth-instellingen",
 	["Open settings"] = "Open instellingen",
 	["Orange = interruptible (Counterspell), grey with lock = not."] = "Oranje = onderbreekbaar (Counterspell), grijs met slot = niet.",
 	["Own cast bar"] = "Eigen castbar",
@@ -121,6 +121,7 @@ add({
 	["Game font"] = "Lettertype van het spel",
 	["Thick outline on text"] = "Dikke rand rond tekst",
 	["Off: clean text with a soft shadow, easier to read."] = "Uit: strakke tekst met een zachte schaduw, leest makkelijker.",
+	["The quest list, quest route, GPS and arrow are now a separate add-on: Roads of Azeroth. Install it to keep them; your settings move over by themselves."] = "De questlijst, questroute, GPS en pijl zijn nu een aparte add-on: Roads of Azeroth. Installeer die om ze te houden; je instellingen gaan vanzelf mee.",
 	["Reload the UI to apply the font."] = "Herlaad de interface om het lettertype toe te passen.",
 	["Reload your UI (/reload) to see the Blizzard cast bar again."] = "Herlaad je UI (/reload) om de Blizzard-castbar terug te zien.",
 	["Reminders (water, food, buffs, bags…)"] = "Herinneringen (water, food, buffs, tassen…)",
@@ -159,8 +160,8 @@ add({
 	["Turn off to drag the bars, hint box, frames and micro menu."] = "Zet uit om de balken, het hintblokje en het micromenu te verslepen.",
 	["Turning this off needs a reload to give the Blizzard bars back."] = "Uitzetten vraagt een herlaad om de Blizzard-balken terug te geven.",
 	["Unlock the frames (General) to drag the panel."] = "Ontgrendel de kaders (Algemeen) om het paneel te verslepen.",
-	["Use CasterKit action bars"] = "CasterKit-actiebalken gebruiken",
-	["Use CasterKit frames"] = "CasterKit-frames gebruiken",
+	["Use Casters of Azeroth action bars"] = "Casters of Azeroth-actiebalken gebruiken",
+	["Use Casters of Azeroth frames"] = "Casters of Azeroth-frames gebruiken",
 	["Version %s, made by DinX."] = "Versie %s, gemaakt door DinX.",
 	["Width"] = "Breedte",
 	["With the number of free slots on your backpack."] = "Met het aantal vrije plaatsen op je rugzak.",
@@ -171,7 +172,7 @@ add({
 	["measured"] = "gemeten",
 	["off"] = "uit",
 	["on"] = "aan",
-	["|cffff5050%s currently manages the action bars.|r Disable it to use the CasterKit bars; meanwhile the rotation helper works on those buttons."] = "|cffff5050%s beheert nu de actiebalken.|r Zet dat uit om de CasterKit-balken te gebruiken; de rotatiehulp werkt intussen op die knoppen.",
+	["|cffff5050%s currently manages the action bars.|r Disable it to use the Casters of Azeroth bars; meanwhile the rotation helper works on those buttons."] = "|cffff5050%s beheert nu de actiebalken.|r Zet dat uit om de Casters of Azeroth-balken te gebruiken; de rotatiehulp werkt intussen op die knoppen.",
 	["±%d kills to level %d (%s%s)"] = "±%d kills tot level %d (%s%s)",
 })
 
@@ -188,7 +189,7 @@ add({
 	["%s bound to %s."] = "%s gekoppeld aan %s.",
 	["Keys cleared: %s"] = "Toetsen gewist: %s",
 	["Keybind mode is not available in combat."] = "Keybind-modus is niet beschikbaar in gevecht.",
-	["No CasterKit action buttons to bind."] = "Geen CasterKit-actieknoppen om te koppelen.",
+	["No Casters of Azeroth action buttons to bind."] = "Geen Casters of Azeroth-actieknoppen om te koppelen.",
 	["Keybind mode closed: you entered combat."] = "Keybind-modus gesloten: je bent in gevecht.",
 })
 
@@ -209,10 +210,10 @@ add({
 	["%d protected lines were left out."] = "%d beschermde regels zijn weggelaten.",
 	["Press Enter to chat"] = "Druk op Enter om te chatten",
 	["Scroll to the bottom"] = "Naar de nieuwste regel",
-	["CasterKit will set up your chat with one tab per channel. Continue?"] = "CasterKit zet je chat op met een tabblad per kanaal. Doorgaan?",
+	["Casters of Azeroth will set up your chat with one tab per channel. Continue?"] = "Casters of Azeroth zet je chat op met een tabblad per kanaal. Doorgaan?",
 	["Chat tabs are set up."] = "Chattabbladen zijn ingesteld.",
 	["No free chat window left for more tabs."] = "Geen vrij chatvenster meer voor extra tabbladen.",
-	["%s already manages the chat; the CasterKit chat stays off."] = "%s beheert de chat al; de CasterKit-chat blijft uit.",
+	["%s already manages the chat; the Casters of Azeroth chat stays off."] = "%s beheert de chat al; de Casters of Azeroth-chat blijft uit.",
 	["Turning the chat off takes effect after /reload."] = "De chat uitschakelen werkt pas na /reload.",
 })
 
@@ -261,7 +262,7 @@ add({
 
 add({
 	["Quests"] = "Quests",
-	["CasterKit quest tracker"] = "CasterKit-questtracker",
+	["Casters of Azeroth quest tracker"] = "Casters of Azeroth-questtracker",
 	["A compact list: level colours, progress bars, turn-ins on top."] = "Een compacte lijst: kleuren per level, voortgangsbalkjes, inleveren bovenaan.",
 	["Hide the Blizzard quest tracker"] = "Blizzard-questtracker verbergen",
 	["Hide the Questie tracker (Questie keeps its map pins)"] = "Questie-tracker verbergen (Questie houdt zijn kaartpins)",
@@ -293,15 +294,15 @@ add({
 	["Almost done"] = "Bijna klaar",
 	["Zone"] = "Zone",
 	["Show time and XP per hour estimates"] = "Geschatte tijd en XP per uur tonen",
-	["Estimates get better as CasterKit learns your kill speed and drop rates."] = "De schattingen worden beter naarmate CasterKit je killtempo en drop-kansen leert.",
+	["Estimates get better as Casters of Azeroth learns your kill speed and drop rates."] = "De schattingen worden beter naarmate Casters of Azeroth je killtempo en drop-kansen leert.",
 })
 
 add({
 	["Arrow to the next stop"] = "Pijl naar de volgende stop",
-	["CasterKit's own navigation arrow. Unlock the frames to move it."] = "De eigen navigatiepijl van CasterKit. Ontgrendel de kaders om hem te verplaatsen.",
+	["Casters of Azeroth's own navigation arrow. Unlock the frames to move it."] = "De eigen navigatiepijl van Casters of Azeroth. Ontgrendel de kaders om hem te verplaatsen.",
 	["Map"] = "Kaart",
 	["World map"] = "Wereldkaart",
-	["CasterKit map upgrade"] = "CasterKit-kaartupgrade",
+	["Casters of Azeroth map upgrade"] = "Casters of Azeroth-kaartupgrade",
 	["Show the quest route on the map"] = "Questroute op de kaart tonen",
 	["Numbered stops in the fastest order, with lines between them."] = "Genummerde stops in de snelste volgorde, met lijnen ertussen.",
 	["Coordinates (player and cursor)"] = "Coördinaten (speler en cursor)",
@@ -309,7 +310,7 @@ add({
 	["Opacity while moving"] = "Dekking tijdens het lopen",
 	["Map size"] = "Kaartgrootte",
 	["Navigation arrow"] = "Navigatiepijl",
-	["Use the CasterKit arrow"] = "CasterKit-pijl gebruiken",
+	["Use the Casters of Azeroth arrow"] = "Casters of Azeroth-pijl gebruiken",
 	["Arrow size"] = "Pijlgrootte",
 	["Arrived within"] = "Aangekomen binnen",
 })
@@ -396,7 +397,7 @@ add({
 	["Blizzard's own clean-up. Right-click a bag slot to keep a bag out of it."] = "Blizzards eigen opruimfunctie. Rechtsklik op een tasplaats om een tas over te slaan.",
 	["Not in combat."] = "Niet tijdens een gevecht.",
 	["Search"] = "Zoeken",
-	["CasterKit bags (one window for all bags)"] = "CasterKit-tassen (één venster voor alle tassen)",
+	["Casters of Azeroth bags (one window for all bags)"] = "Casters of Azeroth-tassen (één venster voor alle tassen)",
 	["Replaces Blizzard's bags. Turning this off gives them back right away."] = "Vervangt de tassen van Blizzard. Uitzetten geeft ze meteen terug.",
 	["View"] = "Weergave",
 	["By category"] = "Per categorie",
@@ -420,7 +421,7 @@ add({
 	["Loot feed"] = "Buitlijst",
 	["Loot rolls"] = "Dobbelen om buit",
 	["Bags full!"] = "Tassen vol!",
-	["CasterKit loot module"] = "CasterKit-buitmodule",
+	["Casters of Azeroth loot module"] = "Casters of Azeroth-buitmodule",
 	["Replace the loot window"] = "Buitvenster vervangen",
 	["A compact list: click an item to loot it, or use Loot all. With master loot Blizzard's window is used."] = "Een compacte lijst: klik op een voorwerp om het op te rapen, of gebruik Alles oprapen. Bij master loot wordt het Blizzard-venster gebruikt.",
 	["Open the loot window at the cursor"] = "Buitvenster bij de muisaanwijzer openen",
@@ -450,7 +451,7 @@ add({
 	["Skin changes apply after a reload (/reload)."] = "Wijzigingen aan de skins gelden na herladen (/reload).",
 	["Skins"] = "Skins",
 	["Windows"] = "Vensters",
-	["Gives Blizzard's windows the CasterKit look: flat dark panels, thin borders and the accent colour instead of the gold and stone frame art. Only the look changes."] = "Geeft de vensters van Blizzard de CasterKit-stijl: vlakke donkere panelen, dunne randen en de accentkleur in plaats van de gouden en stenen kaders. Alleen het uiterlijk verandert.",
+	["Gives Blizzard's windows the Casters of Azeroth look: flat dark panels, thin borders and the accent colour instead of the gold and stone frame art. Only the look changes."] = "Geeft de vensters van Blizzard de Casters of Azeroth-stijl: vlakke donkere panelen, dunne randen en de accentkleur in plaats van de gouden en stenen kaders. Alleen het uiterlijk verandert.",
 	["Skin Blizzard windows"] = "Blizzard-vensters stylen",
 	["Turning a skin off needs a reload (/reload)."] = "Een skin uitzetten vraagt een herlaadbeurt (/reload).",
 	["Character, reputation and currency"] = "Personage, reputatie en munten",
@@ -464,7 +465,7 @@ add({
 	["Game menu, addon list and settings"] = "Spelmenu, addonlijst en instellingen",
 	["Pop-up dialogs"] = "Pop-upvensters",
 	["Other windows (bank, trade, dressing room, group finder…)"] = "Andere vensters (bank, handel, paskamer, groepzoeker…)",
-	["ElvUI skins Blizzard's windows itself: CasterKit leaves those windows to ElvUI. Turn off ElvUI's Blizzard skins to use these."] = "ElvUI stylet de Blizzard-vensters zelf: CasterKit laat die vensters aan ElvUI. Zet de Blizzard-skins van ElvUI uit om deze te gebruiken.",
+	["ElvUI skins Blizzard's windows itself: Casters of Azeroth leaves those windows to ElvUI. Turn off ElvUI's Blizzard skins to use these."] = "ElvUI stylet de Blizzard-vensters zelf: Casters of Azeroth laat die vensters aan ElvUI. Zet de Blizzard-skins van ElvUI uit om deze te gebruiken.",
 	["Changes apply after a reload (/reload)."] = "Wijzigingen gelden na herladen (/reload).",
 })
 
@@ -517,7 +518,7 @@ add({
 	["Waypoint"] = "Waypoint",
 	["Navigation"] = "Navigatie",
 	["Navigation (GPS)"] = "Navigatie (GPS)",
-	["Use CasterKit navigation"] = "CasterKit-navigatie gebruiken",
+	["Use Casters of Azeroth navigation"] = "Casters of Azeroth-navigatie gebruiken",
 	["A route of stops with a GPS panel: direction, distance, arrival time and the next stop."] = "Een route van stops met een GPS-paneel: richting, afstand, aankomsttijd en de volgende stop.",
 	["Follow the quest route"] = "De questroute volgen",
 	["The smart quest route (objectives, then turn-ins) comes after your own stops."] = "De slimme questroute (doelen, dan inleveren) komt na je eigen stops.",
@@ -572,6 +573,6 @@ add({
 })
 
 -- Key bindings (Bindings.xml); names are read before saved settings load, so English
-BINDING_HEADER_CASTERKIT = "CasterKit"
+BINDING_HEADER_CASTERKIT = "Casters of Azeroth"
 BINDING_NAME_CASTERKIT_AOE = "Toggle AoE mode"
 BINDING_NAME_CASTERKIT_CONFIG = "Open settings"

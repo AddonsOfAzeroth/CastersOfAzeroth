@@ -1,4 +1,4 @@
--- CasterKit by DinX: tooltips (spell explanations etc.) at a fixed, movable spot
+-- Casters of Azeroth by DinX: tooltips (spell explanations etc.) at a fixed, movable spot
 local _, ns = ...
 local CK = ns.CK
 local L = CK.L

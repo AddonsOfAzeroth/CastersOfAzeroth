@@ -1,4 +1,4 @@
--- CasterKit by DinX: shared flat look
+-- Casters of Azeroth by DinX: shared flat look
 local ADDON, ns = ...
 local CK = ns.CK
 

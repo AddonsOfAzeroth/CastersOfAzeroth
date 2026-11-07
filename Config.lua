@@ -1,4 +1,4 @@
--- CasterKit by DinX: settings window and minimap button
+-- Casters of Azeroth by DinX: settings window and minimap button
 local _, ns = ...
 local CK = ns.CK
 local L = CK.L
@@ -7,7 +7,7 @@ local S = CK.Style
 local C = CK:NewModule("Config")
 
 ---------------------------------------------------------------------------
--- Widgets (flat, in CasterKit style)
+-- Widgets (flat, in Casters of Azeroth style)
 ---------------------------------------------------------------------------
 local function changed(group)
 	CK:Fire("SETTINGS", group)
@@ -274,9 +274,7 @@ function C:CreateWindow()
 	self:BuildUnits(newPage("units", "Frames"))
 	self:BuildRotation(newPage("rotation", L["Rotation"]))
 	self:BuildLeveling(newPage("leveling", L["Leveling"]))
-	self:BuildQuests(newPage("quests", L["Quests"]))
 	self:BuildMap(newPage("map", L["Map"]))
-	self:BuildNav(newPage("nav", L["Navigation"]))
 	self:BuildSkins(newPage("skins", L["Skins"]))
 	self:BuildChat(newPage("chat", L["Chat"]))
 	self:BuildLoot(newPage("loot", L["Loot"]))
@@ -306,7 +304,7 @@ function C:Refresh()
 	end
 	if self.conflictNote then
 		local c = CK:BarConflict()
-		self.conflictNote:SetText(c and L["|cffff5050%s currently manages the action bars.|r Disable it to use the CasterKit bars; meanwhile the rotation helper works on those buttons."]:format(c) or L["No other action bar addon active."])
+		self.conflictNote:SetText(c and L["|cffff5050%s currently manages the action bars.|r Disable it to use the Casters of Azeroth bars; meanwhile the rotation helper works on those buttons."]:format(c) or L["No other action bar addon active."])
 	end
 end
 
@@ -361,8 +359,8 @@ end
 function C:BuildBars(p)
 	p:Header(L["Action bars"])
 	self.conflictNote = p:Note("")
-	p:Check(L["Use CasterKit action bars"], L["Turning this off needs a reload to give the Blizzard bars back."], setting("bars", "enabled"))
-	p:Check(L["Hide Blizzard bars"], L["Hides the default bars that CasterKit replaces."], setting("bars", "hideBlizzard"))
+	p:Check(L["Use Casters of Azeroth action bars"], L["Turning this off needs a reload to give the Blizzard bars back."], setting("bars", "enabled"))
+	p:Check(L["Hide Blizzard bars"], L["Hides the default bars that Casters of Azeroth replaces."], setting("bars", "hideBlizzard"))
 	p:Slider(L["Rows"], 1, CK.Bars.MAX_ROWS, 1, setting("bars", "rows"))
 	p:Slider(L["Buttons per row"], 4, 12, 1, setting("bars", "perRow"))
 	p:Slider(L["Button size"], 24, 52, 1, setting("bars", "size"))
@@ -379,7 +377,7 @@ end
 
 function C:BuildMicro(p)
 	p:Header(L["Micro menu and bags"])
-	p:Check(L["Micro menu in a CasterKit panel"], L["Character, spellbook, talents, quests… tidy in one panel."], setting("micro", "enabled"))
+	p:Check(L["Micro menu in a Casters of Azeroth panel"], L["Character, spellbook, talents, quests… tidy in one panel."], setting("micro", "enabled"))
 	p:Check(L["Bags in the same panel"], L["With the number of free slots on your backpack."], setting("micro", "bags"))
 	local getS, setS = setting("micro", "scale")
 	p:Slider(L["Scale"], 0.6, 1.2, 0.05, getS, setS, function(v) return ("%d%%"):format(v * 100 + 0.5) end)
@@ -388,7 +386,7 @@ end
 
 function C:BuildUnits(p)
 	p:Header("Unit frames")
-	p:Check(L["Use CasterKit frames"], L["Replaces Blizzard's player, target and party frames."], setting("units", "enabled"))
+	p:Check(L["Use Casters of Azeroth frames"], L["Replaces Blizzard's player, target and party frames."], setting("units", "enabled"))
 	p:Check(L["Player"], nil, setting("units", "player"))
 	p:Check(L["Target (with your debuffs)"], nil, setting("units", "target"))
 	p:Check("Target of target", nil, setting("units", "tot"))
@@ -410,55 +408,18 @@ function C:BuildUnits(p)
 	p:Note(L["Hidden Blizzard frames only come back after a reload. Unlock the frames (General) to drag them."])
 end
 
-function C:BuildQuests(p)
-	p:Header(L["Quests"])
-	p:Check(L["CasterKit quest tracker"], L["A compact list: level colours, progress bars, turn-ins on top."], setting("quests", "enabled"))
-	p:Check(L["Hide the Blizzard quest tracker"], nil, setting("quests", "hideBlizzard"))
-	p:Check(L["Hide the Questie tracker (Questie keeps its map pins)"], nil, setting("quests", "hideQuestieTracker"))
-	p:Check(L["Quests in your current zone first"], nil, setting("quests", "zoneFirst"))
-	p:Check(L["Hide finished objectives"], nil, setting("quests", "hideDone"))
-	p:Choice(L["Sort by"], {
-		{ "smart", L["Smart route (fastest leveling)"] }, { "distance", L["Distance"] }, { "xp", L["XP reward"] },
-		{ "xpmin", L["XP per minute"] }, { "level", L["Level"] }, { "progress", L["Almost done"] }, { "zone", L["Zone"] },
-	}, setting("quests", "sortMode"))
-	p:Choice(L["Route strategy"], {
-		{ "balanced", L["Balanced"] }, { "turnin", L["Turn in first"] },
-		{ "quest", L["Quest first"] }, { "nearest", L["Nearest"] },
-	}, (function()
-		local get, set = setting("quests", "routeStrategy")
-		return get, function(v)
-			set(v)
-			if CK.QuestPlan and CK.QuestPlan.Recalculate then CK.QuestPlan:Recalculate() end
-		end
-	end)())
-	p:Check(L["Keep the route until I recalculate"], L["The smart route keeps its order while you walk. Click the refresh button in the quest list header to plan it again from where you are."], setting("quests", "lockRoute"))
-	p:Check(L["Show time and XP per hour estimates"], L["Estimates get better as CasterKit learns your kill speed and drop rates."], setting("quests", "showEstimates"))
-	p:Check(L["Arrow to the next stop"], L["CasterKit's own navigation arrow. Unlock the frames to move it."], setting("quests", "arrow"))
-	p:Slider(L["Quests shown"], 3, 25, 1, setting("quests", "maxQuests"))
-	p:Slider(L["Width"], 180, 400, 10, setting("quests", "width"))
-	p:Slider(L["Font size"], 10, 16, 1, setting("quests", "fontSize"))
-	p:Note(L["Click a quest title to select it: the arrow points to it (click again for the route). Ctrl-click adds it to the navigation route. Right-click folds it open or closed. Click the lines under it (or Shift-click the title) to open it in the quest log. Unlock the frames (General) to move the list."])
-end
-
 function C:BuildMap(p)
 	p:Header(L["World map"])
-	p:Check(L["CasterKit map upgrade"], nil, setting("map", "enabled"))
+	p:Check(L["Casters of Azeroth map upgrade"], nil, setting("map", "enabled"))
 	p:Check(L["Flat map frame"], L["Hides Blizzard's frame art (borders, title bar, portrait)."], setting("map", "skin"))
-	p:Check(L["Show the quest route on the map"], L["Numbered stops in the fastest order, with lines between them."], setting("map", "route"))
 	p:Check(L["Coordinates (player and cursor)"], nil, setting("map", "coords"))
 	p:Check(L["Coordinates on the minimap"], L["Unlock the frames to move them."], setting("map", "minimapCoords"))
 	p:Check(L["Fade the map while moving"], nil, setting("map", "fadeMoving"))
-	p:Gap()
-	p:Header(L["Navigation arrow"])
-	p:Check(L["Use the CasterKit arrow"], nil, setting("arrow", "enabled"))
-	local getA, setA = setting("arrow", "scale")
-	p:Slider(L["Arrow size"], 0.6, 1.6, 0.05, getA, setA, function(v) return ("%d%%"):format(v * 100 + 0.5) end)
-	p:Slider(L["Arrived within"], 5, 40, 1, setting("arrow", "arriveYards"))
 end
 
 function C:BuildBags(p)
 	p:Header(L["Bags"])
-	p:Check(L["CasterKit bags (one window for all bags)"], L["Replaces Blizzard's bags. Turning this off gives them back right away."], setting("bags", "enabled"))
+	p:Check(L["Casters of Azeroth bags (one window for all bags)"], L["Replaces Blizzard's bags. Turning this off gives them back right away."], setting("bags", "enabled"))
 	p:Choice(L["View"], { { "category", L["By category"] }, { "bag", L["By bag"] } }, setting("bags", "view"))
 	local getC, setC = setting("bags", "columns")
 	p:Slider(L["Columns"], 6, 20, 1, getC, setC)
@@ -482,7 +443,7 @@ end
 
 function C:BuildLoot(p)
 	p:Header(L["Loot"])
-	p:Check(L["CasterKit loot module"], nil, setting("loot", "enabled"))
+	p:Check(L["Casters of Azeroth loot module"], nil, setting("loot", "enabled"))
 	p:Check(L["Replace the loot window"], L["A compact list: click an item to loot it, or use Loot all. With master loot Blizzard's window is used."], setting("loot", "window"))
 	p:Check(L["Open the loot window at the cursor"], L["Off: at a fixed spot. Unlock the frames to move it."], setting("loot", "atCursor"))
 	p:Check(L["Auto loot (Blizzard setting)"], L["Blizzard's own auto loot: everything is picked up when you open a corpse. Applied after combat."], setting("loot", "autoLoot"))
@@ -504,9 +465,9 @@ end
 
 function C:BuildSkins(p)
 	p:Header(L["Skins"])
-	p:Note(L["Gives Blizzard's windows the CasterKit look: flat dark panels, thin borders and the accent colour instead of the gold and stone frame art. Only the look changes."])
+	p:Note(L["Gives Blizzard's windows the Casters of Azeroth look: flat dark panels, thin borders and the accent colour instead of the gold and stone frame art. Only the look changes."])
 	if CK.Skins and CK.Skins.ElvUIActive and CK.Skins:ElvUIActive() then
-		p:Note(L["ElvUI skins Blizzard's windows itself: CasterKit leaves those windows to ElvUI. Turn off ElvUI's Blizzard skins to use these."])
+		p:Note(L["ElvUI skins Blizzard's windows itself: Casters of Azeroth leaves those windows to ElvUI. Turn off ElvUI's Blizzard skins to use these."])
 	end
 	p:Check(L["Skin Blizzard windows"], L["Turning a skin off needs a reload (/reload)."], setting("skins", "enabled"))
 
@@ -524,26 +485,9 @@ function C:BuildSkins(p)
 	p:Note(L["Changes apply after a reload (/reload)."])
 end
 
-function C:BuildNav(p)
-	p:Header(L["Navigation (GPS)"])
-	p:Check(L["Use CasterKit navigation"], L["A route of stops with a GPS panel: direction, distance, arrival time and the next stop."], setting("nav", "enabled"))
-	p:Check(L["Follow the quest route"], L["The smart quest route (objectives, then turn-ins) comes after your own stops."], setting("nav", "followQuests"))
-	p:Check(L["Suggest flight paths"], L["Only flight paths you know. A flight is suggested when it saves more than a minute."], setting("nav", "useFlights"))
-	p:Check(L["Next stop on arrival"], L["Your own waypoints leave the route when you reach them. Quest stops move on when the quest log changes."], setting("nav", "autoAdvance"))
-	p:Check(L["Show the GPS panel"], L["Off: the small navigation arrow is used instead. Unlock the frames (General) to move the panel."], setting("nav", "showPanel"))
-	local getS, setS = setting("nav", "panelScale")
-	p:Slider(L["Panel size"], 0.6, 1.6, 0.05, getS, setS, function(v) return ("%d%%"):format(v * 100 + 0.5) end)
-	p:Check(L["Route on the minimap"], L["The current stop and the next three, with lines. Stops outside the minimap show as an arrow on the edge."], setting("nav", "minimap"))
-	p:Check(L["Route list next to the world map"], L["Click a stop to go there first; ^ v x to reorder or remove."], setting("nav", "mapList"))
-	p:Button(L["Clear route"], function()
-		if CK.Nav and CK.Nav.Clear then CK.Nav:Clear() end
-	end)
-	p:Note(L["Ctrl-click a quest title or a spot on the world map to add a stop. The arrow shows the straight-line direction: WoW gives addons no data for paths, hills or water."])
-end
-
 function C:BuildChat(p)
 	p:Header("Chat")
-	p:Check(L["CasterKit chat (IRC style)"], nil, setting("chat", "enabled"))
+	p:Check(L["Casters of Azeroth chat (IRC style)"], nil, setting("chat", "enabled"))
 	p:Check(L["Timestamps [14:03]"], nil, setting("chat", "timestamps"))
 	p:Check(L["Short channel names ([T], [G], [g]…)"], nil, setting("chat", "shortChannels"))
 	p:Check(L["Names in class color"], nil, setting("chat", "classColors"))
@@ -556,7 +500,7 @@ end
 
 function C:BuildRotation(p)
 	p:Header(L["Rotation helper"])
-	p:Note(L["CasterKit only shows which button to press. You press it yourself: nothing is ever cast automatically."])
+	p:Note(L["Casters of Azeroth only shows which button to press. You press it yourself: nothing is ever cast automatically."])
 	p:Check(L["Rotation helper on"], nil, setting("rotation", "enabled"))
 	p:Choice(L["Suggestion source"], { { "blizzard", "Blizzard (Assisted Combat)" }, { "custom", L["Own priority (guide)"] } }, setting("rotation", "source"))
 	p:Note(L["In combat Blizzard hides many values from addons. Blizzard's own suggestion always works; the own priority falls back to Blizzard when something is hidden."])
@@ -650,12 +594,12 @@ function C:BuildProfiles(p)
 end
 
 function C:BuildAbout(p)
-	p:Header("CasterKit")
+	p:Header("Casters of Azeroth")
 	p:Note(L["Version %s, made by DinX."]:format(CK.version))
 	p:Note(L["A caster interface for WoW Forever: all action bars in one frame, a rotation helper that lights up the right button, and leveling helpers."])
 	p:Gap()
 	p:Header(L["Within the rules"])
-	p:Note(L["CasterKit only uses the official addon API. It shows information and lights up buttons, but never casts anything itself, never sends chat messages and does not work with external programs."])
+	p:Note(L["Casters of Azeroth only uses the official addon API. It shows information and lights up buttons, but never casts anything itself, never sends chat messages and does not work with external programs."])
 	p:Gap()
 	p:Header(L["Commands"])
 	p:Note(L["/ck  settings\n/ck unlock  and  /ck lock  drag frames\n/ck aoe  toggle AoE mode\n/ck reset  reset positions"])
@@ -717,7 +661,7 @@ function C:CreateMinimapButton()
 	end)
 	b:SetScript("OnEnter", function(self)
 		GameTooltip:SetOwner(self, "ANCHOR_LEFT")
-		GameTooltip:AddLine("CasterKit")
+		GameTooltip:AddLine("Casters of Azeroth")
 		GameTooltip:AddLine(L["Click: settings"], 1, 1, 1)
 		GameTooltip:AddLine(L["Right-click: lock/unlock frames"], 1, 1, 1)
 		GameTooltip:AddLine(L["Middle-click: AoE mode"], 1, 1, 1)
@@ -744,17 +688,17 @@ function C:RegisterBlizzardSettings()
 	local panel = CreateFrame("Frame")
 	local t = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlightLarge")
 	t:SetPoint("TOPLEFT", 16, -16)
-	t:SetText("CasterKit")
+	t:SetText("Casters of Azeroth")
 	local b = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
 	b:SetSize(200, 26)
 	b:SetPoint("TOPLEFT", 16, -50)
-	b:SetText(L["Open CasterKit settings"])
+	b:SetText(L["Open Casters of Azeroth settings"])
 	b:SetScript("OnClick", function()
 		if SettingsPanel then HideUIPanel(SettingsPanel) end
 		CK:ToggleConfig(true)
 	end)
 	pcall(function()
-		local cat = Settings.RegisterCanvasLayoutCategory(panel, "CasterKit")
+		local cat = Settings.RegisterCanvasLayoutCategory(panel, "Casters of Azeroth")
 		Settings.RegisterAddOnCategory(cat)
 	end)
 end

@@ -1,4 +1,4 @@
--- CasterKit by DinX: loot window, loot feed and group loot rolls
+-- Casters of Azeroth by DinX: loot window, loot feed and group loot rolls
 --
 -- Rules this module keeps (no automation beyond what Blizzard offers):
 --   * items are only looted by the user's click (LootSlot in OnClick) or by
@@ -117,7 +117,7 @@ local function hideTooltip(owner)
 	if GameTooltip and GameTooltip:IsOwned(owner) then GameTooltip:Hide() end
 end
 
--- Flat text button in CasterKit style.
+-- Flat text button in Casters of Azeroth style.
 local function flatButton(parent, label, w, h)
 	local b = CreateFrame("Button", nil, parent, "BackdropTemplate")
 	b:SetSize(w, h)

@@ -1,4 +1,4 @@
--- CasterKit by DinX: rotation helper (visual only, never casts anything)
+-- Casters of Azeroth by DinX: rotation helper (visual only, never casts anything)
 local _, ns = ...
 local CK = ns.CK
 local S = CK.Style

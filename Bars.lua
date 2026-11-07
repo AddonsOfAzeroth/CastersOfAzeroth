@@ -1,4 +1,4 @@
--- CasterKit by DinX: all action bars stacked in one frame
+-- Casters of Azeroth by DinX: all action bars stacked in one frame
 local _, ns = ...
 local CK = ns.CK
 local L = CK.L
@@ -6,7 +6,7 @@ local S = CK.Style
 local LAB = LibStub("LibActionButton-1.0")
 
 local Bars = CK:NewModule("Bars")
-Bars.buttons = {}   -- every CasterKit action button
+Bars.buttons = {}   -- every Casters of Azeroth action button
 Bars.rows = {}      -- rows[r][i] = button
 
 -- Each row maps to a Blizzard bar: its action slots, key binding and frame.
@@ -98,7 +98,7 @@ function Bars:CreatePanel()
 	mover:SetBackdropBorderColor(0.41, 0.80, 0.94, 1)
 	local label = S:Font(mover, 12)
 	label:SetPoint("CENTER")
-	label:SetText(L["CasterKit bars: drag me\n/ck lock to lock"])
+	label:SetText(L["Casters of Azeroth bars: drag me\n/ck lock to lock"])
 	mover:SetScript("OnDragStart", function()
 		if InCombatLockdown() then return end
 		p:StartMoving()

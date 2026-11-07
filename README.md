@@ -1,4 +1,6 @@
-# CasterKit
+# Casters of Azeroth
+
+> Voorheen **CasterKit**. Vanaf 0.5.0 zitten de questlijst, slimme questroute, GPS, pijl en route op de wereldkaart in de aparte add-on **Roads of Azeroth**; je instellingen gaan vanzelf mee. `/coa` en `/ck` werken allebei. Werkt samen met **Scrum of Azeroth**.
 
 Caster-interface voor **WoW Forever** (client `_forever_`, interface 16001), gemaakt door **DinX**.
 Werkt op een kale installatie, zonder ElvUI of Bartender4.
@@ -17,11 +19,12 @@ Werkt op een kale installatie, zonder ElvUI of Bartender4.
 - **Mage**: tellers voor conjured water, food en mana gems (klik = bijmaken), één klik eten en drinken,
   herinnering voor armor en Arcane Intellect, tip voor beter water bij de innkeeper.
 - **Micromenu en tassen** samen in één paneel, met vrije tasplaatsen.
-- **Instellingen**: `/ck` of de minimapknop. Rechtsklik op de minimapknop = kaders verslepen.
+- **Lettertype**: standaard Roboto met een zachte schaduw (instelbaar).
+- **Instellingen**: `/coa` (of `/ck`) of de minimapknop. Rechtsklik op de minimapknop = kaders verslepen.
 
 ## Binnen de regels
 
-Alleen de officiële addon-API. CasterKit toont informatie en laat knoppen oplichten,
+Alleen de officiële addon-API. Casters of Azeroth toont informatie en laat knoppen oplichten,
 maar cast nooit zelf iets, verstuurt geen chatberichten en werkt niet met externe programma's.
 
 ## Structuur
@@ -35,6 +38,7 @@ maar cast nooit zelf iets, verstuurt geen chatberichten en werkt niet met extern
 | `Rotation.lua` | rotatiemotor, racials, glow op knoppen, hintblokje |
 | `Leveling.lua` | XP-balk, tooltip "kills tot level", herinneringen, verkoper |
 | `Classes/Mage.lua` | Frost/Fire/Arcane-prioriteiten, conjured food/water, buffs |
+| `Map.lua` | wereldkaart: coördinaten, vervagen tijdens lopen, vlak kader, coördinaten op de minimap |
 | `Config.lua` | instellingenvenster, minimapknop |
 
 Een nieuwe class toevoegen: maak `Classes/<Class>.lua` met `CK:RegisterClass("TOKEN", { defaultSpec, specs, specOrder })`

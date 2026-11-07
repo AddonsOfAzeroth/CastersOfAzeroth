@@ -1,4 +1,4 @@
--- CasterKit by DinX: castbar
+-- Casters of Azeroth by DinX: castbar
 -- Display only: shows your own and your target's casts, automates nothing.
 local _, ns = ...
 local CK = ns.CK

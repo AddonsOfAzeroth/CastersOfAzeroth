@@ -1,4 +1,4 @@
--- CasterKit by DinX: mage module (Forever leveling guide priorities)
+-- Casters of Azeroth by DinX: mage module (Forever leveling guide priorities)
 local _, ns = ...
 local CK = ns.CK
 local L = CK.L

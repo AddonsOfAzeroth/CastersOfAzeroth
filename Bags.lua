@@ -1,4 +1,4 @@
--- CasterKit by DinX: one compact bag window with categories, junk selling and bag assignment
+-- Casters of Azeroth by DinX: one compact bag window with categories, junk selling and bag assignment
 local _, ns = ...
 local CK = ns.CK
 local L = CK.L
