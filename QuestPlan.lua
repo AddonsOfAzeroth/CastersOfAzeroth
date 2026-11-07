@@ -18,7 +18,7 @@ local DROP_RATE = 0.5
 local TURNIN_TIME = 10       -- s
 local CLUSTER_YD = 150
 local FAR_YD = 2000
-local ROUTE_MAX = 10
+local ROUTE_MAX = 25
 local THROTTLE = 2           -- s between recomputes
 local MOVE_YD = 50           -- recompute while moving after this many yards
 local TRAVEL_UNKNOWN = 120   -- s when the player position is unknown
@@ -749,7 +749,7 @@ function QP:Get(mode)
 	return out
 end
 
--- The "smart" route as clustered stops (at most 10).
+-- The "smart" route as clustered stops (at most ROUTE_MAX).
 function QP:GetRoute()
 	ensure()
 	local out = {}
