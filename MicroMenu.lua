@@ -8,7 +8,7 @@ local M = CK:NewModule("Micro")
 -- Order as shown; buttons this client does not have are skipped.
 local MICRO = {
 	"CharacterMicroButton", "SpellbookMicroButton", "ProfessionMicroButton", "TalentMicroButton",
-	"PlayerSpellsMicroButton", "AchievementMicroButton", "QuestLogMicroButton", "GuildMicroButton",
+	"PlayerSpellsMicroButton", "AchievementMicroButton", "LegacyMicroButton", "QuestLogMicroButton", "GuildMicroButton",
 	"SocialsMicroButton", "LFDMicroButton", "LFGMicroButton", "PVPMicroButton", "WorldMapMicroButton",
 	"CollectionsMicroButton", "EJMicroButton", "StoreMicroButton", "MainMenuMicroButton", "HelpMicroButton",
 }
@@ -90,6 +90,17 @@ function M:DoLayout()
 	end
 
 	local first = true
+	-- micro buttons this list does not know yet (new in a patch) go at the end
+	local container = _G.MicroMenu or _G.MicroMenuContainer
+	if container then
+		for _, child in ipairs({ container:GetChildren() }) do
+			local name = child:GetName()
+			if name and name:find("MicroButton$") and not tContains(MICRO, name) then
+				MICRO[#MICRO + 1] = name
+			end
+		end
+	end
+
 	for _, name in ipairs(MICRO) do
 		local b = _G[name]
 		if b and b:IsShown() then
