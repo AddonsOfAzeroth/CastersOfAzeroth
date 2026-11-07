@@ -562,6 +562,10 @@ add({
 	["Needs the Enchanting profession (Disenchant)."] = "Vereist het beroep Enchanting (Disenchant).",
 })
 
+add({
+	["Your corpse"] = "Je lijk",
+})
+
 -- Key bindings (Bindings.xml); names are read before saved settings load, so English
 BINDING_HEADER_CASTERKIT = "CasterKit"
 BINDING_NAME_CASTERKIT_AOE = "Toggle AoE mode"

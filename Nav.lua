@@ -44,12 +44,14 @@ local KIND = {
 	turnin = { icon = "Interface\\GossipFrame\\ActiveQuestIcon", label = "Turn-in" },
 	custom = { icon = "Interface\\Icons\\INV_Misc_Map_01", label = "Waypoint", crop = true },
 	flight = { icon = "Interface\\GossipFrame\\TaxiGossipIcon", label = "Flight" },
+	corpse = { icon = "Interface\\Icons\\Spell_Holy_Resurrection", label = "Your corpse", crop = true },
 }
 
 local function kindColor(kind)
 	if kind == "turnin" then return S.colors.hint end
 	if kind == "custom" then return GREEN end
 	if kind == "flight" then return S.colors.proc end
+	if kind == "corpse" then return { 1, 1, 1 } end
 	return S.colors.accent
 end
 
@@ -449,6 +451,25 @@ local function pushHistory(h)
 	while #history > HISTORY_MAX do table.remove(history, 1) end
 end
 
+-- Ghost: your corpse comes first (on your zone map, or the continent map)
+local function corpseStop()
+	local ghost = UnitIsGhost and flag(try(UnitIsGhost, "player"))
+	if not ghost or not (C_DeathInfo and C_DeathInfo.GetCorpseMapPosition) then return end
+	local m = playerMap()
+	for _, map in ipairs({ m or 0, m and continentOf(m) or 0 }) do
+		if map > 0 then
+			local pos = try(C_DeathInfo.GetCorpseMapPosition, map)
+			if pos and pos.GetXY then
+				local x, y = pos:GetXY()
+				x, y = num(x), num(y)
+				if x and y and (x > 0 or y > 0) then
+					return { mapID = map, x = x, y = y, title = L["Your corpse"], kind = "corpse", src = "corpse" }
+				end
+			end
+		end
+	end
+end
+
 local function questStops()
 	local qp = CK.QuestPlan
 	if not (qp and qp.GetRoute) then return {} end
@@ -474,6 +495,8 @@ local function buildBase()
 	local function mark(e)
 		if e.questID then used[e.kind .. ":" .. e.questID] = true end
 	end
+	local corpse = corpseStop()
+	if corpse then list[#list + 1] = corpse end
 	if override and validWP(override) then
 		local e = copyWP(override)
 		e.src = "override"
@@ -549,7 +572,8 @@ local function rebuild()
 			e.cont, e.wn, e.ww = worldPos(e.mapID, e.x, e.y)
 			if prev and prev.cont and e.cont and prev.cont == e.cont then
 				local f
-				if nodes and i <= FLIGHT_LEGS and not noFlight[e.key] then
+				-- ghosts can't take flights
+				if nodes and i <= FLIGHT_LEGS and not noFlight[e.key] and base[1].kind ~= "corpse" then
 					f = bestFlight(prev, e, speed, e.key, nodes)
 				end
 				if f then
@@ -1697,6 +1721,10 @@ function NV:OnEnable()
 		end
 	end)
 	on("PLAYER_ENTERING_WORLD", function() wipe(taxiCache); NV:Request() end)
+	-- corpse run: the corpse becomes the first stop while you are a ghost
+	for _, ev in ipairs({ "PLAYER_DEAD", "PLAYER_ALIVE", "PLAYER_UNGHOST" }) do
+		on(ev, function() NV:RebuildNow() end)
+	end
 	on("ZONE_CHANGED_NEW_AREA", function() NV:Request() end)
 	on("PLAYER_CONTROL_LOST", function() NV:Request() end)   -- taking a flight
 	on("PLAYER_CONTROL_GAINED", function() NV:Request() end) -- landed
