@@ -535,6 +535,15 @@ add({
 	["Starts a quest"] = "Start een quest",
 })
 
+add({
+	["Route recalculated from where you are now."] = "Route herberekend vanaf waar je nu staat.",
+	["Recalculate route"] = "Route herberekenen",
+	["The route stays as it is until you click here. Finished stops drop off, new quests go last."] = "De route blijft zoals ze is tot je hier klikt. Afgewerkte stops vallen weg, nieuwe quests komen achteraan.",
+	["The route follows you as you move (turn on 'Keep the route' under Quests to lock it)."] = "De route past zich aan terwijl je beweegt (zet 'Route behouden' aan onder Quests om ze vast te zetten).",
+	["Keep the route until I recalculate"] = "Route behouden tot ik herbereken",
+	["The smart route keeps its order while you walk. Click the refresh button in the quest list header to plan it again from where you are."] = "De slimme route behoudt haar volgorde terwijl je loopt. Klik op de herlaadknop in de kop van de questlijst om ze opnieuw te plannen vanaf waar je staat.",
+})
+
 -- Key bindings (Bindings.xml); names are read before saved settings load, so English
 BINDING_HEADER_CASTERKIT = "CasterKit"
 BINDING_NAME_CASTERKIT_AOE = "Toggle AoE mode"

@@ -146,6 +146,8 @@ local charDefaults = {
 		collapsed = {},
 		allCollapsed = false,
 		sortMode = "smart", -- smart, distance, xp, xpmin, level, progress, zone
+		lockRoute = true, -- keep the smart route until "Recalculate route" is clicked
+		frozenRoute = nil, -- saved stop order (quest keys) while the route is locked
 		showEstimates = true,
 		arrow = true, -- CasterKit arrow (Arrow.lua) to the next stop
 	},
@@ -580,6 +582,7 @@ local PERSONAL = {
 	bags = { junkList = true },
 	loot = { autoLoot = true },
 	nav = { queue = true, taxiKnown = true },
+	quests = { frozenRoute = true, collapsed = true },
 }
 
 local function profileCopy(src)

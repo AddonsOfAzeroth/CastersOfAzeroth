@@ -628,6 +628,44 @@ function Q:CreatePanel()
 	end)
 	self.modeButton = m
 
+	-- Recalculate the route (it stays as it is until you click this)
+	local rc = CreateFrame("Button", nil, h)
+	rc:SetSize(14, 14)
+	rc:SetPoint("RIGHT", h.mark, "LEFT", -6, 0)
+	rc.icon = rc:CreateTexture(nil, "ARTWORK")
+	rc.icon:SetAllPoints()
+	rc.icon:SetTexture("Interface\\Buttons\\UI-RefreshButton")
+	rc.icon:SetVertexColor(unpack(S.colors.muted))
+	rc:RegisterForClicks("LeftButtonUp")
+	rc:SetScript("OnClick", function()
+		guard(function()
+			local P = CK.QuestPlan
+			if P and P.Recalculate then
+				P:Recalculate()
+				CK:Print(L["Route recalculated from where you are now."])
+			end
+		end)
+	end)
+	rc:SetScript("OnEnter", function(btn)
+		guard(function()
+			btn.icon:SetVertexColor(unpack(S.colors.accent))
+			GameTooltip:SetOwner(btn, "ANCHOR_LEFT")
+			GameTooltip:SetText(L["Recalculate route"], 1, 0.82, 0)
+			local P = CK.QuestPlan
+			if P and P.IsLocked and P:IsLocked() then
+				GameTooltip:AddLine(L["The route stays as it is until you click here. Finished stops drop off, new quests go last."], 1, 1, 1, true)
+			else
+				GameTooltip:AddLine(L["The route follows you as you move (turn on 'Keep the route' under Quests to lock it)."], 1, 1, 1, true)
+			end
+			GameTooltip:Show()
+		end)
+	end)
+	rc:SetScript("OnLeave", function(btn)
+		btn.icon:SetVertexColor(unpack(S.colors.muted))
+		if GameTooltip:IsOwned(btn) then GameTooltip:Hide() end
+	end)
+	self.recalcButton = rc
+
 	-- Accent bar left of the next stop
 	local bar = p:CreateTexture(nil, "ARTWORK")
 	local a = S.colors.accent

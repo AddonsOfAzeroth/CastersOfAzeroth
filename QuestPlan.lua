@@ -527,6 +527,41 @@ local function holds(n, h)
 	end
 end
 
+-- Locked route: the stop order is saved as quest keys ("id:t" turn-in, "id:o"
+-- objectives) and reused on every recompute until the player recalculates.
+local function qkey(q) return q.questID .. (q.turnIn and ":t" or ":o") end
+
+local function routeLocked()
+	local c = CK.char and CK.char.quests
+	return c and c.lockRoute ~= false
+end
+
+local function freeze(order)
+	local keys = {}
+	for _, n in ipairs(order) do
+		for _, q in ipairs(n.quests) do keys[#keys + 1] = qkey(q) end
+	end
+	CK.char.quests.frozenRoute = keys
+end
+
+-- Nodes in the saved order; stops that are new since then go last, in planned order.
+local function applyFrozen(order, keys)
+	local pos = {}
+	for i, k in ipairs(keys) do pos[k] = pos[k] or i end
+	local big = #keys + 1
+	local rank = {}
+	for i, n in ipairs(order) do
+		local best
+		for _, q in ipairs(n.quests) do
+			local p = pos[qkey(q)]
+			if p and (not best or p < best) then best = p end
+		end
+		rank[n] = best or (big + i)
+	end
+	table.sort(order, function(a, b) return rank[a] < rank[b] end)
+	return order
+end
+
 local function planRoute(quests, start, speed)
 	local nodes, noStop = buildNodes(quests)
 	-- greedy: best value per second (travel + work) from the current spot
@@ -687,6 +722,15 @@ function QP:Recompute()
 
 	-- "smart": routed nodes, then quests without a stop, then skipped ones
 	local order, noStop = planRoute(quests, start, speed)
+	if routeLocked() then
+		local keys = CK.char.quests.frozenRoute
+		if type(keys) == "table" and #keys > 0 and not self.recalculating then
+			applyFrozen(order, keys)
+		else
+			freeze(order)
+		end
+	end
+	self.recalculating = nil
 	wipe(smartOrder)
 	wipe(route)
 	local function addNode(n, toRoute)
@@ -738,6 +782,15 @@ function QP:Request()
 		guard(QP.Recompute, QP)
 	end)
 end
+
+-- Plan a fresh route from where you stand now and keep it (button in the tracker).
+function QP:Recalculate()
+	heading = nil
+	self.recalculating = true
+	guard(QP.Recompute, QP)
+end
+
+function QP:IsLocked() return routeLocked() end
 
 local function ensure()
 	if not computed and CK.char then guard(QP.Recompute, QP) end
