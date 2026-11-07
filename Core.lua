@@ -13,6 +13,19 @@ CK.classes = {}
 -- Defaults
 ---------------------------------------------------------------------------
 local charDefaults = {
+	skins = {
+		enabled = true,
+		character = true,
+		spellbook = true,
+		quest = true,
+		merchant = true,
+		mail = true,
+		trainer = true,
+		friends = true,
+		menus = true,
+		popups = true,
+		other = true,
+	},
 	bags = {
 		enabled = true,
 		view = "category", -- "category" or "bag"

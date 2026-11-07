@@ -441,6 +441,28 @@ add({
 	["Highlights what you can disenchant. Click an item to disenchant it, one per click."] = "Licht op wat je kunt disenchanten. Klik op een item om het te disenchanten, één per klik.",
 })
 
+add({
+	["Skin changes apply after a reload (/reload)."] = "Wijzigingen aan de skins gelden na herladen (/reload).",
+	["Skins"] = "Skins",
+	["Windows"] = "Vensters",
+	["Gives Blizzard's windows the CasterKit look: flat dark panels, thin borders and the accent colour instead of the gold and stone frame art. Only the look changes."] = "Geeft de vensters van Blizzard de CasterKit-stijl: vlakke donkere panelen, dunne randen en de accentkleur in plaats van de gouden en stenen kaders. Alleen het uiterlijk verandert.",
+	["Skin Blizzard windows"] = "Blizzard-vensters stylen",
+	["Turning a skin off needs a reload (/reload)."] = "Een skin uitzetten vraagt een herlaadbeurt (/reload).",
+	["Character, reputation and currency"] = "Personage, reputatie en munten",
+	["Spellbook and talents"] = "Spreukenboek en talenten",
+	["Quest and gossip windows"] = "Quest- en gespreksvensters",
+	["The parchment behind quest text stays, so the text remains readable."] = "Het perkament achter questtekst blijft, zodat de tekst leesbaar blijft.",
+	["Vendor"] = "Handelaar",
+	["Mailbox"] = "Brievenbus",
+	["Class trainer"] = "Klassetrainer",
+	["Friends, who and raid"] = "Vrienden, wie en raid",
+	["Game menu, addon list and settings"] = "Spelmenu, addonlijst en instellingen",
+	["Pop-up dialogs"] = "Pop-upvensters",
+	["Other windows (bank, trade, dressing room, group finder…)"] = "Andere vensters (bank, handel, paskamer, groepzoeker…)",
+	["ElvUI skins Blizzard's windows itself: CasterKit leaves those windows to ElvUI. Turn off ElvUI's Blizzard skins to use these."] = "ElvUI stylet de Blizzard-vensters zelf: CasterKit laat die vensters aan ElvUI. Zet de Blizzard-skins van ElvUI uit om deze te gebruiken.",
+	["Changes apply after a reload (/reload)."] = "Wijzigingen gelden na herladen (/reload).",
+})
+
 -- Key bindings (Bindings.xml); names are read before saved settings load, so English
 BINDING_HEADER_CASTERKIT = "CasterKit"
 BINDING_NAME_CASTERKIT_AOE = "Toggle AoE mode"

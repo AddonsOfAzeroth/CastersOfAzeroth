@@ -276,6 +276,7 @@ function C:CreateWindow()
 	self:BuildLeveling(newPage("leveling", L["Leveling"]))
 	self:BuildQuests(newPage("quests", L["Quests"]))
 	self:BuildMap(newPage("map", L["Map"]))
+	self:BuildSkins(newPage("skins", L["Skins"]))
 	self:BuildChat(newPage("chat", L["Chat"]))
 	self:BuildLoot(newPage("loot", L["Loot"]))
 	self:BuildProfiles(newPage("profiles", L["Profiles"]))
@@ -471,6 +472,28 @@ function C:BuildLoot(p)
 	p:Header(L["Group loot"])
 	p:Check(L["Compact roll frames"], L["Need, Greed, Transmog and Pass with a timer bar. You always choose yourself; Blizzard still asks to confirm Bind on Pickup."], setting("loot", "rollFrames"))
 	p:Note(L["Unlock the frames (/ck unlock) to move the loot window, feed and roll frames."])
+end
+
+function C:BuildSkins(p)
+	p:Header(L["Skins"])
+	p:Note(L["Gives Blizzard's windows the CasterKit look: flat dark panels, thin borders and the accent colour instead of the gold and stone frame art. Only the look changes."])
+	if CK.Skins and CK.Skins.ElvUIActive and CK.Skins:ElvUIActive() then
+		p:Note(L["ElvUI skins Blizzard's windows itself: CasterKit leaves those windows to ElvUI. Turn off ElvUI's Blizzard skins to use these."])
+	end
+	p:Check(L["Skin Blizzard windows"], L["Turning a skin off needs a reload (/reload)."], setting("skins", "enabled"))
+
+	p:Header(L["Windows"])
+	p:Check(L["Character, reputation and currency"], nil, setting("skins", "character"))
+	p:Check(L["Spellbook and talents"], nil, setting("skins", "spellbook"))
+	p:Check(L["Quest and gossip windows"], L["The parchment behind quest text stays, so the text remains readable."], setting("skins", "quest"))
+	p:Check(L["Vendor"], nil, setting("skins", "merchant"))
+	p:Check(L["Mailbox"], nil, setting("skins", "mail"))
+	p:Check(L["Class trainer"], nil, setting("skins", "trainer"))
+	p:Check(L["Friends, who and raid"], nil, setting("skins", "friends"))
+	p:Check(L["Game menu, addon list and settings"], nil, setting("skins", "menus"))
+	p:Check(L["Pop-up dialogs"], nil, setting("skins", "popups"))
+	p:Check(L["Other windows (bank, trade, dressing room, group finder…)"], nil, setting("skins", "other"))
+	p:Note(L["Changes apply after a reload (/reload)."])
 end
 
 function C:BuildChat(p)
