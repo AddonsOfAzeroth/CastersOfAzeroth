@@ -531,6 +531,10 @@ add({
 	["The current stop and the next three, with lines. Stops outside the minimap show as an arrow on the edge."] = "De huidige stop en de volgende drie, met lijnen. Stops buiten de minimap verschijnen als pijltje aan de rand.",
 })
 
+add({
+	["Starts a quest"] = "Start een quest",
+})
+
 -- Key bindings (Bindings.xml); names are read before saved settings load, so English
 BINDING_HEADER_CASTERKIT = "CasterKit"
 BINDING_NAME_CASTERKIT_AOE = "Toggle AoE mode"

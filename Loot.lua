@@ -231,9 +231,19 @@ function M:Row(i)
 	local quest = icon:CreateTexture(nil, "OVERLAY")
 	quest:SetAllPoints()
 	r.quest = quest
+	-- quest items: gold tint behind the row and a tag on the right
+	local qbg = r:CreateTexture(nil, "BACKGROUND")
+	qbg:SetAllPoints()
+	qbg:SetColorTexture(1, 0.82, 0, 0.14)
+	qbg:Hide()
+	r.questBg = qbg
+	local tag = S:Font(r, 10)
+	tag:SetPoint("RIGHT", r, "RIGHT", -3, 0)
+	tag:SetTextColor(1, 0.82, 0)
+	r.tag = tag
 	local name = S:Font(r, 12)
 	name:SetPoint("LEFT", icon, "RIGHT", 6, 0)
-	name:SetPoint("RIGHT", r, "RIGHT", -2, 0)
+	name:SetPoint("RIGHT", tag, "LEFT", -4, 0)
 	name:SetJustifyH("LEFT")
 	name:SetWordWrap(false)
 	r.name = name
@@ -264,6 +274,16 @@ local function readSlot(slot)
 	slotData.questID = num(questID)
 	slotData.isActive = flag(isActive)
 	slotData.kind = num(GetLootSlotType and try(GetLootSlotType, slot), 1)
+	-- quest class items count too, even when the loot API does not flag them
+	if not slotData.isQuest and GetLootSlotLink then
+		local link = try(GetLootSlotLink, slot)
+		if type(link) == "string" and not IsSecret(link) then
+			local getInstant = C_Item and C_Item.GetItemInfoInstant or GetItemInfoInstant
+			local classID = getInstant and select(7, pcall(getInstant, link)) -- ok, id, type, subType, equipLoc, icon, classID
+			local questClass = (Enum and Enum.ItemClass and Enum.ItemClass.Questitem) or 12
+			if num(classID) == questClass then slotData.isQuest = true end
+		end
+	end
 	return slotData
 end
 
@@ -285,24 +305,31 @@ function M:FillRow(r, d)
 		r.name:SetTextColor(qualityColor(d.quality))
 	end
 	r.count:SetText(d.qty > 1 and d.qty or "")
-	if d.questID and not d.isActive then
+	local starts = d.questID and not d.isActive
+	local isQuest = starts or d.isQuest or d.questID
+	if starts then
 		r.quest:SetTexture(QUEST_BANG) -- starts a quest
 		r.quest:Show()
-	elseif d.isQuest or d.questID then
+	elseif isQuest then
 		r.quest:SetTexture(QUEST_BORDER)
 		r.quest:Show()
 	else
 		r.quest:Hide()
 	end
+	r.questBg:SetShown(isQuest and true or false)
+	r.tag:SetText(starts and L["Starts a quest"] or (isQuest and L["Quest"] or ""))
+	if isQuest and not d.locked and not IsSecret(d.name) then r.name:SetTextColor(1, 0.82, 0) end
 	-- 1px border in the quality colour for green and better
 	if d.quality and d.quality >= 2 and not d.locked then
 		r.iconFrame:SetBackdropBorderColor(qualityColor(d.quality))
 	else
 		r.iconFrame:SetBackdropBorderColor(0, 0, 0, 1)
 	end
+	if isQuest and not d.locked then r.iconFrame:SetBackdropBorderColor(1, 0.82, 0, 1) end
 end
 
 local SAMPLES = {
+	{ tex = 134939, name = "Mirror Lake Water Sample", qty = 1, quality = 1, isQuest = true },
 	{ tex = 133784, name = "12 Silver", qty = 1, quality = 1 },
 	{ tex = 134939, name = "Linen Cloth", qty = 3, quality = 1 },
 	{ tex = 135145, name = "Sample Staff", qty = 1, quality = 3 },
