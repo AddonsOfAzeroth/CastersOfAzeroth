@@ -165,7 +165,10 @@ local function runSpeed()
 	return clamp(num(learn().runSpeed, RUN_SPEED), 3, RUN_SPEED_MAX)
 end
 
+local providerRate -- defined below (optional add-on rates)
 local function killTime()
+	local v = providerRate and providerRate("GetKillTime")
+	if v then return clamp(v, 8, 120) end
 	return clamp(num(learn().killTime, KILL_TIME), 8, 120)
 end
 
@@ -178,6 +181,8 @@ local function dropKey(text)
 end
 
 local function dropRate(text)
+	local v = providerRate and providerRate("GetDropRate", text)
+	if v then return clamp(v, 0.05, 1) end
 	local k = dropKey(text)
 	local d = k and learn().drop[k]
 	return clamp(type(d) == "table" and num(d.r, DROP_RATE) or DROP_RATE, 0.05, 1)
@@ -567,6 +572,33 @@ end
 --   turnin    hand in everything that is ready first, then quest on
 --   quest     work on objectives first, hand in at the end
 --   nearest   always the closest stop
+-- Optional add-on priority (CK.EpicProvider.GetPriority: 1 highest .. 5 lowest)
+-- nudges a quest's routing value a little; nothing changes without the add-on.
+local PRIORITY_WEIGHT = { 1.15, 1.07, 1, 0.95, 0.9 }
+local function providerOnHold(questID)
+	local p = CK.EpicProvider
+	local fn = type(p) == "table" and p.IsOnHold
+	if type(fn) ~= "function" then return false end
+	local ok, v = pcall(fn, p, questID)
+	return ok and v == true
+end
+-- learned rates from the add-on (nil until it has enough samples)
+function providerRate(name, ...)
+	local p = CK.EpicProvider
+	local fn = type(p) == "table" and p[name]
+	if type(fn) ~= "function" then return end
+	local ok, v = pcall(fn, p, ...)
+	return ok and num(v) or nil
+end
+local function priorityWeight(questID)
+	local p = CK.EpicProvider
+	local fn = type(p) == "table" and p.GetPriority
+	if type(fn) ~= "function" then return end
+	local ok, pr = pcall(fn, p, questID)
+	pr = ok and num(pr) or nil
+	return pr and PRIORITY_WEIGHT[pr]
+end
+
 local STRATEGIES = { "balanced", "turnin", "quest", "nearest" }
 QP.STRATEGIES = STRATEGIES
 
@@ -756,12 +788,16 @@ function QP:Recompute()
 					end
 				end
 				if not q.skip and farAway then q.skip = "far" end
+				-- an add-on can put a quest on hold: it leaves the route like a skipped one
+				if providerOnHold(id) then q.skip = "hold" end
 
 				-- routing value: objectives add a 20% bonus as they make the quest ready
 				local v = (q.xp or 0)
 				if not q.turnIn then v = v * 1.2 end
 				if level >= pl + 3 then v = v * 0.6 end
 				q.value = math.max(1, v)
+				local pw = priorityWeight(id)
+				if pw then q.value = q.value * pw end
 				quests[#quests + 1] = q
 			end
 		end
@@ -834,6 +870,28 @@ end
 function QP:Recalculate()
 	heading = nil
 	self.recalculating = true
+	guard(QP.Recompute, QP)
+	CK:Fire("QUESTPLAN_RECALC") -- e.g. an add-on starting a new sprint
+end
+
+-- Saved stop order of the locked route (quest keys "id:t" / "id:o"), as a copy; nil when none.
+function QP:GetFrozenRoute()
+	local keys = CK.char and CK.char.quests and CK.char.quests.frozenRoute
+	if type(keys) ~= "table" then return nil end
+	local out = {}
+	for i, k in ipairs(keys) do out[i] = k end
+	return out
+end
+
+-- Replace the saved stop order (sprint planning in an add-on) and plan again.
+-- An empty list makes the next recompute freeze the whole route again.
+function QP:SetFrozenRoute(keys)
+	if not (CK.char and CK.char.quests and type(keys) == "table") then return end
+	local out = {}
+	for _, k in ipairs(keys) do
+		if type(k) == "string" then out[#out + 1] = k end
+	end
+	CK.char.quests.frozenRoute = out
 	guard(QP.Recompute, QP)
 end
 

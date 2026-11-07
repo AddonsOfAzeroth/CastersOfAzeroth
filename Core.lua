@@ -666,6 +666,9 @@ SlashCmdList.CASTERKIT = function(msg)
 		if CK.Rotation and CK.Rotation.Diagnose then CK.Rotation:Diagnose() end
 	elseif msg == "aoe" then
 		CK:ToggleAoE()
+	elseif msg == "board" and type(_G.ScrumOfAzeroth) == "table" and _G.ScrumOfAzeroth.ToggleBoard then
+		-- forwarder to the optional Scrum of Azeroth add-on
+		pcall(_G.ScrumOfAzeroth.ToggleBoard, _G.ScrumOfAzeroth)
 	elseif msg == "reset" then
 		CK:OutOfCombat("reset", function()
 			CK:ResetGroup("bars")

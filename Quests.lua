@@ -83,6 +83,25 @@ local function setFont(fs, size)
 end
 
 ---------------------------------------------------------------------------
+-- Optional epic provider (CK.EpicProvider, set by an add-on such as Scrum of
+-- Azeroth). Without it every call returns nil and the tracker works as always.
+---------------------------------------------------------------------------
+local function provider()
+	local p = CK.EpicProvider
+	if type(p) == "table" then return p end
+end
+
+local function ask(name, ...)
+	local p = provider()
+	local fn = p and p[name]
+	if type(fn) ~= "function" then return end
+	local ok, a, b = pcall(fn, p, ...)
+	if ok then return a, b end
+end
+
+local CHECK = "|TInterface\\RaidFrame\\ReadyCheck-Ready:0|t "
+
+---------------------------------------------------------------------------
 -- Quest log reading (C_QuestLog first, classic functions as fallback)
 ---------------------------------------------------------------------------
 local function logCounts()
@@ -320,7 +339,62 @@ function Q:Collect()
 	self.usingPlan = applyPlan(cfg.sortMode or "smart")
 	table.sort(list, self.usingPlan and planSorter or sorter)
 	if total < #list then total = #list end
+	self:BuildGroups()
 	return total, #list
+end
+
+-- Epic groups from the optional provider, for the quests that will be shown.
+-- A group takes the place of its first quest, so with the route sort epics
+-- follow their earliest stop. self.groups stays nil without provider or epics.
+function Q:BuildGroups()
+	self.groups = nil
+	if not ask("GroupingEnabled") then return end
+	local maxQ = num(CK.char.quests.maxQuests, 12)
+	local byKey, out, loose, anyEpic = {}, {}, nil, false
+	for qi = 1, math.min(#list, maxQ) do
+		local q = list[qi]
+		local e = ask("GetEpic", q.id)
+		local key = type(e) == "table" and str(e.key) or nil
+		local g
+		if key then
+			g = byKey[key]
+			if not g then
+				g = { key = key, epic = e, quests = {} }
+				byKey[key] = g
+				out[#out + 1] = g
+			end
+			anyEpic = true
+		else
+			if not loose then
+				loose = { key = "loose", loose = true, quests = {} }
+				out[#out + 1] = loose
+			end
+			g = loose
+		end
+		g.quests[#g.quests + 1] = q
+	end
+	if not anyEpic then return end -- no questline data: plain list as always
+	if loose then
+		local info = ask("LooseGroup")
+		loose.epic = type(info) == "table" and info or { name = "Loose tasks" }
+		loose.key = type(info) == "table" and str(info.key) or "loose"
+		if type(info) == "table" and info.header == false then
+			-- no header: the loose quests follow the epics
+			loose.noHeader = true
+			for i, g in ipairs(out) do
+				if g == loose then table.remove(out, i) break end
+			end
+			out[#out + 1] = loose
+		end
+	end
+	self.groups = out
+end
+
+-- Folded state of an epic group; loose tasks start folded.
+local function groupFolded(g)
+	local c = CK.char.quests.collapsed
+	if g.loose then return c[g.key] ~= false end
+	return c[g.key] and true or false
 end
 
 ---------------------------------------------------------------------------
@@ -480,21 +554,96 @@ local function onTitleClick(self, button)
 			local c = CK.char.quests.collapsed
 			c[id] = not c[id] or nil
 			Q:Redraw()
-		elseif Q.selected == id then
-			-- click the selected quest again: back to the route
-			Q.selected, Q.manualArrow, Q.arrowKey = nil, false, nil
-			local N = nav()
-			if N then
-				pcall(N.ClearOverride, N)
-			elseif CK.Arrow and CK.Arrow.Clear then
-				pcall(CK.Arrow.Clear, CK.Arrow)
+		else
+			Q:ClickQuest(id, self.questTitle)
+		end
+	end)
+end
+
+-- Same as a left-click on a quest title: select it (arrow/GPS), or back to the
+-- route when it is already selected. Also used by add-ons (quest board).
+function Q:ClickQuest(id, title)
+	if not id then return end
+	if Q.selected == id then
+		Q.selected, Q.manualArrow, Q.arrowKey = nil, false, nil
+		local N = nav()
+		if N then
+			pcall(N.ClearOverride, N)
+		elseif CK.Arrow and CK.Arrow.Clear then
+			pcall(CK.Arrow.Clear, CK.Arrow)
+		end
+	else
+		setWaypoint(id, title)
+	end
+	Q:Redraw()
+end
+
+function Q:OpenQuest(id, index) openQuest(id, index) end
+function Q:AddToRoute(id, title) addToRoute(id, title) end
+
+-- Epic header rows (only with an epic provider): click selects the epic's next
+-- quest, right-click folds, hover lists the steps (tooltip from the provider).
+local epicRows = {}
+
+local function onEpicClick(self, button)
+	guard(function()
+		local g = self.group
+		if not g then return end
+		if button == "RightButton" then
+			local c = CK.char.quests.collapsed
+			if g.loose then
+				if c[g.key] ~= false then c[g.key] = false else c[g.key] = true end
+			else
+				c[g.key] = not c[g.key] or nil
 			end
 			Q:Redraw()
 		else
-			setWaypoint(id, self.questTitle)
-			Q:Redraw()
+			local q = g.quests[1]
+			if q then Q:ClickQuest(q.id, q.title) end
 		end
 	end)
+end
+
+local function onEpicEnter(self)
+	guard(function()
+		if not (GameTooltip and self.group) then return end
+		GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+		if not ask("EpicTooltip", GameTooltip, self.group.key, self.group.epic) then
+			GameTooltip:SetText(str(self.group.epic and self.group.epic.name) or "?", 1, 0.82, 0)
+		end
+		GameTooltip:Show()
+	end)
+end
+
+function Q:EpicRow(i)
+	local r = epicRows[i]
+	if r then return r end
+	r = CreateFrame("Button", nil, self.content)
+	r:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+	r:SetScript("OnClick", onEpicClick)
+	r:SetScript("OnEnter", onEpicEnter)
+	r:SetScript("OnLeave", function(btn)
+		if GameTooltip and GameTooltip:IsOwned(btn) then GameTooltip:Hide() end
+	end)
+	local hl = r:CreateTexture(nil, "HIGHLIGHT")
+	hl:SetAllPoints()
+	hl:SetColorTexture(1, 1, 1, 0.06)
+	r.chev = r:CreateTexture(nil, "ARTWORK")
+	r.chev:SetSize(10, 10)
+	r.chev:SetPoint("LEFT", 0, 0)
+	r.count = S:Font(r, 10)
+	r.count:SetPoint("RIGHT", 0, 0)
+	r.count:SetTextColor(unpack(S.colors.muted))
+	r.bar = S:StatusBar(r)
+	r.bar:SetHeight(BAR)
+	r.bar:SetPoint("RIGHT", r.count, "LEFT", -4, 0)
+	r.text = S:Font(r, 12)
+	r.text:SetPoint("LEFT", r.chev, "RIGHT", 3, 0)
+	r.text:SetPoint("RIGHT", r.bar, "LEFT", -4, 0)
+	r.text:SetJustifyH("LEFT")
+	r.text:SetWordWrap(false)
+	epicRows[i] = r
+	return r
 end
 
 -- Tooltip on a skip suggestion
@@ -714,6 +863,56 @@ function Q:CreatePanel()
 	end)
 	self.recalcButton = rc
 
+	-- Board icon (only when an epic provider offers a board): three small columns
+	local bb = CreateFrame("Button", nil, h)
+	bb:SetSize(14, 14)
+	bb:SetPoint("RIGHT", rc, "LEFT", -4, 0)
+	bb:RegisterForClicks("LeftButtonUp")
+	bb.cols = {}
+	for i, hgt in ipairs({ 12, 8, 10 }) do
+		local t = bb:CreateTexture(nil, "ARTWORK")
+		t:SetSize(3, hgt)
+		t:SetPoint("TOPLEFT", (i - 1) * 5 + 1, -1)
+		t:SetColorTexture(1, 1, 1, 1)
+		t:SetVertexColor(unpack(S.colors.muted))
+		bb.cols[i] = t
+	end
+	local function tintBoard(c) for _, t in ipairs(bb.cols) do t:SetVertexColor(c[1], c[2], c[3]) end end
+	bb:SetScript("OnClick", function() guard(function() ask("ToggleBoard") end) end)
+	bb:SetScript("OnEnter", function(btn)
+		guard(function()
+			tintBoard(S.colors.accent)
+			GameTooltip:SetOwner(btn, "ANCHOR_LEFT")
+			if not ask("BoardTooltip", GameTooltip) then GameTooltip:SetText("Board", 1, 0.82, 0) end
+			GameTooltip:Show()
+		end)
+	end)
+	bb:SetScript("OnLeave", function(btn)
+		tintBoard(S.colors.muted)
+		if GameTooltip:IsOwned(btn) then GameTooltip:Hide() end
+	end)
+	bb:Hide()
+	self.boardButton = bb
+
+	-- Sprint line under the header (only when the provider reports a sprint)
+	local sl = CreateFrame("Button", nil, p)
+	sl:RegisterForClicks("LeftButtonUp")
+	sl.text = S:Font(sl, 10)
+	sl.text:SetPoint("LEFT", 0, 0)
+	sl.text:SetJustifyH("LEFT")
+	sl.text:SetWordWrap(false)
+	sl.text:SetTextColor(unpack(S.colors.muted))
+	sl:SetScript("OnClick", function() guard(function() ask("ToggleBoard") end) end)
+	sl:SetScript("OnEnter", function(btn)
+		guard(function()
+			GameTooltip:SetOwner(btn, "ANCHOR_LEFT")
+			if ask("SprintTooltip", GameTooltip) then GameTooltip:Show() else GameTooltip:Hide() end
+		end)
+	end)
+	sl:SetScript("OnLeave", function(btn) if GameTooltip:IsOwned(btn) then GameTooltip:Hide() end end)
+	sl:Hide()
+	self.sprintLine = sl
+
 	-- Accent bar left of the next stop
 	local bar = p:CreateTexture(nil, "ARTWORK")
 	local a = S.colors.accent
@@ -839,12 +1038,13 @@ end
 -- One text line under a quest; returns the new y.
 local lineCount = 0
 local lineQuest -- quest the next lines belong to
+local extraIndent = 0 -- quests under an epic header sit one level deeper
 local function placeLine(self, y, inner, size, text, color, have, need, pct)
 	lineCount = lineCount + 1
 	local o = self:LineRow(lineCount)
 	o.questID, o.logIndex, o.questTitle = lineQuest and lineQuest.id, lineQuest and lineQuest.index, lineQuest and lineQuest.title
 	setFont(o.text, size)
-	local w = inner - INDENT
+	local w = inner - INDENT - extraIndent
 	o.text:SetWidth(w)
 	o.text:SetText(text)
 	o.text:SetTextColor(color[1], color[2], color[3])
@@ -868,7 +1068,7 @@ local function placeLine(self, y, inner, size, text, color, have, need, pct)
 		o.bar:Hide()
 	end
 	o:ClearAllPoints()
-	o:SetPoint("TOPLEFT", self.content, "TOPLEFT", PAD + INDENT, y - self.y0)
+	o:SetPoint("TOPLEFT", self.content, "TOPLEFT", PAD + INDENT + extraIndent, y - self.y0)
 	o:SetSize(w, h + barH)
 	o:Show()
 	return y - (h + barH + GAP)
@@ -905,86 +1105,171 @@ function Q:Render(total, tracked)
 	elseif stb then
 		stb:Hide()
 	end
+	local small = math.max(8, size - 2)
 	local y = -PAD - (size + 6)
+	-- optional add-on hooks: board icon in the header, sprint line under it
+	local bb = self.boardButton
+	if bb then
+		local pr = provider()
+		bb:SetShown(pr ~= nil and type(pr.ToggleBoard) == "function")
+	end
+	local sl = self.sprintLine
+	if sl then
+		local line = ask("SprintLine")
+		if type(line) == "string" and line ~= "" then
+			setFont(sl.text, small)
+			sl.text:SetText(line)
+			sl:ClearAllPoints()
+			sl:SetPoint("TOPLEFT", p, "TOPLEFT", PAD, y + 2)
+			sl:SetSize(inner, small + 2)
+			sl.text:SetWidth(inner)
+			sl:Show()
+			y = y - (small + 4)
+		else
+			sl:Hide()
+		end
+	end
 	self.y0 = y
 	local content = self.content
 
 	local smart = mode == "smart" and self.usingPlan
 	local accentHex = hex(S.colors.accent)
-	local small = math.max(8, size - 2)
 	self.nextBar:Hide()
 
-	local ti
-	ti, lineCount = 0, 0
-	if not cfg.allCollapsed then
-		local text = S.colors.text
-		for qi = 1, math.min(#list, maxQ) do
-			local q = list[qi]
-			local plan = q.plan
-			local top = y
-			ti = ti + 1
-			local t = self:TitleRow(ti)
-			setFont(t.text, size)
-			setFont(t.mark, size)
-			setFont(t.tag, small)
-			t.questID, t.logIndex, t.questTitle = q.id, q.index, q.title
-			lineQuest = q
-			local rank = smart and plan and num(plan.rank)
-			local s = titleString(q)
-			if rank then s = "|cff" .. accentHex .. rank .. ".|r " .. s end
-			if self.selected == q.id then s = "|cff" .. accentHex .. ">|r " .. s end
-			t.text:SetText(s)
-			t.text:SetTextColor(levelColor(q.level))
-			local skip = plan and Safe(plan.skip, nil)
-			t.skip = SKIP[skip] and skip or nil
-			if t.skip then
-				t.tag:SetText(L[SKIP[t.skip][1]])
-				local c = t.skip == "red" and ORANGE or S.colors.muted
-				t.tag:SetTextColor(c[1], c[2], c[3])
+	local ti, ei
+	ti, ei, lineCount = 0, 0, 0
+	local groups = self.groups
+	local text = S.colors.text
+
+	local function renderQuest(q)
+		local plan = q.plan
+		local top = y
+		ti = ti + 1
+		local t = self:TitleRow(ti)
+		setFont(t.text, size)
+		setFont(t.mark, size)
+		setFont(t.tag, small)
+		t.questID, t.logIndex, t.questTitle = q.id, q.index, q.title
+		lineQuest = q
+		local rank = smart and plan and num(plan.rank)
+		local s = titleString(q)
+		if rank then s = "|cff" .. accentHex .. rank .. ".|r " .. s end
+		if provider() then
+			local marker = ask("PriorityMarker", q.id)
+			if type(marker) == "string" then s = marker .. s end
+		end
+		if self.selected == q.id then s = "|cff" .. accentHex .. ">|r " .. s end
+		t.text:SetText(s)
+		t.text:SetTextColor(levelColor(q.level))
+		local skip = plan and Safe(plan.skip, nil)
+		t.skip = SKIP[skip] and skip or nil
+		if t.skip then
+			t.tag:SetText(L[SKIP[t.skip][1]])
+			local c = t.skip == "red" and ORANGE or S.colors.muted
+			t.tag:SetTextColor(c[1], c[2], c[3])
+		else
+			t.tag:SetText("")
+		end
+		local collapsed = cfg.collapsed[q.id]
+		t.mark:SetText(collapsed and "+" or "")
+		t:ClearAllPoints()
+		t:SetPoint("TOPLEFT", content, "TOPLEFT", PAD + extraIndent, y - self.y0)
+		t:SetSize(inner - extraIndent, size + 4)
+		t:Show()
+		y = y - (size + 4)
+
+		if not collapsed and plan and cfg.showEstimates then
+			local est = estimateString(plan)
+			if est then y = placeLine(self, y, inner, small, est, S.colors.muted) end
+		end
+
+		if not collapsed then
+			if q.failed then
+				y = placeLine(self, y, inner, size, L["Failed"], RED)
+			elseif q.complete then
+				y = placeLine(self, y, inner, size, L["Ready to turn in"], GREEN)
 			else
-				t.tag:SetText("")
-			end
-			local collapsed = cfg.collapsed[q.id]
-			t.mark:SetText(collapsed and "+" or "")
-			t:ClearAllPoints()
-			t:SetPoint("TOPLEFT", content, "TOPLEFT", PAD, y - self.y0)
-			t:SetSize(inner, size + 4)
-			t:Show()
-			y = y - (size + 4)
-
-			if not collapsed and plan and cfg.showEstimates then
-				local est = estimateString(plan)
-				if est then y = placeLine(self, y, inner, small, est, S.colors.muted) end
-			end
-
-			if not collapsed then
-				if q.failed then
-					y = placeLine(self, y, inner, size, L["Failed"], RED)
-				elseif q.complete then
-					y = placeLine(self, y, inner, size, L["Ready to turn in"], GREEN)
-				else
-					for oi = 1, q.numObj do
-						local o = q.objectives[oi]
-						if not (o.done and cfg.hideDone) and o.text ~= "" then
-							y = placeLine(self, y, inner, size, o.text, o.done and GREEN or text, o.have, o.need, o.pct)
-						end
+				for oi = 1, q.numObj do
+					local o = q.objectives[oi]
+					if not (o.done and cfg.hideDone) and o.text ~= "" then
+						local ot = (groups and o.done) and (CHECK .. o.text) or o.text
+						y = placeLine(self, y, inner, size, ot, o.done and GREEN or text, o.have, o.need, o.pct)
 					end
 				end
 			end
-			-- the next stop of the smart route gets an accent bar on the left
-			if smart and qi == 1 then
-				local bar = self.nextBar
-				bar:ClearAllPoints()
-				bar:SetPoint("TOPLEFT", content, "TOPLEFT", PAD - 4, top - self.y0)
-				bar:SetHeight(math.max(1, top - y - GAP))
-				bar:Show()
+		end
+		-- the next stop of the smart route gets an accent bar on the left
+		if smart and q == list[1] then
+			local bar = self.nextBar
+			bar:ClearAllPoints()
+			bar:SetPoint("TOPLEFT", content, "TOPLEFT", PAD - 4 + extraIndent, top - self.y0)
+			bar:SetHeight(math.max(1, top - y - GAP))
+			bar:Show()
+		end
+		y = y - GAP * 2
+	end
+
+	local function renderEpic(g)
+		ei = ei + 1
+		local r = self:EpicRow(ei)
+		r.group = g
+		local e = g.epic or {}
+		setFont(r.text, size)
+		setFont(r.count, small)
+		local folded = groupFolded(g)
+		r.chev:SetTexture(folded and "Interface\Buttons\UI-PlusButton-Up" or "Interface\Buttons\UI-MinusButton-Up")
+		local c = type(e.color) == "table" and e.color or S.colors.muted
+		local name = str(e.name) or "?"
+		local tag = str(e.tag)
+		r.text:SetText(tag and (name .. " |cff999999" .. tag .. "|r") or name)
+		r.text:SetTextColor(num(c[1], 1), num(c[2], 1), num(c[3], 1))
+		local done, total = num(e.done), num(e.total)
+		if g.loose then
+			r.count:SetText(#g.quests)
+			r.bar:SetWidth(1)
+			r.bar:Hide()
+		elseif done and total and total > 0 then
+			r.count:SetText(done .. "/" .. total)
+			r.bar:SetWidth(math.min(70, math.floor(inner * 0.25)))
+			r.bar:SetMinMaxValues(0, total)
+			r.bar:SetValue(math.max(0, math.min(total, done)))
+			r.bar:SetStatusBarColor(num(c[1], 1), num(c[2], 1), num(c[3], 1))
+			r.bar:Show()
+		else
+			r.count:SetText("")
+			r.bar:SetWidth(1)
+			r.bar:Hide()
+		end
+		r:ClearAllPoints()
+		r:SetPoint("TOPLEFT", content, "TOPLEFT", PAD, y - self.y0)
+		r:SetSize(inner, size + 4)
+		r:Show()
+		y = y - (size + 4 + GAP)
+		return folded
+	end
+
+	if not cfg.allCollapsed then
+		if groups then
+			for _, g in ipairs(groups) do
+				local folded = false
+				extraIndent = 0
+				if not g.noHeader then
+					folded = renderEpic(g)
+					extraIndent = INDENT
+				end
+				if not folded then
+					for _, q in ipairs(g.quests) do renderQuest(q) end
+				end
 			end
-			y = y - GAP * 2
+			extraIndent = 0
+		else
+			for qi = 1, math.min(#list, maxQ) do renderQuest(list[qi]) end
 		end
 	end
 
 	for i = ti + 1, #titles do titles[i]:Hide() end
 	for i = lineCount + 1, #lines do lines[i]:Hide() end
+	for i = ei + 1, #epicRows do epicRows[i]:Hide() end
 
 	-- fit on screen: the list scrolls when it would run off the bottom
 	local contentH = math.max(1, self.y0 - y - GAP * 2)
@@ -1261,6 +1546,8 @@ function Q:OnEnable()
 	CK:Listen("QUESTPLAN", function()
 		if not self.inPlan then guard(self.Schedule, self) end
 	end)
+	-- an optional epic provider (add-on) changed its data
+	CK:Listen("EPICS", function() guard(self.Schedule, self) end)
 	-- arrived at the arrow's target: point at the plan's next stop when it changed
 	CK:On("BAG_UPDATE_COOLDOWN", function() guard(self.UpdateItemCooldowns, self) end)
 	CK:On("PLAYER_REGEN_ENABLED", function() guard(self.UpdateItems, self) end)

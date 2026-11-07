@@ -280,6 +280,15 @@ function C:CreateWindow()
 	self:BuildSkins(newPage("skins", L["Skins"]))
 	self:BuildChat(newPage("chat", L["Chat"]))
 	self:BuildLoot(newPage("loot", L["Loot"]))
+	-- pages from optional add-ons: CK.configPages = { { key, label, build = function(page) end } }
+	if type(CK.configPages) == "table" then
+		for _, def in ipairs(CK.configPages) do
+			if type(def) == "table" and type(def.key) == "string" and type(def.build) == "function" and not self.pages[def.key] then
+				local ok, err = pcall(def.build, newPage(def.key, def.label or def.key))
+				if not ok and CK.debug then CK:Print("config page " .. def.key .. ":", tostring(err)) end
+			end
+		end
+	end
 	self:BuildProfiles(newPage("profiles", L["Profiles"]))
 	self:BuildAbout(newPage("about", L["About"]))
 end
