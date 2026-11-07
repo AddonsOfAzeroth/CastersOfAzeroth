@@ -272,6 +272,12 @@ add({
 	["Click: cast on %s"] = "Klik: casten op %s",
 })
 
+add({
+	["Group"] = "Groep",
+	["Ready to turn in"] = "Klaar om in te leveren",
+	["Type /reload to bring back the other quest trackers."] = "Typ /reload om de andere questtrackers terug te halen.",
+})
+
 -- Key bindings (Bindings.xml); names are read before saved settings load, so English
 BINDING_HEADER_CASTERKIT = "CasterKit"
 BINDING_NAME_CASTERKIT_AOE = "Toggle AoE mode"

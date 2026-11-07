@@ -95,6 +95,7 @@ local charDefaults = {
 		width = 260,
 		fontSize = 12,
 		collapsed = {},
+		allCollapsed = false,
 	},
 	tooltip = {
 		anchor = true,
