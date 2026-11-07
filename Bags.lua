@@ -302,6 +302,12 @@ local function readSlot(b)
 	return d
 end
 
+-- Uncommon to epic weapons and armour can be disenchanted.
+local function disenchantable(d)
+	if not d.id or d.locked or not d.quality or d.quality < 2 or d.quality > 4 then return false end
+	return d.classID == 2 or d.classID == 4
+end
+
 -- Junk the Sell button may sell: greys and items you marked, with a vendor price.
 local function sellable(d)
 	if not d.id or not d.junk or d.noValue or d.locked then return false end
@@ -520,7 +526,64 @@ local function onItemClick(self, button)
 	end)
 end
 
+local DISENCHANT_ID = 13262
+local deButton
+local function disenchantName()
+	local n = CK.GetSpellName and CK.GetSpellName(DISENCHANT_ID)
+	if not n and GetSpellInfo then n = GetSpellInfo(DISENCHANT_ID) end
+	return n
+end
+
+local function knowsDisenchant()
+	local n = disenchantName()
+	return n ~= nil and CK:Known(n)
+end
+
+local function hideDisenchant()
+	if deButton and not InCombatLockdown() then
+		deButton:Hide()
+		deButton:ClearAllPoints()
+	end
+end
+
+local function placeDisenchant(itemButton, d)
+	if InCombatLockdown() or not B.deMode then return end
+	local spell = disenchantName()
+	if not spell then return end
+	if not deButton then
+		deButton = CreateFrame("Button", "CasterKitDisenchantButton", UIParent, "SecureActionButtonTemplate")
+		deButton:RegisterForClicks("AnyUp", "AnyDown")
+		deButton:SetAttribute("type", "macro")
+		local hl = deButton:CreateTexture(nil, "OVERLAY")
+		hl:SetAllPoints()
+		hl:SetColorTexture(0.64, 0.21, 0.93, 0.35)
+		deButton:SetScript("OnEnter", function(self)
+			guard(function()
+				GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+				if self.bag then GameTooltip:SetBagItem(self.bag, self.slot) end
+				GameTooltip:AddLine(L["Click: disenchant"], 0.64, 0.21, 0.93)
+				GameTooltip:Show()
+			end)
+		end)
+		deButton:SetScript("OnLeave", function()
+			GameTooltip:Hide()
+			hideDisenchant()
+		end)
+		deButton:Hide()
+	end
+	deButton:SetAttribute("macrotext", "/cast " .. spell .. "\n/use " .. d.bag .. " " .. d.slot)
+	deButton.bag, deButton.slot = d.bag, d.slot
+	deButton:SetFrameStrata("DIALOG")
+	deButton:ClearAllPoints()
+	deButton:SetAllPoints(itemButton)
+	deButton:Show()
+end
+
 local function onItemEnter(self)
+	guard(function()
+		local dd = data[self]
+		if B.deMode and dd and disenchantable(dd) then placeDisenchant(self, dd) end
+	end)
 	guard(function()
 		local d, v = data[self], deco[self]
 		if not d then return end
@@ -802,7 +865,9 @@ function B:ApplySearch()
 		for _, b in pairs(list) do
 			local d = data[b]
 			local match = true
-			if hb ~= nil then
+			if self.deMode then
+				match = disenchantable(d)
+			elseif hb ~= nil then
 				match = d.bag == hb
 			elseif q then
 				match = d.search ~= nil and d.search:find(q, 1, true) ~= nil
@@ -830,6 +895,13 @@ function B:UpdateBar()
 
 	local canSort = (CC and CC.SortBags or SortBags) and not InCombatLockdown()
 	self:SetButtonEnabled(f.sortBtn, canSort and true or false)
+	if f.deBtn then
+		local known = knowsDisenchant()
+		if not known then B.deMode = false end
+		f.deBtn:SetShown(known)
+		self:SetButtonEnabled(f.deBtn, not InCombatLockdown())
+		f.deBtn:SetBackdropBorderColor(unpack(B.deMode and { 0.64, 0.21, 0.93, 1 } or { 0, 0, 0, 1 }))
+	end
 	self:SetButtonEnabled(f.sellBtn, self:MerchantOpen() and not self.selling and self:JunkCount() > 0)
 	f.viewBtn.icon:SetTexture(opt("view") == "bag" and "Interface\\Icons\\INV_Misc_Bag_10" or "Interface\\Icons\\INV_Misc_Book_09")
 end
@@ -1167,10 +1239,23 @@ function B:CreateWindow()
 	end)
 	f.sortBtn:SetPoint("RIGHT", f.sellBtn, "LEFT", -3, 0)
 
+	f.deBtn = iconButton(f, "Interface\\Icons\\INV_Enchant_Disenchant", function()
+		if InCombatLockdown() then return end
+		B.deMode = not B.deMode
+		if not B.deMode then hideDisenchant() end
+		B:ApplySearch()
+		B:UpdateBar()
+	end, function()
+		GameTooltip:AddLine(L["Disenchant mode"], 1, 1, 1)
+		GameTooltip:AddLine(L["Highlights what you can disenchant. Click an item to disenchant it, one per click."], 0.6, 0.65, 0.71, true)
+		if InCombatLockdown() then GameTooltip:AddLine(L["Not in combat."], 1, 0.3, 0.3) end
+	end)
+	f.deBtn:SetPoint("RIGHT", f.sortBtn, "LEFT", -3, 0)
+
 	local search = CreateFrame("EditBox", nil, f, "BackdropTemplate")
 	search:SetHeight(18)
 	search:SetPoint("LEFT", title, "RIGHT", 8, 0)
-	search:SetPoint("RIGHT", f.sortBtn, "LEFT", -6, 0)
+	search:SetPoint("RIGHT", f.deBtn, "LEFT", -6, 0)
 	S:Backdrop(search, 1)
 	search:SetFont(S.font, 11, "")
 	search:SetTextColor(unpack(S.colors.text))
@@ -1218,6 +1303,8 @@ function B:CreateWindow()
 		guard(B.Refresh, B)
 	end)
 	f:SetScript("OnHide", function()
+		B.deMode = false
+		hideDisenchant()
 		B.hoverBag = nil
 		search:ClearFocus()
 		-- like Blizzard's bags: items stop being "new" once you closed your bags
@@ -1494,7 +1581,14 @@ function B:OnEnable()
 		B:StopSelling()
 		B:UpdateBar()
 	end)
-	on("PLAYER_REGEN_DISABLED", function() B:UpdateBar() end)
+	on("PLAYER_REGEN_DISABLED", function()
+		if B.deMode then
+			B.deMode = false
+			hideDisenchant()
+			B:ApplySearch()
+		end
+		B:UpdateBar()
+	end)
 	on("PLAYER_REGEN_ENABLED", function()
 		B:UpdateBar()
 		if B.dirty then B:RequestUpdate() end

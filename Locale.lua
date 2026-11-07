@@ -435,6 +435,12 @@ add({
 	["Unlock the frames (/ck unlock) to move the loot window, feed and roll frames."] = "Ontgrendel de kaders (/ck unlock) om het buitvenster, de buitlijst en de dobbelkaders te verplaatsen.",
 })
 
+add({
+	["Click: disenchant"] = "Klik: disenchanten",
+	["Disenchant mode"] = "Disenchant-modus",
+	["Highlights what you can disenchant. Click an item to disenchant it, one per click."] = "Licht op wat je kunt disenchanten. Klik op een item om het te disenchanten, één per klik.",
+})
+
 -- Key bindings (Bindings.xml); names are read before saved settings load, so English
 BINDING_HEADER_CASTERKIT = "CasterKit"
 BINDING_NAME_CASTERKIT_AOE = "Toggle AoE mode"
