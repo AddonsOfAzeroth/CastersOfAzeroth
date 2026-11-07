@@ -562,21 +562,68 @@ local function applyFrozen(order, keys)
 	return order
 end
 
-local function planRoute(quests, start, speed)
-	local nodes, noStop = buildNodes(quests)
-	-- greedy: best value per second (travel + work) from the current spot
-	local order, left, cur = {}, nodes, start
+-- Route strategies (button in the tracker header):
+--   balanced  best XP per minute, turn-ins and objectives mixed (default)
+--   turnin    hand in everything that is ready first, then quest on
+--   quest     work on objectives first, hand in at the end
+--   nearest   always the closest stop
+local STRATEGIES = { "balanced", "turnin", "quest", "nearest" }
+QP.STRATEGIES = STRATEGIES
+
+local function strategy()
+	local c = CK.char and CK.char.quests
+	local s = c and c.routeStrategy
+	for _, k in ipairs(STRATEGIES) do if k == s then return s end end
+	return "balanced"
+end
+
+local function hasTurnIn(n)
+	for _, q in ipairs(n.quests) do if q.turnIn then return true end end
+end
+
+local function hasObjective(n)
+	for _, q in ipairs(n.quests) do if not q.turnIn then return true end end
+end
+
+-- greedy from cur over nodes; returns the order and the last node
+local function greedy(nodes, cur, speed, nearest)
+	local order, left = {}, nodes
 	while #left > 0 do
 		local bi, bs
 		for i, n in ipairs(left) do
-			local s = n.value / (travelTime(cur, n, speed) + n.work + 5)
+			local t = travelTime(cur, n, speed)
+			local s = nearest and 1 / (t + 1) or n.value / (t + n.work + 5)
 			if not bs or s > bs then bi, bs = i, s end
 		end
 		local n = table.remove(left, bi)
 		order[#order + 1] = n
 		cur = n
 	end
-	twoOpt(order, start, speed)
+	return order, cur
+end
+
+local function planRoute(quests, start, speed)
+	local nodes, noStop = buildNodes(quests)
+	local mode = strategy()
+	local order
+	if mode == "turnin" or mode == "quest" then
+		-- two groups, each planned on its own; the second starts where the first ends
+		local first, second = {}, {}
+		for _, n in ipairs(nodes) do
+			local early = (mode == "turnin") and hasTurnIn(n) or (mode == "quest" and hasObjective(n))
+			if early then first[#first + 1] = n else second[#second + 1] = n end
+		end
+		local a, last = greedy(first, start, speed)
+		twoOpt(a, start, speed)
+		last = a[#a] or start
+		local b = greedy(second, last, speed)
+		twoOpt(b, last, speed)
+		order = a
+		for _, n in ipairs(b) do order[#order + 1] = n end
+	else
+		order = greedy(nodes, start, speed, mode == "nearest")
+		if mode ~= "nearest" then twoOpt(order, start, speed) end
+	end
 	if heading and #order > 1 and not holds(order[1], heading) then
 		for i = 2, #order do
 			if holds(order[i], heading) then
@@ -791,6 +838,13 @@ function QP:Recalculate()
 end
 
 function QP:IsLocked() return routeLocked() end
+
+function QP:Strategy() return strategy() end
+
+function QP:SetStrategy(key)
+	CK.char.quests.routeStrategy = key
+	self:Recalculate()
+end
 
 local function ensure()
 	if not computed and CK.char then guard(QP.Recompute, QP) end

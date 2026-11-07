@@ -544,6 +544,20 @@ add({
 	["The smart route keeps its order while you walk. Click the refresh button in the quest list header to plan it again from where you are."] = "De slimme route behoudt haar volgorde terwijl je loopt. Klik op de herlaadknop in de kop van de questlijst om ze opnieuw te plannen vanaf waar je staat.",
 })
 
+add({
+	["Route strategy"] = "Routestrategie",
+	["Route: %s"] = "Route: %s",
+	["Balanced"] = "Gebalanceerd",
+	["Turn in first"] = "Eerst inleveren",
+	["Quest first"] = "Eerst questen",
+	["Nearest"] = "Dichtstbij",
+	["Most XP per minute"] = "Meeste XP per minuut",
+	["Hand in what's ready, then quest"] = "Inleveren wat klaar is, dan verder questen",
+	["Objectives first, hand in at the end"] = "Eerst de doelen, op het einde inleveren",
+	["Always the closest stop"] = "Altijd de dichtstbijzijnde stop",
+	["Click: next, right-click: previous. The route is planned again."] = "Klik: volgende, rechtsklik: vorige. De route wordt opnieuw gepland.",
+})
+
 -- Key bindings (Bindings.xml); names are read before saved settings load, so English
 BINDING_HEADER_CASTERKIT = "CasterKit"
 BINDING_NAME_CASTERKIT_AOE = "Toggle AoE mode"

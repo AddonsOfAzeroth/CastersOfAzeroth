@@ -146,6 +146,7 @@ local charDefaults = {
 		collapsed = {},
 		allCollapsed = false,
 		sortMode = "smart", -- smart, distance, xp, xpmin, level, progress, zone
+		routeStrategy = "balanced", -- balanced, turnin, quest, nearest
 		lockRoute = true, -- keep the smart route until "Recalculate route" is clicked
 		frozenRoute = nil, -- saved stop order (quest keys) while the route is locked
 		showEstimates = true,

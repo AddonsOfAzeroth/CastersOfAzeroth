@@ -405,6 +405,16 @@ function C:BuildQuests(p)
 		{ "smart", L["Smart route (fastest leveling)"] }, { "distance", L["Distance"] }, { "xp", L["XP reward"] },
 		{ "xpmin", L["XP per minute"] }, { "level", L["Level"] }, { "progress", L["Almost done"] }, { "zone", L["Zone"] },
 	}, setting("quests", "sortMode"))
+	p:Choice(L["Route strategy"], {
+		{ "balanced", L["Balanced"] }, { "turnin", L["Turn in first"] },
+		{ "quest", L["Quest first"] }, { "nearest", L["Nearest"] },
+	}, (function()
+		local get, set = setting("quests", "routeStrategy")
+		return get, function(v)
+			set(v)
+			if CK.QuestPlan and CK.QuestPlan.Recalculate then CK.QuestPlan:Recalculate() end
+		end
+	end)())
 	p:Check(L["Keep the route until I recalculate"], L["The smart route keeps its order while you walk. Click the refresh button in the quest list header to plan it again from where you are."], setting("quests", "lockRoute"))
 	p:Check(L["Show time and XP per hour estimates"], L["Estimates get better as CasterKit learns your kill speed and drop rates."], setting("quests", "showEstimates"))
 	p:Check(L["Arrow to the next stop"], L["CasterKit's own navigation arrow. Unlock the frames to move it."], setting("quests", "arrow"))

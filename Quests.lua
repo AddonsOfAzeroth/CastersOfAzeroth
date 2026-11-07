@@ -20,6 +20,14 @@ local MODE_NAMES = {
 	level = "Level", progress = "Almost done", zone = "Zone",
 }
 
+local STRATEGY_NAMES = { balanced = "Balanced", turnin = "Turn in first", quest = "Quest first", nearest = "Nearest" }
+local STRATEGY_TIPS = {
+	balanced = "Most XP per minute",
+	turnin = "Hand in what's ready, then quest",
+	quest = "Objectives first, hand in at the end",
+	nearest = "Always the closest stop",
+}
+
 -- Skip suggestions from the plan: tag text and tooltip (label keys)
 local SKIP = {
 	grey = { "Skip?", "Gives little XP at your level." },
@@ -628,6 +636,46 @@ function Q:CreatePanel()
 	end)
 	self.modeButton = m
 
+	-- Route strategy (smart route only): click cycles, the route is planned again
+	local st = CreateFrame("Button", nil, h)
+	st:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+	st:SetPoint("LEFT", m, "RIGHT", 2, 0)
+	local sthl = st:CreateTexture(nil, "HIGHLIGHT")
+	sthl:SetAllPoints()
+	sthl:SetColorTexture(1, 1, 1, 0.06)
+	st.text = S:Font(st, 10)
+	st.text:SetPoint("LEFT", 0, 0)
+	st.text:SetTextColor(unpack(S.colors.accent))
+	st:SetScript("OnClick", function(_, button)
+		guard(function()
+			local P = CK.QuestPlan
+			if not (P and P.STRATEGIES) then return end
+			local list, cur = P.STRATEGIES, 1
+			for i, k in ipairs(list) do if k == P:Strategy() then cur = i end end
+			local step = button == "RightButton" and -1 or 1
+			local key = list[(cur - 1 + step) % #list + 1]
+			P:SetStrategy(key)
+			CK:Print(L["Route: %s"]:format(L[STRATEGY_NAMES[key]]))
+		end)
+	end)
+	st:SetScript("OnEnter", function(btn)
+		guard(function()
+			GameTooltip:SetOwner(btn, "ANCHOR_LEFT")
+			GameTooltip:SetText(L["Route strategy"], 1, 0.82, 0)
+			local P = CK.QuestPlan
+			local cur = P and P.Strategy and P:Strategy()
+			for _, k in ipairs(P and P.STRATEGIES or {}) do
+				local on = k == cur
+				GameTooltip:AddDoubleLine((on and "> " or "  ") .. L[STRATEGY_NAMES[k]], L[STRATEGY_TIPS[k]],
+					on and 0.41 or 1, on and 0.8 or 1, on and 0.94 or 1, 0.6, 0.65, 0.71)
+			end
+			GameTooltip:AddLine(L["Click: next, right-click: previous. The route is planned again."], 0.6, 0.65, 0.71, true)
+			GameTooltip:Show()
+		end)
+	end)
+	st:SetScript("OnLeave", function(btn) if GameTooltip:IsOwned(btn) then GameTooltip:Hide() end end)
+	self.strategyButton = st
+
 	-- Recalculate the route (it stays as it is until you click this)
 	local rc = CreateFrame("Button", nil, h)
 	rc:SetSize(14, 14)
@@ -847,6 +895,16 @@ function Q:Render(total, tracked)
 	setFont(mb.text, math.max(8, size - 2))
 	mb.text:SetText("· " .. L[MODE_NAMES[mode] or MODE_NAMES.smart])
 	mb:SetSize((mb.text:GetStringWidth() or 40) + 4, size + 4)
+	local stb = self.strategyButton
+	local P = CK.QuestPlan
+	if stb and mode == "smart" and P and P.Strategy then
+		setFont(stb.text, math.max(8, size - 2))
+		stb.text:SetText("· " .. L[STRATEGY_NAMES[P:Strategy()] or "Balanced"])
+		stb:SetSize((stb.text:GetStringWidth() or 40) + 4, size + 4)
+		stb:Show()
+	elseif stb then
+		stb:Hide()
+	end
 	local y = -PAD - (size + 6)
 	self.y0 = y
 	local content = self.content
