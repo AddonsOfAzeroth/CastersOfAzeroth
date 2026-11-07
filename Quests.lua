@@ -940,6 +940,7 @@ function Q:Redraw()
 		self.panel:Show()
 	end)
 	guard(self.UpdateArrow, self)
+	guard(self.UpdateItems, self)
 	if self:QuestieMissing() then self:ApplyHiding() end
 end
 
@@ -963,6 +964,128 @@ function Q:Refresh()
 	S:ApplyPoint(self.panel, "quests")
 	self:ApplyHiding()
 	self:Redraw()
+end
+
+---------------------------------------------------------------------------
+-- Quest item buttons ("fill the vial" etc.): secure buttons left of the list.
+-- Placed on UIParent at a fixed spot and only changed out of combat.
+---------------------------------------------------------------------------
+local itemButtons, itemHolder = {}, nil
+local MAX_ITEMS, ITEM_SIZE = 8, 30
+
+local function itemButton(i)
+	local b = itemButtons[i]
+	if b then return b end
+	b = CreateFrame("Button", "CasterKitQuestItem" .. i, itemHolder, "SecureActionButtonTemplate")
+	b:SetSize(ITEM_SIZE, ITEM_SIZE)
+	b:RegisterForClicks("AnyUp", "AnyDown")
+	b:SetAttribute("type", "item")
+	S:Backdrop(b)
+	b.icon = b:CreateTexture(nil, "ARTWORK")
+	b.icon:SetPoint("TOPLEFT", 1, -1)
+	b.icon:SetPoint("BOTTOMRIGHT", -1, 1)
+	b.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+	b.cd = CreateFrame("Cooldown", nil, b, "CooldownFrameTemplate")
+	b.cd:SetAllPoints(b.icon)
+	b.count = S:Font(b, 10)
+	b.count:SetPoint("BOTTOMRIGHT", -2, 2)
+	local hl = b:CreateTexture(nil, "HIGHLIGHT")
+	hl:SetAllPoints(b.icon)
+	hl:SetColorTexture(1, 1, 1, 0.15)
+	b:SetScript("OnEnter", function(self)
+		guard(function()
+			if not (GameTooltip and self.link) then return end
+			GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+			GameTooltip:SetHyperlink(self.link)
+			if self.questTitle then GameTooltip:AddLine(self.questTitle, 1, 0.82, 0) end
+			GameTooltip:Show()
+		end)
+	end)
+	b:SetScript("OnLeave", function(self)
+		guard(function()
+			if GameTooltip and GameTooltip:IsOwned(self) then GameTooltip:Hide() end
+		end)
+	end)
+	itemButtons[i] = b
+	return b
+end
+
+-- Quests with a usable item, in the order of the list.
+local function questItems()
+	local out = {}
+	if not GetQuestLogSpecialItemInfo then return out end
+	local function add(index, id, title, complete)
+		if #out >= MAX_ITEMS or not index then return end
+		local ok, link, tex, charges, showComplete = pcall(GetQuestLogSpecialItemInfo, index)
+		if not ok then return end
+		link, tex = str(link), Safe(tex, nil)
+		if not link or not tex then return end
+		if complete and not flag(showComplete) then return end
+		for _, o in ipairs(out) do if o.link == link then return end end
+		out[#out + 1] = { link = link, tex = tex, charges = num(charges, 0), index = index, title = title }
+	end
+	for _, q in ipairs(list) do add(q.index, q.id, q.title, q.complete) end
+	-- also quests not shown in the list (folded away or over the limit)
+	local n = logCounts()
+	for i = 1, n do
+		local e = readEntry(i)
+		if e and not e.isHeader then add(i, e.questID, e.title, false) end
+	end
+	return out
+end
+
+function Q:UpdateItems()
+	CK:OutOfCombat("quest-items", function()
+		guard(function()
+			if not itemHolder then
+				itemHolder = CreateFrame("Frame", "CasterKitQuestItems", UIParent)
+				itemHolder:SetSize(ITEM_SIZE, ITEM_SIZE)
+			end
+			local p = self.panel
+			local show = p and p:IsShown() and CK.char.quests.enabled and CK.char.quests.questItems ~= false
+			local items = show and questItems() or {}
+			-- holder sits left of the list's top, fixed on the screen (not anchored to the list)
+			local left, top = p and p:GetLeft(), p and p:GetTop()
+			if left and top then
+				local s = p:GetEffectiveScale() / UIParent:GetEffectiveScale()
+				itemHolder:ClearAllPoints()
+				itemHolder:SetPoint("TOPRIGHT", UIParent, "BOTTOMLEFT", left * s - 4, top * s)
+			end
+			for i = 1, math.max(#items, #itemButtons) do
+				local it = items[i]
+				if it then
+					local b = itemButton(i)
+					b:SetAttribute("item", it.link)
+					b.link, b.questTitle, b.logIndex = it.link, it.title, it.index
+					b.icon:SetTexture(it.tex)
+					b.count:SetText(it.charges > 1 and it.charges or "")
+					b:ClearAllPoints()
+					b:SetPoint("TOPRIGHT", itemHolder, "TOPRIGHT", 0, -(i - 1) * (ITEM_SIZE + 3))
+					b:Show()
+				elseif itemButtons[i] then
+					itemButtons[i]:Hide()
+					itemButtons[i]:SetAttribute("item", nil)
+					itemButtons[i].link = nil
+				end
+			end
+			self:UpdateItemCooldowns()
+		end)
+	end)
+end
+
+function Q:UpdateItemCooldowns()
+	if not GetQuestLogSpecialItemCooldown then return end
+	for _, b in ipairs(itemButtons) do
+		if b:IsShown() and b.logIndex then
+			local start, dur, enable = try(GetQuestLogSpecialItemCooldown, b.logIndex)
+			start, dur = num(start), num(dur)
+			if start and dur and dur > 0 and Safe(enable, 1) ~= 0 then
+				b.cd:SetCooldown(start, dur)
+			else
+				b.cd:Clear()
+			end
+		end
+	end
 end
 
 function Q:OnEnable()
@@ -990,6 +1113,8 @@ function Q:OnEnable()
 		if not self.inPlan then guard(self.Schedule, self) end
 	end)
 	-- arrived at the arrow's target: point at the plan's next stop when it changed
+	CK:On("BAG_UPDATE_COOLDOWN", function() guard(self.UpdateItemCooldowns, self) end)
+	CK:On("PLAYER_REGEN_ENABLED", function() guard(self.UpdateItems, self) end)
 	CK:Listen("ARROW_ARRIVED", function()
 		self.manualArrow = false
 		self.selected = nil
