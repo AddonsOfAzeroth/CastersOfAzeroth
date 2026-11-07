@@ -382,9 +382,98 @@ function UF:Build()
 		pf.role:SetPoint("CENTER", pf, "TOPLEFT", 2, -2)
 		pf.role:Hide()
 		wire(pf, { "GROUP_ROSTER_UPDATE", "PLAYER_ROLES_ASSIGNED" })
+		self:AddPartyBuffs(pf)
 	end
 
 	self.built = true
+end
+
+---------------------------------------------------------------------------
+-- Party: buttons for the buffs you can give (click = cast on that member)
+---------------------------------------------------------------------------
+local function fmtLeft(left)
+	if left >= 3600 then return ("%dh"):format(left / 3600) end
+	if left >= 60 then return ("%dm"):format(left / 60) end
+	return ("%ds"):format(left)
+end
+
+function UF:AddPartyBuffs(pf)
+	local def = CK:GetClass()
+	pf.buffButtons = {}
+	for i, b in ipairs(def and def.partyBuffs or {}) do
+		local btn = CreateFrame("Button", nil, pf, "SecureActionButtonTemplate,BackdropTemplate")
+		btn:SetSize(20, 20)
+		btn:SetPoint("LEFT", pf, "RIGHT", 4 + (i - 1) * 23, 0)
+		btn:RegisterForClicks("AnyUp", "AnyDown")
+		btn:SetAttribute("type", "spell")
+		btn:SetAttribute("spell", b.spell)
+		btn:SetAttribute("unit", pf.unit)
+		S:Backdrop(btn, 1)
+		btn.icon = btn:CreateTexture(nil, "ARTWORK")
+		btn.icon:SetPoint("TOPLEFT", 1, -1)
+		btn.icon:SetPoint("BOTTOMRIGHT", -1, 1)
+		btn.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+		btn.text = S:Font(btn, 9)
+		btn.text:SetPoint("BOTTOM", 0, 1)
+		local ag = btn:CreateAnimationGroup()
+		ag:SetLooping("BOUNCE")
+		local a = ag:CreateAnimation("Alpha")
+		a:SetFromAlpha(1)
+		a:SetToAlpha(0.4)
+		a:SetDuration(0.6)
+		btn.pulse = ag
+		btn.def = b
+		btn:SetScript("OnEnter", function(self)
+			GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+			GameTooltip:AddLine(self.def.spell, 1, 1, 1)
+			GameTooltip:AddLine(L["Click: cast on %s"]:format(Safe(UnitName(pf.unit)) or "?"), 0.4, 0.8, 1)
+			GameTooltip:Show()
+		end)
+		btn:SetScript("OnLeave", GameTooltip_Hide)
+		btn:Hide()
+		pf.buffButtons[i] = btn
+	end
+end
+
+function UF:UpdatePartyBuffs()
+	if not self.built then return end
+	local cfg = CK.char.leveling
+	local inCombat = InCombatLockdown()
+	for n = 1, 4 do
+		local pf = self.frames["party" .. n]
+		for _, btn in ipairs(pf.buffButtons or {}) do
+			local b, u = btn.def, pf.unit
+			local wanted = CK.char.units.partyBuffs and CK:Known(b.spell) and UnitExists(u)
+				and Safe(UnitIsConnected(u), true) and not Safe(UnitIsDeadOrGhost(u), false)
+				and (not b.filter or b.filter(u))
+			local found
+			if wanted then
+				for _, name in ipairs(b.names) do
+					if CK:FindAura(u, name, "HELPFUL") then found = name break end
+				end
+			end
+			local left = found and CK:AuraRemaining(u, found, "HELPFUL")
+			local low = not found or (left and left ~= 1 and left < cfg.buffWarnMinutes * 60)
+			local show = wanted and (cfg.buffMode == "always" or low)
+			-- secure buttons cannot be shown or hidden in combat: only refresh looks then
+			if not inCombat then btn:SetShown(show and true or false) end
+			if btn:IsShown() then
+				btn.icon:SetTexture(CK:SpellTexture(b.spell))
+				btn.text:SetText(found and left and left ~= 1 and left ~= math.huge and fmtLeft(left) or (found and "" or "!"))
+				local inRange = C_Spell and C_Spell.IsSpellInRange and Safe(C_Spell.IsSpellInRange(b.spell, u))
+				btn.icon:SetDesaturated(inRange == false)
+				if low then
+					btn:SetBackdropBorderColor(unpack(S.colors.warn))
+					btn.icon:SetAlpha(1)
+					if not btn.pulse:IsPlaying() then btn.pulse:Play() end
+				else
+					btn:SetBackdropBorderColor(0, 0, 0, 1)
+					btn.icon:SetAlpha(0.6)
+					btn.pulse:Stop()
+				end
+			end
+		end
+	end
 end
 
 function UF:Apply()
@@ -425,4 +514,5 @@ function UF:OnEnable()
 	CK:Listen("PANEL_LAYOUT", function()
 		if self.built then CK:OutOfCombat("units-apply", function() self:Apply() end) end
 	end)
+	C_Timer.NewTicker(1, function() pcall(self.UpdatePartyBuffs, self) end)
 end

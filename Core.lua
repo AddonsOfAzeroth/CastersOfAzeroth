@@ -72,6 +72,7 @@ local charDefaults = {
 		targetCastbar = true,
 		hideBlizzardCastbar = true,
 		castbarLatency = true,
+		partyBuffs = true,
 	},
 	chat = {
 		enabled = true,
@@ -83,6 +84,17 @@ local charDefaults = {
 		width = 440,
 		height = 190,
 		fontSize = 13,
+	},
+	quests = {
+		enabled = true,
+		hideBlizzard = true,
+		hideQuestieTracker = true,
+		zoneFirst = true,
+		hideDone = true,
+		maxQuests = 12,
+		width = 260,
+		fontSize = 12,
+		collapsed = {},
 	},
 	tooltip = {
 		anchor = true,

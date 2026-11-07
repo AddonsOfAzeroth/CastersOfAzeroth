@@ -254,6 +254,24 @@ add({
 	["Dampen Magic (solo only)"] = "Dampen Magic (enkel solo)",
 })
 
+add({
+	["Quests"] = "Quests",
+	["CasterKit quest tracker"] = "CasterKit-questtracker",
+	["A compact list: level colours, progress bars, turn-ins on top."] = "Een compacte lijst: kleuren per level, voortgangsbalkjes, inleveren bovenaan.",
+	["Hide the Blizzard quest tracker"] = "Blizzard-questtracker verbergen",
+	["Hide the Questie tracker (Questie keeps its map pins)"] = "Questie-tracker verbergen (Questie houdt zijn kaartpins)",
+	["Quests in your current zone first"] = "Quests in je huidige zone eerst",
+	["Hide finished objectives"] = "Afgewerkte doelen verbergen",
+	["Quests shown"] = "Aantal quests",
+	["Click a quest to fold it open or closed. Shift-click opens it on the map. Unlock the frames (General) to move the list."] = "Klik op een quest om hem open of dicht te klappen. Shift-klik opent hem op de kaart. Ontgrendel de kaders (Algemeen) om de lijst te verplaatsen.",
+})
+
+add({
+	["Buff buttons next to party members"] = "Buffknopjes naast groepsleden",
+	["Buffs you can give, e.g. Arcane Intellect. Red = missing, click = cast on that member."] = "Buffs die jij kunt geven, bv. Arcane Intellect. Rood = ontbreekt, klik = op dat groepslid casten.",
+	["Click: cast on %s"] = "Klik: casten op %s",
+})
+
 -- Key bindings (Bindings.xml); names are read before saved settings load, so English
 BINDING_HEADER_CASTERKIT = "CasterKit"
 BINDING_NAME_CASTERKIT_AOE = "Toggle AoE mode"

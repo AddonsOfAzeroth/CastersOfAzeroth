@@ -183,6 +183,11 @@ local Mage = {
 		ARCANE = { name = "Arcane", icon = 135932, rotation = arcane },
 	},
 	specOrder = { "FROST", "FIRE", "ARCANE" },
+	-- buffs you can give to party members (buttons next to the party frames)
+	partyBuffs = {
+		{ spell = "Arcane Intellect", names = { "Arcane Intellect", "Arcane Brilliance" },
+			filter = function(unit) return CK.Safe(UnitPowerType(unit), 0) == 0 end }, -- mana users only
+	},
 	-- buff buttons the settings can switch on/off: { key, label }
 	buffOptions = {
 		{ "armor", "Armor (Frost, Ice or Mage Armor)" },
