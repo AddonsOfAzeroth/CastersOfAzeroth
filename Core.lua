@@ -13,6 +13,29 @@ CK.classes = {}
 -- Defaults
 ---------------------------------------------------------------------------
 local charDefaults = {
+	bags = {
+		enabled = true,
+		view = "category", -- "category" or "bag"
+		columns = 10,
+		iconSize = 34,
+		itemLevel = true,
+		showNewGlow = true,
+		autoOpenMerchant = true,
+		junkList = {}, -- [itemID] = true: items marked as junk with Alt-click
+	},
+	loot = {
+		enabled = true,
+		window = true,       -- replace Blizzard's loot window
+		atCursor = true,     -- open at the cursor; false = fixed spot (mover "loot")
+		feed = true,         -- loot feed (mover "lootfeed")
+		feedDuration = 6,    -- seconds per line
+		feedMax = 6,         -- lines
+		showMoney = true,
+		questItems = true,   -- quest items in the feed (with a "Quest" tag)
+		bagsFull = true,     -- prominent "Bags full!" line on ERR_INV_FULL
+		rollFrames = true,   -- own group loot roll frames (mover "lootroll")
+		autoLoot = false,    -- mirror of CVar autoLootDefault (read from the CVar at login)
+	},
 	bars = {
 		enabled = true,
 		rows = 3,
@@ -519,6 +542,8 @@ local PERSONAL = {
 	leveling = { trainerPending = true, mobXP = true },
 	chat = { setupDone = true, channelTabs = true, prevTimestamps = true },
 	rotation = { spec = true },
+	bags = { junkList = true },
+	loot = { autoLoot = true },
 }
 
 local function profileCopy(src)
