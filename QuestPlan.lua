@@ -158,7 +158,6 @@ end
 local fight = { start = nil, kills = 0, xpKills = 0 }
 local pending        -- finished fight waiting for its recovery time
 local killsTotal = 0 -- kills by the player this session
-local cleuOK = false -- combat log is readable
 local recentXP = {}  -- recent plain kill XP at this level
 local itemTrack = {} -- [questID:index] = { have, kills }
 
@@ -255,7 +254,7 @@ end
 local function onCombatEnd()
 	if not fight.start then return end
 	local t = now()
-	local kills = cleuOK and fight.kills or fight.xpKills
+	local kills = fight.xpKills
 	pending = { dur = t - fight.start, kills = kills, stop = t }
 	fight.start = nil
 	local mine = pending
@@ -277,18 +276,7 @@ local function onXPMessage(msg)
 		if #recentXP > 10 then table.remove(recentXP, 1) end
 	end
 	if fight.start then fight.xpKills = fight.xpKills + 1 end
-	if not cleuOK then addKill() end
-end
-
-local playerGUID
-local function onCombatLog()
-	if not CombatLogGetCurrentEventInfo then return end
-	local ok, _, sub, _, src = pcall(CombatLogGetCurrentEventInfo)
-	if not ok or isSecret(sub) or type(sub) ~= "string" then return end
-	cleuOK = true
-	if sub ~= "PARTY_KILL" or isSecret(src) then return end
-	playerGUID = playerGUID or UnitGUID("player")
-	if src == playerGUID then addKill() end
+	addKill()
 end
 
 -- Run speed from GetUnitSpeed (or position deltas), out of combat on the ground only.
@@ -817,11 +805,8 @@ function QP:OnEnable()
 	CK:On("PLAYER_REGEN_ENABLED", function() guard(onCombatEnd) end)
 	CK:On("CHAT_MSG_COMBAT_XP_GAIN", function(_, msg) guard(onXPMessage, msg) end)
 
-	-- combat log may be restricted in this client: register on a private frame
-	local f = CreateFrame("Frame")
-	if pcall(f.RegisterEvent, f, "COMBAT_LOG_EVENT_UNFILTERED") then
-		f:SetScript("OnEvent", function() guard(onCombatLog) end)
-	end
+	-- no combat log: registering COMBAT_LOG_EVENT_UNFILTERED is forbidden for
+	-- addons in this client; kills are counted from the XP messages instead
 
 	C_Timer.NewTicker(1, function() guard(tick) end)
 	guard(request)

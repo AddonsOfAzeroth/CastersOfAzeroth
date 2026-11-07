@@ -3,7 +3,7 @@
 ## Notes: Caster UI: all action bars in one frame, rotation helper and leveling helpers.
 ## Notes-nlNL: Caster-UI: actiebalken in Ã©Ã©n kader, rotatiehulp en levelhulpjes.
 ## Author: DinX
-## Version: 0.1.6
+## Version: 0.1.7
 ## IconTexture: Interface\Icons\Spell_Frost_FrostBolt02
 ## SavedVariables: CasterKitDB
 ## SavedVariablesPerCharacter: CasterKitCharDB

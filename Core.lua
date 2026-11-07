@@ -165,7 +165,10 @@ end
 CK:SetScript("OnEvent", function(self, event, ...)
 	local list = handlers[event]
 	if list then
+		local prev = CK.where
+		CK.where = (prev and prev .. " > " or "") .. event
 		for i = 1, #list do list[i](event, ...) end
+		CK.where = prev
 	end
 end)
 
@@ -485,10 +488,13 @@ end)
 CK:On("PLAYER_LOGIN", function()
 	CK:ScanSpellbook()
 	local def = CK:GetClass()
+	CK.where = "PLAYER_LOGIN class"
 	if def and def.OnEnable then def:OnEnable() end
 	for _, m in ipairs(CK.modules) do
+		CK.where = "PLAYER_LOGIN " .. m.name
 		if m.OnEnable then m:OnEnable() end
 	end
+	CK.where = "PLAYER_LOGIN"
 	local conflict = CK:BarConflict()
 	if conflict and CK.char.bars.enabled then
 		CK:Print(CK.L["%s already manages the action bars. CasterKit bars are off; the rotation helper still lights up those buttons. Type /ck for settings."]:format(conflict))
@@ -629,12 +635,14 @@ do
 	f:RegisterEvent("ADDON_ACTION_FORBIDDEN")
 	f:SetScript("OnEvent", function(_, event, addon, func)
 		if addon ~= ADDON then return end
+		local where = tostring(CK.where)
 		local line = date("%H:%M:%S") .. " " .. event .. " " .. tostring(func)
+			.. " | in: " .. where .. " | " .. tostring(debugstack and debugstack(2, 12, 0))
 		if type(CasterKitDB) == "table" then
 			CasterKitDB.blocked = CasterKitDB.blocked or {}
 			table.insert(CasterKitDB.blocked, line)
 			while #CasterKitDB.blocked > 20 do table.remove(CasterKitDB.blocked, 1) end
 		end
-		C_Timer.After(3, function() CK:Print("|cffff5555blocked:|r " .. tostring(func)) end)
+		C_Timer.After(3, function() CK:Print("|cffff5555blocked:|r " .. tostring(func) .. " (" .. where .. ")") end)
 	end)
 end
