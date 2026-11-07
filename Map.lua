@@ -620,7 +620,60 @@ local function setup()
 	MP:Apply()
 end
 
+---------------------------------------------------------------------------
+-- Coordinates on the minimap (replaces TomTom's coords box)
+---------------------------------------------------------------------------
+local mmCoords
+local function updateMinimapCoords()
+	local m = C_Map and C_Map.GetBestMapForUnit and num(try(C_Map.GetBestMapForUnit, "player"))
+	local pos = m and C_Map.GetPlayerMapPosition and try(C_Map.GetPlayerMapPosition, m, "player")
+	local x, y
+	if pos and not IsSecret(pos) and pos.GetXY then x, y = try(pos.GetXY, pos) end
+	x, y = num(x), num(y)
+	if x and y and (x > 0 or y > 0) then
+		mmCoords.text:SetText(("%.1f, %.1f"):format(x * 100, y * 100))
+	else
+		mmCoords.text:SetText("--")
+	end
+end
+
+local function applyMinimapCoords()
+	if not mmCoords then return end
+	if db().minimapCoords then
+		S:ApplyPoint(mmCoords, "mmcoords")
+		mmCoords:Show()
+		updateMinimapCoords()
+	else
+		mmCoords:Hide()
+	end
+end
+
+local function setupMinimapCoords()
+	if mmCoords or not Minimap then return end
+	local f = CreateFrame("Frame", "CasterKitMinimapCoords", UIParent, "BackdropTemplate")
+	f:SetSize(70, 16)
+	f:SetFrameStrata("MEDIUM")
+	f:SetFrameLevel((Minimap:GetFrameLevel() or 1) + 10)
+	S:Backdrop(f)
+	f.text = S:Font(f, 11)
+	f.text:SetPoint("CENTER")
+	f.text:SetTextColor(1, 1, 1)
+	mmCoords = f
+	S:RegisterMover(f, "mmcoords", L["Coordinates"], function(fr)
+		fr:SetPoint("BOTTOM", Minimap, "BOTTOM", 0, 4)
+	end)
+	local elapsed = 0
+	f:SetScript("OnUpdate", function(_, e)
+		elapsed = elapsed + e
+		if elapsed < 0.2 then return end
+		elapsed = 0
+		if not pcall(updateMinimapCoords) then f.text:SetText("--") end
+	end)
+	applyMinimapCoords()
+end
+
 function MP:OnEnable()
+	guard("minimapcoords", setupMinimapCoords)
 	if WorldMapFrame then
 		guard("setup", setup)
 	else
@@ -635,5 +688,6 @@ CK:Listen("QUESTPLAN", function()
 end)
 
 CK:Listen("SETTINGS", function(group)
+	if group == "map" then guard("minimapcoords", applyMinimapCoords) end
 	if group == "map" and WMF then MP:Apply() end
 end)

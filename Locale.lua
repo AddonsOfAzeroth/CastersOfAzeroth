@@ -333,6 +333,12 @@ add({
 	["Far away"] = "Ver weg",
 })
 
+add({
+	["Coordinates"] = "Coördinaten",
+	["Coordinates on the minimap"] = "Coördinaten op de minimap",
+	["Unlock the frames to move them."] = "Ontgrendel de kaders om ze te verplaatsen.",
+})
+
 -- Key bindings (Bindings.xml); names are read before saved settings load, so English
 BINDING_HEADER_CASTERKIT = "CasterKit"
 BINDING_NAME_CASTERKIT_AOE = "Toggle AoE mode"

@@ -108,6 +108,7 @@ local charDefaults = {
 		enabled = true,
 		route = true,
 		coords = true,
+		minimapCoords = true,
 		fadeMoving = true,
 		fadeAlpha = 0.5,
 		scale = 1,
