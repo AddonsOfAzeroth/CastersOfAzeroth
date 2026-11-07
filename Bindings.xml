@@ -1,0 +1,8 @@
+<Bindings>
+	<Binding name="CASTERKIT_AOE" header="CASTERKIT" category="ADDONS">
+		CasterKit:ToggleAoE()
+	</Binding>
+	<Binding name="CASTERKIT_CONFIG" category="ADDONS">
+		CasterKit:ToggleConfig()
+	</Binding>
+</Bindings>

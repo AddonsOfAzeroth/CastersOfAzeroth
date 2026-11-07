@@ -1,0 +1,23 @@
+## Interface: 16001
+## Title: CasterKit
+## Notes: Caster-UI: actiebalken in één kader, rotatiehulp en levelhulpjes.
+## Author: DinX
+## Version: 0.1.0
+## IconTexture: Interface\Icons\Spell_Frost_FrostBolt02
+## SavedVariables: CasterKitDB
+## SavedVariablesPerCharacter: CasterKitCharDB
+## OptionalDeps: ElvUI, Bartender4
+
+libs\LibStub\LibStub.lua
+libs\CallbackHandler-1.0\CallbackHandler-1.0.xml
+libs\LibButtonGlow-1.0\LibButtonGlow-1.0.lua
+libs\LibActionButton-1.0\LibActionButton-1.0.lua
+
+Core.lua
+Style.lua
+Bars.lua
+MicroMenu.lua
+Rotation.lua
+Leveling.lua
+Classes\Mage.lua
+Config.lua
