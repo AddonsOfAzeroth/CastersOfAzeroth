@@ -195,7 +195,7 @@ end
 function L:CollectEntries()
 	local list = {}
 	local function add(e) list[#list + 1] = e end
-	for _, fn in ipairs(CK.reminderProviders) do fn(add) end
+	for _, fn in ipairs(CK.reminderProviders) do pcall(fn, add) end
 	local out = {}
 	for _, e in ipairs(list) do
 		if e.always or e.warn then out[#out + 1] = e end
@@ -361,6 +361,7 @@ end
 local XP_PATTERN = "^(.+) dies, you gain (%d+) experience"
 
 function L:OnXPMessage(msg)
+	if CK.IsSecret(msg) or type(msg) ~= "string" then return end
 	local name, amount = msg:match(XP_PATTERN)
 	amount = tonumber(amount)
 	if not name or not amount then return end
@@ -406,12 +407,12 @@ function L:HookTooltip()
 		TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Unit, function(tooltip)
 			if tooltip ~= GameTooltip then return end
 			local _, unit = tooltip:GetUnit()
-			self:TooltipUnit(tooltip, unit)
+			pcall(self.TooltipUnit, self, tooltip, unit)
 		end)
 	else
 		GameTooltip:HookScript("OnTooltipSetUnit", function(tooltip)
 			local _, unit = tooltip:GetUnit()
-			self:TooltipUnit(tooltip, unit)
+			pcall(self.TooltipUnit, self, tooltip, unit)
 		end)
 	end
 end

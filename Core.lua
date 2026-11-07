@@ -29,6 +29,7 @@ local charDefaults = {
 	rotation = {
 		enabled = true,
 		spec = nil, -- nil = standaard van de class-module
+		source = "blizzard", -- "blizzard" (Assisted Combat) of "custom" (eigen prioriteit)
 		glow = true,
 		glowStyle = "blizzard", -- "blizzard" of "pulse"
 		secondary = true,
@@ -138,6 +139,20 @@ function CK:Fire(msg, ...)
 end
 
 ---------------------------------------------------------------------------
+-- Secret values: in combat Blizzard hides some numbers from addons.
+-- We may show them but never compute with them, so check first.
+---------------------------------------------------------------------------
+local issecret = issecretvalue or function() return false end
+CK.IsSecret = issecret
+
+-- Returns v, or default when v is a secret value.
+function CK.Safe(v, default)
+	if issecret(v) then return default end
+	return v
+end
+local Safe = CK.Safe
+
+---------------------------------------------------------------------------
 -- Spell helpers (spellbook scan; names are enUS)
 ---------------------------------------------------------------------------
 local known = {}     -- name -> highest spellID
@@ -196,29 +211,34 @@ function CK:SpellTexture(name)
 	return GetSpellTexture(id)
 end
 
+-- Returns start, duration; nil, nil when the values are secret.
 local function rawCooldown(id)
+	local s, d
 	if C_Spell and C_Spell.GetSpellCooldown then
 		local cd = C_Spell.GetSpellCooldown(id)
-		if cd then return cd.startTime, cd.duration end
-		return 0, 0
+		if not cd then return 0, 0 end
+		s, d = cd.startTime, cd.duration
+	else
+		s, d = GetSpellCooldown(id)
 	end
-	local s, d = GetSpellCooldown(id)
+	if issecret(s) or issecret(d) then return nil, nil end
 	return s or 0, d or 0
 end
 
--- Seconds left on the global cooldown.
+-- Seconds left on the global cooldown (0 when unknown).
 function CK:GCDRemaining()
 	local s, d = rawCooldown(61304)
 	if s and s > 0 then return math.max(0, s + d - GetTime()) end
 	return 0
 end
 
--- Seconds left on a spell's own cooldown (GCD ignored).
+-- Seconds left on a spell's own cooldown (GCD ignored); math.huge when unknown.
 function CK:CooldownRemaining(name)
 	local id = known[name]
 	if not id then return math.huge end
 	local s, d = rawCooldown(id)
-	if not s or s == 0 or d == 0 then return 0 end
+	if not s then return math.huge end
+	if s == 0 or d == 0 then return 0 end
 	local _, gd = rawCooldown(61304)
 	if gd and gd > 0 and d <= gd + 0.05 then return 0 end
 	return math.max(0, s + d - GetTime())
@@ -227,25 +247,32 @@ end
 function CK:IsUsable(name)
 	local id = known[name]
 	if not id then return false, false end
-	if C_Spell and C_Spell.IsSpellUsable then return C_Spell.IsSpellUsable(id) end
-	return IsUsableSpell(id)
+	local usable, noMana
+	if C_Spell and C_Spell.IsSpellUsable then
+		usable, noMana = C_Spell.IsSpellUsable(id)
+	else
+		usable, noMana = IsUsableSpell(id)
+	end
+	if issecret(usable) or issecret(noMana) then return false, false end
+	return usable, noMana
 end
 
 ---------------------------------------------------------------------------
 -- Aura helpers
 ---------------------------------------------------------------------------
+-- Auras whose data is secret are skipped (treated as not found).
 function CK:FindAura(unit, name, filter)
 	if C_UnitAuras and C_UnitAuras.GetAuraDataByIndex then
 		for i = 1, 40 do
 			local a = C_UnitAuras.GetAuraDataByIndex(unit, i, filter)
 			if not a then return end
-			if a.name == name then return a end
+			if not issecret(a.name) and a.name == name then return a end
 		end
 	elseif UnitAura then
 		for i = 1, 40 do
 			local n, _, count, _, dur, exp = UnitAura(unit, i, filter)
 			if not n then return end
-			if n == name then return { name = n, applications = count, duration = dur, expirationTime = exp } end
+			if not issecret(n) and n == name then return { name = n, applications = count, duration = dur, expirationTime = exp } end
 		end
 	end
 end
@@ -253,8 +280,10 @@ end
 function CK:AuraRemaining(unit, name, filter)
 	local a = self:FindAura(unit, name, filter)
 	if not a then return 0 end
-	if not a.expirationTime or a.expirationTime == 0 then return math.huge end
-	return math.max(0, a.expirationTime - GetTime())
+	local exp = Safe(a.expirationTime)
+	if not exp then return 1 end -- present, duration hidden
+	if exp == 0 then return math.huge end
+	return math.max(0, exp - GetTime())
 end
 
 ---------------------------------------------------------------------------
@@ -413,6 +442,9 @@ SlashCmdList.CASTERKIT = function(msg)
 		CK.char.bars.locked = (msg == "lock")
 		CK:Fire("SETTINGS", "bars")
 		CK:Print(CK.char.bars.locked and "Kaders vergrendeld." or "Kaders ontgrendeld: sleep ze waar je wil, typ /ck lock als je klaar bent.")
+	elseif msg == "debug" then
+		CK.debug = not CK.debug
+		CK:Print("debug", CK.debug and "aan" or "uit")
 	elseif msg == "aoe" then
 		CK:ToggleAoE()
 	elseif msg == "reset" then

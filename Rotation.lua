@@ -53,29 +53,39 @@ local function lossOfControl()
 	end
 end
 
+local Safe = CK.Safe
+
+-- a / b, or default when either side is secret or b is 0
+local function ratio(a, b, default)
+	a, b = Safe(a), Safe(b)
+	if not a or not b or b <= 0 then return default end
+	return a / b
+end
+
 local fallStart
 function R:BuildContext()
 	local now = GetTime()
 	ctx.now = now
 	ctx.level = UnitLevel("player")
-	ctx.inCombat = UnitAffectingCombat("player")
-	ctx.hostile = UnitExists("target") and UnitCanAttack("player", "target") and not UnitIsDead("target")
-	ctx.targetHealthPct = ctx.hostile and (UnitHealth("target") / math.max(1, UnitHealthMax("target"))) or 0
-	ctx.targetIsBoss = ctx.hostile and (UnitClassification("target") == "worldboss" or UnitLevel("target") == -1)
-	ctx.healthPct = UnitHealth("player") / math.max(1, UnitHealthMax("player"))
-	ctx.manaPct = UnitPower("player", 0) / math.max(1, UnitPowerMax("player", 0))
-	ctx.moving = GetUnitSpeed("player") > 0
+	ctx.inCombat = Safe(UnitAffectingCombat("player"), true)
+	ctx.hostile = UnitExists("target") and Safe(UnitCanAttack("player", "target"), false) and not Safe(UnitIsDead("target"), false)
+	ctx.targetHealthPct = ctx.hostile and ratio(UnitHealth("target"), UnitHealthMax("target")) or nil
+	ctx.targetIsBoss = ctx.hostile and Safe(UnitClassification("target")) == "worldboss"
+	ctx.healthPct = ratio(UnitHealth("player"), UnitHealthMax("player"), 1)
+	ctx.manaPct = ratio(UnitPower("player", 0), UnitPowerMax("player", 0), 1)
+	ctx.moving = (Safe(GetUnitSpeed("player"), 0) or 0) > 0
 	ctx.aoe = CK.char.rotation.aoe
-	ctx.targetingMe = ctx.hostile and UnitIsUnit("targettarget", "player")
+	ctx.targetingMe = ctx.hostile and Safe(UnitIsUnit("targettarget", "player"), false)
 
-	local name, _, _, _, endMS, _, _, _, spellID = UnitCastingInfo("player")
+	local name, _, _, _, endMS = UnitCastingInfo("player")
 	ctx.channeling = false
 	if not name then
 		name, _, _, _, endMS = UnitChannelInfo("player")
 		ctx.channeling = name ~= nil
 	end
+	name, endMS = Safe(name), Safe(endMS)
 	ctx.casting = name
-	ctx.castRemaining = name and math.max(0, endMS / 1000 - now) or 0
+	ctx.castRemaining = (name and endMS) and math.max(0, endMS / 1000 - now) or 0
 	ctx.wait = math.max(CK:GCDRemaining(), ctx.castRemaining)
 
 	if IsFalling() then
@@ -109,31 +119,56 @@ local function firstReady(names)
 	end
 end
 
+-- Blizzard's own rotation assistant (official, works in combat).
+function R:HasBlizzard()
+	return C_AssistedCombat and C_AssistedCombat.GetNextCastSpell ~= nil
+end
+
+function R:BlizzardNext()
+	if not self:HasBlizzard() then return end
+	local ok, id = pcall(C_AssistedCombat.GetNextCastSpell, false)
+	if ok and id and not CK.IsSecret(id) and id ~= 0 then return CK.GetSpellName(id) end
+end
+
+local function layer(fn, ...)
+	-- extra layers must never break the main suggestion
+	pcall(fn, ...)
+end
+
 function R:Evaluate()
 	local cfg = CK.char.rotation
 	local spec = CK:GetSpec()
 	local c = self:BuildContext()
 	local list = {}
+	local wantTarget = c.hostile or not cfg.onlyHostile
+	local useCustom = cfg.source == "custom" or not self:HasBlizzard()
 
-	if spec and spec.rotation and (c.hostile or not cfg.onlyHostile) then
-		spec.rotation(c, list, push)
+	if wantTarget then
+		if useCustom and spec and spec.rotation then
+			-- secret values make parts of the custom priority unreadable in combat
+			if not pcall(spec.rotation, c, list, push) then wipe(list) end
+		end
+		local blizz = self:BlizzardNext()
+		if blizz and (not useCustom or #list == 0) then push(list, blizz, "hint", true) end
 	end
 
 	-- racial layer
-	if c.control then push(list, firstReady(self.racials.escape), "defensive", true) end
-	if c.fallTime > 0.8 then push(list, firstReady(self.racials.fall), "defensive", true) end
-	if c.manaPct < (c.inCombat and 0.35 or 0.5) then
-		local m = firstReady(self.racials.mana)
-		if m then push(list, m, "hint", c.inCombat and #list > 0) end
-	end
-	if c.inCombat and c.hostile and #list > 0 then
-		local b = firstReady(self.racials.burst)
-		if b then table.insert(list, math.min(2, #list + 1), { name = b, kind = "hint" }) end
-	end
+	layer(function()
+		if c.control then push(list, firstReady(self.racials.escape), "defensive", true) end
+		if c.fallTime > 0.8 then push(list, firstReady(self.racials.fall), "defensive", true) end
+		if c.manaPct < (c.inCombat and 0.35 or 0.5) then
+			local m = firstReady(self.racials.mana)
+			if m then push(list, m, "hint", c.inCombat and #list > 0) end
+		end
+		if c.inCombat and c.hostile and #list > 0 then
+			local b = firstReady(self.racials.burst)
+			if b then table.insert(list, math.min(2, #list + 1), { name = b, kind = "hint" }) end
+		end
+	end)
 
 	-- class extras that also apply without a target (e.g. Slow Fall, Blink)
 	local def = CK:GetClass()
-	if def and def.Always then def.Always(c, list, push) end
+	if def and def.Always then layer(def.Always, c, list, push) end
 
 	return list
 end
@@ -386,8 +421,12 @@ function R:Tick()
 		self.hint:Hide()
 		return
 	end
-	if mapDirty or GetTime() - mapTime > 1 then self:RebuildMap() end
-	local list = self:Evaluate()
+	if mapDirty or GetTime() - mapTime > 1 then pcall(self.RebuildMap, self) end
+	local ok, list = pcall(self.Evaluate, self)
+	if not ok then
+		if CK.debug then CK:Print("rotatie:", list) end
+		list = {}
+	end
 	self.current = list
 	self:UpdateGlows(list)
 	self:UpdateHint(list)

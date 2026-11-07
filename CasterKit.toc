@@ -2,7 +2,7 @@
 ## Title: CasterKit
 ## Notes: Caster-UI: actiebalken in één kader, rotatiehulp en levelhulpjes.
 ## Author: DinX
-## Version: 0.1.0
+## Version: 0.1.1
 ## IconTexture: Interface\Icons\Spell_Frost_FrostBolt02
 ## SavedVariables: CasterKitDB
 ## SavedVariablesPerCharacter: CasterKitCharDB
