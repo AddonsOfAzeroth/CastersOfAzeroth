@@ -13,7 +13,7 @@ local Safe, IsSecret = CK.Safe, CK.IsSecret
 local P = CK:NewModule("Predict")
 
 local COLORS = {
-	damage = { 0.55, 0.05, 0.05, 0.85 },
+	damage = { 0.9, 0.1, 0.1, 0.8 },
 	heal = { 0.25, 1, 0.35, 0.55 },
 	absorb = { 0.45, 0.8, 1, 0.55 },
 }
@@ -93,13 +93,42 @@ end
 ---------------------------------------------------------------------------
 -- Drawing on the unit frames
 ---------------------------------------------------------------------------
+-- A bar the size of `bar`, glued to the end of its fill: the client works out
+-- where that end is, so this also works while health or mana are hidden (combat).
+local function makeSeg(bar, layerUp)
+	local clip = CreateFrame("Frame", nil, bar)
+	clip:SetAllPoints(bar)
+	clip:SetFrameLevel(bar:GetFrameLevel() + (layerUp or 1))
+	pcall(clip.SetClipsChildren, clip, true) -- nothing past the ends of the bar
+	local sb = CreateFrame("StatusBar", nil, clip)
+	sb:SetStatusBarTexture(S.flat)
+	clip.sb = sb
+	return clip
+end
+
+-- back = true: the part that goes off (ends where the fill ends);
+-- false: the part that comes on (starts where the fill ends)
+local function placeSeg(clip, bar, max, amount, back, c)
+	local fill = bar:GetStatusBarTexture()
+	local sb = clip.sb
+	sb:ClearAllPoints()
+	if back then
+		sb:SetPoint("TOPRIGHT", fill, "TOPRIGHT")
+		sb:SetPoint("BOTTOMRIGHT", fill, "BOTTOMRIGHT")
+	else
+		sb:SetPoint("TOPLEFT", fill, "TOPRIGHT")
+		sb:SetPoint("BOTTOMLEFT", fill, "BOTTOMRIGHT")
+	end
+	sb:SetWidth(math.max(1, bar:GetWidth()))
+	sb:SetReverseFill(back and true or false)
+	sb:SetStatusBarColor(c[1], c[2], c[3], c[4])
+	local ok = pcall(sb.SetMinMaxValues, sb, 0, max) and pcall(sb.SetValue, sb, amount)
+	sb:SetShown(ok and true or false)
+end
+
 local function overlay(f)
 	if f.predict then return f.predict end
-	local o = CreateFrame("Frame", nil, f.health)
-	o:SetAllPoints(f.health)
-	o:SetFrameLevel(f.health:GetFrameLevel() + 1)
-	o.bar = o:CreateTexture(nil, "ARTWORK")
-	o.bar:SetTexture(S.flat)
+	local o = makeSeg(f.health)
 	o.text = S:Font(o, 12)
 	o.text:SetPoint("CENTER", o, "CENTER", 0, 0)
 	o:Hide()
@@ -114,31 +143,12 @@ end
 local function show(f, est)
 	local o = overlay(f)
 	local u = f.unit
-	local cur, max = Safe(UnitHealth(u), nil), Safe(UnitHealthMax(u), nil)
 	local a = est.amount
-	local c = COLORS[est.kind]
-	local sign = est.kind == "damage" and "-" or "+"
-	local label = sign .. a .. (est.over and (" / " .. est.over .. "s") or "")
-	o.bar:Hide()
-	if type(cur) == "number" and type(max) == "number" and max > 0 then
-		local w = f.health:GetWidth()
-		local x0, x1
-		if est.kind == "damage" then
-			x0, x1 = math.max(0, cur - a), cur
-			if not est.over and a >= cur then label = L["KILL"] end
-		else
-			x0, x1 = cur, math.min(max, cur + a)
-		end
-		if x1 > x0 then
-			o.bar:ClearAllPoints()
-			o.bar:SetPoint("TOPLEFT", f.health, "TOPLEFT", x0 / max * w, 0)
-			o.bar:SetPoint("BOTTOMLEFT", f.health, "BOTTOMLEFT", x0 / max * w, 0)
-			o.bar:SetWidth(math.max(1, (x1 - x0) / max * w))
-			o.bar:SetVertexColor(c[1], c[2], c[3], c[4])
-			o.bar:Show()
-		end
-	end
-	-- health hidden (combat): the number alone
+	local label = (est.kind == "damage" and "-" or "+") .. a .. (est.over and (" / " .. est.over .. "s") or "")
+	placeSeg(o, f.health, UnitHealthMax(u), a, est.kind == "damage", COLORS[est.kind])
+	-- "KILL" only when the health can be read
+	local cur = Safe(UnitHealth(u), nil)
+	if est.kind == "damage" and not est.over and type(cur) == "number" and a >= cur then label = L["KILL"] end
 	o.text:SetText(label)
 	local tc = est.kind == "damage" and { 1, 0.45, 0.45 } or (est.kind == "heal" and { 0.5, 1, 0.55 } or { 0.6, 0.85, 1 })
 	o.text:SetTextColor(tc[1], tc[2], tc[3])
@@ -163,39 +173,22 @@ local function manaCost(spellID)
 end
 
 -- the cost as a lighter part at the end of your mana bar; "OOM" when it does not fit
+local MANA_COLOR = { 1, 1, 1, 0.5 }
 local function showMana(f, cost)
 	local bar = f.power
 	if not bar then return end
 	local o = f.predictMana
 	if not o then
-		o = CreateFrame("Frame", nil, bar)
-		o:SetAllPoints(bar)
-		o:SetFrameLevel(bar:GetFrameLevel() + 1)
-		o.bar = o:CreateTexture(nil, "ARTWORK")
-		o.bar:SetTexture(S.flat)
-		o.bar:SetVertexColor(1, 1, 1, 0.45)
+		o = makeSeg(bar)
 		o.text = S:Font(o, 10)
+		o.text:SetPoint("CENTER", bar, "CENTER", 0, 0)
 		f.predictMana = o
 	end
-	local cur, max = Safe(UnitPower("player", 0), nil), Safe(UnitPowerMax("player", 0), nil)
-	o.bar:Hide()
-	o.text:ClearAllPoints()
-	o.text:SetPoint("CENTER", bar, "CENTER", 0, 0)
-	if type(cur) == "number" and type(max) == "number" and max > 0 then
-		local w = bar:GetWidth()
-		local x0 = math.max(0, cur - cost)
-		o.bar:ClearAllPoints()
-		o.bar:SetPoint("TOPLEFT", bar, "TOPLEFT", x0 / max * w, 0)
-		o.bar:SetPoint("BOTTOMLEFT", bar, "BOTTOMLEFT", x0 / max * w, 0)
-		o.bar:SetWidth(math.max(1, (cur - x0) / max * w))
-		o.bar:Show()
-		if cost > cur then
-			o.text:SetText(L["OOM"])
-			o.text:SetTextColor(1, 0.3, 0.3)
-		else
-			o.text:SetText(("-%d %s"):format(cost, L["mana"]))
-			o.text:SetTextColor(0.55, 0.75, 1)
-		end
+	placeSeg(o, bar, UnitPowerMax("player", 0), cost, true, MANA_COLOR)
+	local cur = Safe(UnitPower("player", 0), nil)
+	if type(cur) == "number" and cost > cur then
+		o.text:SetText(L["OOM"])
+		o.text:SetTextColor(1, 0.3, 0.3)
 	else
 		o.text:SetText(("-%d %s"):format(cost, L["mana"]))
 		o.text:SetTextColor(0.55, 0.75, 1)
