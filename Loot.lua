@@ -26,7 +26,7 @@ local Safe, IsSecret = CK.Safe, CK.IsSecret
 
 local M = CK:NewModule("Loot")
 
-local WIDTH, ROW_H, ICON = 230, 26, 22
+local WIDTH, ROW_H, ICON = 270, 26, 22
 local HEADER, FOOTER, PAD = 22, 26, 4
 local FEED_W, FEED_ROW, FEED_ICON = 260, 20, 16
 local ROLL_W, ROLL_H, ROLL_GAP = 300, 32, 4
@@ -134,6 +134,28 @@ end
 ---------------------------------------------------------------------------
 -- Loot window
 ---------------------------------------------------------------------------
+-- Kinds with their own button (only shown when that kind is in the loot).
+local CATS = {
+	{ key = "quest", label = "Quest", tip = "Loot the quest items." },
+	{ key = "gear", label = "Gear", tip = "Loot weapons and armour (not grey)." },
+	{ key = "reagents", label = "Reagents", tip = "Loot trade goods and reagents (cloth, herbs, ore...)." },
+	{ key = "money", label = "Money", tip = "Loot the money and currencies." },
+	{ key = "trash", label = "Trash", tip = "Loot the grey items (to sell)." },
+}
+local CLASS_WEAPON = (Enum and Enum.ItemClass and Enum.ItemClass.Weapon) or 2
+local CLASS_ARMOR = (Enum and Enum.ItemClass and Enum.ItemClass.Armor) or 4
+local CLASS_REAGENT = (Enum and Enum.ItemClass and Enum.ItemClass.Reagent) or 5
+local CLASS_TRADE = (Enum and Enum.ItemClass and Enum.ItemClass.Tradegoods) or 7
+
+-- Which button a slot belongs to (nil: only "Loot all").
+local function kindOf(d)
+	if d.kind == 2 or d.kind == 3 then return "money" end
+	if d.isQuest or d.questID then return "quest" end
+	if d.quality == 0 then return "trash" end
+	if d.classID == CLASS_WEAPON or d.classID == CLASS_ARMOR then return "gear" end
+	if d.classID == CLASS_TRADE or d.classID == CLASS_REAGENT then return "reagents" end
+end
+
 local QUEST_BANG = TEXTURE_ITEM_QUEST_BANG or "Interface\\ContainerFrame\\UI-Icon-QuestBang"
 local QUEST_BORDER = TEXTURE_ITEM_QUEST_BORDER or "Interface\\ContainerFrame\\UI-Icon-QuestBorder"
 
@@ -201,6 +223,26 @@ function M:CreateWindow()
 	all:SetPoint("BOTTOMLEFT", PAD, PAD)
 	all:SetScript("OnClick", function() guard(M.LootAll, M) end)
 	f.lootAll = all
+
+	-- one click per kind, for when your bags are nearly full
+	f.cats = {}
+	for _, c in ipairs(CATS) do
+		local b = flatButton(f, L[c.label], 50, 18)
+		b.cat = c.key
+		b:SetScript("OnClick", function(btn) guard(M.LootKind, M, btn.cat) end)
+		b:SetScript("OnEnter", function(btn)
+			btn:SetBackdropBorderColor(unpack(S.colors.accent))
+			GameTooltip:SetOwner(btn, "ANCHOR_TOP")
+			GameTooltip:AddLine(L[c.tip], 1, 1, 1, true)
+			GameTooltip:Show()
+		end)
+		b:SetScript("OnLeave", function(btn)
+			btn:SetBackdropBorderColor(0, 0, 0, 1)
+			hideTooltip(btn)
+		end)
+		b:Hide()
+		f.cats[c.key] = b
+	end
 
 	f:SetScript("OnHide", function() guard(M.OnWindowHide, M) end)
 	-- Esc closes the window (and with it the loot)
@@ -274,14 +316,15 @@ local function readSlot(slot)
 	slotData.questID = num(questID)
 	slotData.isActive = flag(isActive)
 	slotData.kind = num(GetLootSlotType and try(GetLootSlotType, slot), 1)
-	-- quest class items count too, even when the loot API does not flag them
-	if not slotData.isQuest and GetLootSlotLink then
+	-- item class: quest class items count as quest even when the loot API does not flag them
+	if GetLootSlotLink and slotData.kind == 1 then
 		local link = try(GetLootSlotLink, slot)
 		if type(link) == "string" and not IsSecret(link) then
 			local getInstant = C_Item and C_Item.GetItemInfoInstant or GetItemInfoInstant
 			local classID = getInstant and select(7, pcall(getInstant, link)) -- ok, id, type, subType, equipLoc, icon, classID
+			slotData.classID = num(classID)
 			local questClass = (Enum and Enum.ItemClass and Enum.ItemClass.Questitem) or 12
-			if num(classID) == questClass then slotData.isQuest = true end
+			if slotData.classID == questClass then slotData.isQuest = true end
 		end
 	end
 	return slotData
@@ -335,9 +378,11 @@ local SAMPLES = {
 	{ tex = 135145, name = "Sample Staff", qty = 1, quality = 3 },
 }
 
+local counts = {}
 function M:RenderWindow()
 	local f = self.window
 	local shown = 0
+	wipe(counts)
 	if self.preview then
 		for _, s in ipairs(SAMPLES) do
 			shown = shown + 1
@@ -351,8 +396,16 @@ function M:RenderWindow()
 			if d then
 				shown = shown + 1
 				self:FillRow(self:Row(shown), d)
+				local k = kindOf(d)
+				if k then counts[k] = (counts[k] or 0) + 1 end
 			end
 		end
+	end
+	-- free bag slots next to the title: you see at once if it all fits
+	local free = CK.FreeBagSlots and CK:FreeBagSlots()
+	if type(free) == "number" then
+		local c = free <= 2 and "|cffff5555" or "|cff999999"
+		f.title:SetText(L["Loot"] .. "  " .. c .. L["%d free"]:format(free) .. "|r")
 	end
 	for i = 1, shown do
 		local r = self.rows[i]
@@ -365,7 +418,30 @@ function M:RenderWindow()
 		self.rows[i].slot = nil
 	end
 	f.lootAll:SetShown(shown > 1)
+	-- kind buttons: only kinds that are here, and only when there is a choice
+	local kinds = 0
+	for _, c in ipairs(CATS) do
+		if counts[c.key] and counts[c.key] < shown then kinds = kinds + 1 end
+	end
+	if self.preview then counts.quest, counts.gear, counts.reagents, counts.money, counts.trash, kinds = 1, 1, 1, 1, 0, 4 end
+	local w = kinds > 0 and math.floor((WIDTH - PAD * 2 - (kinds - 1) * 3) / kinds) or 0
+	local x = PAD
+	for _, c in ipairs(CATS) do
+		local b = f.cats[c.key]
+		local n = counts[c.key]
+		if kinds > 0 and n and n > 0 and (self.preview or n < shown) then
+			b:SetWidth(w)
+			b.text:SetText(n > 1 and (L[c.label] .. " " .. n) or L[c.label])
+			b:ClearAllPoints()
+			b:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", x, PAD + 21)
+			b:Show()
+			x = x + w + 3
+		else
+			b:Hide()
+		end
+	end
 	local foot = shown > 1 and FOOTER or PAD
+	if kinds > 0 and shown > 1 then foot = foot + 21 end
 	f:SetHeight(HEADER + math.max(1, shown) * ROW_H + foot)
 	return shown
 end
@@ -420,6 +496,16 @@ function M:SlotTooltip(btn)
 	end
 	GameTooltip:Show()
 	if CursorUpdate then CursorUpdate(btn) end
+end
+
+-- One user click loots every slot of one kind.
+function M:LootKind(kind)
+	if not self.lootOpen then return end
+	local n = num(GetNumLootItems and try(GetNumLootItems), 0)
+	for slot = n, 1, -1 do
+		local d = readSlot(slot)
+		if d and not d.locked and kindOf(d) == kind then LootSlot(slot) end
+	end
 end
 
 -- One user click loots every slot, like Blizzard's shift-click / auto loot.
