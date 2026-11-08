@@ -532,6 +532,20 @@ local function knowsDisenchant()
 	return n ~= nil and CK:Known(n)
 end
 
+-- Disenchant mode: the tooltip goes next to the bags (left, or right when the
+-- bags sit at the left edge) so it never covers the slots you are clicking.
+local function sideTooltip(owner)
+	local f = B.frame
+	GameTooltip:SetOwner(owner, "ANCHOR_NONE")
+	GameTooltip:ClearAllPoints()
+	if f and f:GetLeft() and f:GetLeft() > 320 then
+		GameTooltip:SetPoint("TOPRIGHT", f, "TOPLEFT", -6, 0)
+	elseif f then
+		GameTooltip:SetPoint("TOPLEFT", f, "TOPRIGHT", 6, 0)
+	end
+end
+B.SideTooltip = sideTooltip
+
 local function hideDisenchant()
 	if deButton and not InCombatLockdown() then
 		deButton:Hide()
@@ -552,7 +566,7 @@ local function placeDisenchant(itemButton, d)
 		hl:SetColorTexture(0.64, 0.21, 0.93, 0.35)
 		deButton:SetScript("OnEnter", function(self)
 			guard(function()
-				GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+				sideTooltip(self)
 				if self.bag then GameTooltip:SetBagItem(self.bag, self.slot) end
 				GameTooltip:AddLine(L["Click: disenchant"], 0.64, 0.21, 0.93)
 				GameTooltip:Show()
@@ -562,6 +576,8 @@ local function placeDisenchant(itemButton, d)
 			GameTooltip:Hide()
 			hideDisenchant()
 		end)
+		-- the item is gone after the cast: don't leave its tooltip behind
+		deButton:HookScript("PostClick", function() GameTooltip:Hide() end)
 		deButton:Hide()
 	end
 	deButton:SetAttribute("macrotext", "/cast " .. spell .. "\n/use " .. d.bag .. " " .. d.slot)
@@ -589,6 +605,14 @@ local function onItemEnter(self)
 			addTooltipLines(GameTooltip, d)
 			GameTooltip:Show()
 		end
+		if B.deMode and GameTooltip:IsOwned(self) and B.frame then
+			GameTooltip:ClearAllPoints()
+			if B.frame:GetLeft() and B.frame:GetLeft() > 320 then
+				GameTooltip:SetPoint("TOPRIGHT", B.frame, "TOPLEFT", -6, 0)
+			else
+				GameTooltip:SetPoint("TOPLEFT", B.frame, "TOPRIGHT", 6, 0)
+			end
+		end
 	end)
 end
 
@@ -597,7 +621,7 @@ local function ownEnter(self)
 	guard(function()
 		local d = data[self]
 		if not (d and d.id) then return end
-		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+		if B.deMode then sideTooltip(self) else GameTooltip:SetOwner(self, "ANCHOR_RIGHT") end
 		GameTooltip:SetBagItem(d.bag, d.slot)
 		if B.atMerchant and ShowContainerSellCursor then try(ShowContainerSellCursor, d.bag, d.slot) end
 		GameTooltip:Show()
