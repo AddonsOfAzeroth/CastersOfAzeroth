@@ -324,24 +324,40 @@ local SOURCES = {
 	end },
 }
 
--- Full read of a unit's auras: a list of { d, id, harmful, index, filter },
--- or nil when this client refuses right now (enemy auras in combat).
--- Second value: the way that worked (or the filter that was refused).
+-- one filter, through the first way that gives something
+local function readFilter(unit, filter)
+	local best, used
+	for _, src in ipairs(SOURCES) do
+		local got = src[2](unit, filter)
+		if got and (not best or #got > #best) then best, used = got, src[1] end
+		if best and #best > 0 then break end
+	end
+	return best, used
+end
+
+-- Read a unit's auras: a list of { d, id, harmful, index, filter }, or nil
+-- when this client refuses everything right now. complete = false when only
+-- your own auras could be read (enemy in combat: "HARMFUL|PLAYER" is allowed
+-- where "HARMFUL" is not), so the list is not the whole picture.
 local function scan(unit)
-	local list, used = {}, nil
+	local list, used, complete, any = {}, nil, true, false
 	for _, filter in ipairs({ "HARMFUL", "HELPFUL" }) do
-		local best
-		for _, src in ipairs(SOURCES) do
-			local got = src[2](unit, filter)
-			if got and (not best or #got > #best) then best, used = got, src[1] end
-			if best and #best > 0 then break end
+		local got, how = readFilter(unit, filter)
+		local f = filter
+		if not got then
+			complete = false
+			f = filter .. "|PLAYER"
+			got, how = readFilter(unit, f)
 		end
-		if not best then return nil, filter end
-		for i, d in ipairs(best) do
-			list[#list + 1] = { d = d, id = Safe(d.auraInstanceID), harmful = filter == "HARMFUL", index = i, filter = filter }
+		if got then
+			any, used = true, how
+			for i, d in ipairs(got) do
+				list[#list + 1] = { d = d, id = Safe(d.auraInstanceID), harmful = filter == "HARMFUL", index = i, filter = f }
+			end
 		end
 	end
-	return list, used
+	if not any then return nil end
+	return list, used, complete
 end
 UF.ScanAuras = scan
 
@@ -409,12 +425,30 @@ function UF:UpdateAuras(f, info)
 	local unit = f.unit
 	local cache = f.auraCache or {}
 	f.auraCache = cache
-	local partial = type(info) == "table" and Safe(info.isFullUpdate, true) == false
-	local list = not partial and scan(unit)
-	if list then
+	-- some clients leave isFullUpdate out of a partial update
+	local partial = type(info) == "table" and Safe(info.isFullUpdate, false) ~= true
+	f.auraEvents = (f.auraEvents or 0) + (info and 1 or 0)
+	if partial then
+		f.auraLast = ("+%d ~%d -%d"):format(#(info.addedAuras or {}), #(info.updatedAuraInstanceIDs or {}),
+			#(info.removedAuraInstanceIDs or {}))
+	elseif info then
+		f.auraLast = "full"
+	end
+	local list, _, complete = scan(unit)
+	if list and complete then
 		wipe(cache)
 		for i, r in ipairs(list) do cache[i] = r end
-	elseif partial then
+	elseif list then
+		-- only your own auras could be read: drop the old ones of yours, keep the rest
+		local mine = {}
+		for _, r in ipairs(list) do if r.id then mine[r.id] = true end end
+		for i = #cache, 1, -1 do
+			local r = cache[i]
+			if r.mine or (r.id and mine[r.id]) then table.remove(cache, i) end
+		end
+		for _, r in ipairs(list) do r.mine = true cache[#cache + 1] = r end
+	end
+	if partial and not (list and complete) then
 		for _, id in ipairs(info.removedAuraInstanceIDs or {}) do
 			id = Safe(id)
 			for i = #cache, 1, -1 do if id and cache[i].id == id then table.remove(cache, i) end end
@@ -480,8 +514,11 @@ SlashCmdList.CASTERSAURAS = function()
 	if f and f.auras then
 		for _, row in pairs(f.auras) do for _, a in ipairs(row) do if a:IsShown() then shown = shown + 1 end end end
 	end
-	CK:Print(("auras %s (debuffs/buffs): %s; kept %d, shown %d, frame %s"):format(unit, table.concat(counts, ", "),
-		f and f.auraCache and #f.auraCache or 0, shown, tostring(f and f:IsVisible())))
+	local h, b = readFilter(unit, "HARMFUL|PLAYER"), readFilter(unit, "HELPFUL|PLAYER")
+	counts[#counts + 1] = "mine " .. (h and #h or "-") .. "/" .. (b and #b or "-")
+	CK:Print(("auras %s (debuffs/buffs): %s; kept %d, shown %d, events %d (last %s)"):format(unit,
+		table.concat(counts, ", "), f and f.auraCache and #f.auraCache or 0, shown,
+		f and f.auraEvents or 0, f and f.auraLast or "-"))
 end
 
 ---------------------------------------------------------------------------
