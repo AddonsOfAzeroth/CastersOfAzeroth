@@ -76,6 +76,8 @@ end
 -- heal yourself when it gets close (Shadowform blocks healing: leave it yourself)
 local function selfHeal(ctx, push)
 	if shadowform(ctx) or ctx.healthPct >= 0.35 then return end
+	-- Human / Dwarf: Desperate Prayer is instant and free
+	if ctx:Ready("Desperate Prayer") then push("Desperate Prayer", "defensive") end
 	if ctx:Ready("Flash Heal") then push("Flash Heal", "defensive")
 	elseif ctx:Ready("Heal") and not ctx.moving then push("Heal", "defensive")
 	elseif ctx:Ready("Lesser Heal") and not ctx.moving then push("Lesser Heal", "defensive") end
