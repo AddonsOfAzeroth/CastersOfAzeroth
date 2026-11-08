@@ -18,6 +18,13 @@ local BAGS = { "MainMenuBarBackpackButton", "CharacterBag0Slot", "CharacterBag1S
 local hider = CreateFrame("Frame")
 hider:Hide()
 
+-- where each Blizzard button came from, to give it back when the panel is off
+local origParent = {}
+local function take(b, parent)
+	if origParent[b] == nil then origParent[b] = b:GetParent() or false end
+	b:SetParent(parent)
+end
+
 function M:CreatePanel()
 	local p = CreateFrame("Frame", "CasterKitMicro", UIParent, "BackdropTemplate")
 	p:SetMovable(true)
@@ -60,9 +67,11 @@ function M:DoLayout()
 	local cfg = CK.char.micro
 	local p = self.panel
 	if not cfg.enabled then
+		self:GiveBack()
 		p:Hide()
 		return
 	end
+	self.givenBack = nil
 	p:Show()
 	p:SetScale(cfg.scale)
 	p:ClearAllPoints()
@@ -78,7 +87,7 @@ function M:DoLayout()
 		for _, name in ipairs(BAGS) do
 			local b = _G[name]
 			if b and (name ~= "KeyRingButton" or b:IsShown()) then
-				b:SetParent(p)
+				take(b, p)
 				b:ClearAllPoints()
 				b:SetSize(28, 28)
 				b:SetPoint("BOTTOMLEFT", p, "BOTTOMLEFT", x, pad)
@@ -105,7 +114,7 @@ function M:DoLayout()
 		local b = _G[name]
 		if b and b:IsShown() then
 			strip(b)
-			b:SetParent(p)
+			take(b, p)
 			b:ClearAllPoints()
 			b:SetPoint("BOTTOMLEFT", p, "BOTTOMLEFT", x, pad)
 			x = x + b:GetWidth() + (first and gap or gap)
@@ -138,6 +147,7 @@ function M:UpdateFree()
 end
 
 function M:HideContainers()
+	if not CK.char.micro.enabled then return end
 	local mm = _G.MicroMenu
 	if mm then
 		if mm.BorderArt then mm.BorderArt:SetAlpha(0) end
@@ -150,6 +160,28 @@ function M:HideContainers()
 		if bb then bb:SetAlpha(0) end
 		if _G.BagBarExpandToggle then _G.BagBarExpandToggle:SetParent(hider) end
 	end
+end
+
+-- Panel off: Blizzard's micro menu and bag bar get their buttons back, so
+-- Blizzard can lay them out again (in our hidden panel they have no position).
+function M:GiveBack()
+	if self.givenBack then return end
+	self.givenBack = true
+	for b, parent in pairs(origParent) do
+		if parent then b:SetParent(parent) end
+	end
+	local mm = _G.MicroMenu
+	if mm then
+		if mm.BorderArt then mm.BorderArt:SetAlpha(1) end
+		if mm.BackgroundArt then mm.BackgroundArt:SetAlpha(1) end
+		if mm.Layout then pcall(mm.Layout, mm) end
+	end
+	local bb = _G.BagsBar
+	if bb then
+		bb:SetAlpha(1)
+		if bb.Layout then pcall(bb.Layout, bb) end
+	end
+	if _G.BagBarExpandToggle and _G.BagsBar then _G.BagBarExpandToggle:SetParent(_G.BagsBar) end
 end
 
 function M:Setup()
