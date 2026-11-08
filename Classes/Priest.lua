@@ -334,7 +334,7 @@ CK:AddReminderProvider(function(add)
 	local inCombat = InCombatLockdown()
 
 	-- shown always (or only when low, per setting), red when missing or running low
-	local function buff(key, names, spell, missingText)
+	local function buff(key, names, spell, missingText, anyTarget)
 		if CK.char.leveling.buffsOff[key] then return end
 		local found, hidden
 		for _, n in ipairs(names) do
@@ -346,7 +346,7 @@ CK:AddReminderProvider(function(add)
 		if not found and hidden then
 			-- auras hidden (combat): keep the button, don't call it missing
 			add({ key = key, icon = CK:SpellTexture(spell), count = "", always = cfg.buffMode == "always",
-				warn = false, spell = spell, tooltip = spell })
+				warn = false, spell = spell, tooltip = spell, anyTarget = anyTarget })
 			return
 		end
 		local left = found and CK:AuraRemaining("player", found, "HELPFUL")
@@ -356,15 +356,15 @@ CK:AddReminderProvider(function(add)
 		end
 		local low = not found or (left and left ~= 1 and left < cfg.buffWarnMinutes * 60)
 		add({ key = key, icon = CK:SpellTexture(spell), count = text, always = cfg.buffMode == "always" or low,
-			warn = not inCombat and low, spell = spell, tooltip = found and found or missingText })
+			warn = not inCombat and low, spell = spell, tooltip = found and found or missingText, anyTarget = anyTarget })
 	end
 
 	if CK:Known("Inner Fire") then buff("innerfire", { "Inner Fire" }, "Inner Fire", L["Inner Fire is missing."]) end
 	if CK:Known("Power Word: Fortitude") then
-		buff("fortitude", FORTITUDE, "Power Word: Fortitude", L["Power Word: Fortitude is missing."])
+		buff("fortitude", FORTITUDE, "Power Word: Fortitude", L["Power Word: Fortitude is missing."], true)
 	end
 	if CK:Known("Shadow Protection") then
-		buff("shadowprot", SHADOW_PROT, "Shadow Protection", L["Shadow Protection is missing."])
+		buff("shadowprot", SHADOW_PROT, "Shadow Protection", L["Shadow Protection is missing."], true)
 	end
-	if CK:Known("Divine Spirit") then buff("spirit", SPIRIT, "Divine Spirit", L["Divine Spirit is missing."]) end
+	if CK:Known("Divine Spirit") then buff("spirit", SPIRIT, "Divine Spirit", L["Divine Spirit is missing."], true) end
 end)

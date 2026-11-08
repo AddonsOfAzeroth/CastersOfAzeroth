@@ -300,7 +300,7 @@ CK:AddReminderProvider(function(add)
 	end
 
 	-- buffs: shown always (or only when low, per setting), red when missing or running low
-	local function buff(key, names, spell, missingText)
+	local function buff(key, names, spell, missingText, anyTarget)
 		if CK.char.leveling.buffsOff[key] then return end
 		local found, hidden
 		for _, n in ipairs(names) do
@@ -312,7 +312,7 @@ CK:AddReminderProvider(function(add)
 			-- auras hidden (combat): keep the button, don't call it missing
 			local cfg = CK.char.leveling
 			add({ key = key, icon = CK:SpellTexture(spell), count = "", always = cfg.buffMode == "always",
-				warn = false, spell = spell, tooltip = spell })
+				warn = false, spell = spell, tooltip = spell, anyTarget = anyTarget })
 			return
 		end
 		local left = found and CK:AuraRemaining("player", found, "HELPFUL")
@@ -324,16 +324,16 @@ CK:AddReminderProvider(function(add)
 		local low = not found or (left and left ~= 1 and left < cfg.buffWarnMinutes * 60)
 		add({ key = key, icon = CK:SpellTexture(spell), count = text, always = cfg.buffMode == "always" or low,
 			warn = not inCombat and low, spell = spell,
-			tooltip = found and found or missingText })
+			tooltip = found and found or missingText, anyTarget = anyTarget })
 	end
 
 	local armor = (IsInInstance() and CK:Known("Mage Armor") and "Mage Armor") or firstKnown({ "Ice Armor", "Frost Armor" })
 	if armor then buff("armor", ARMORS, armor, L["No armor buff active."]) end
 	if CK:Known("Arcane Intellect") then
-		buff("intellect", { "Arcane Intellect", "Arcane Brilliance" }, "Arcane Intellect", L["Arcane Intellect is missing."])
+		buff("intellect", { "Arcane Intellect", "Arcane Brilliance" }, "Arcane Intellect", L["Arcane Intellect is missing."], true)
 	end
 	-- Dampen Magic only solo: it also lowers healing you receive
 	if CK:Known("Dampen Magic") and not IsInGroup() then
-		buff("dampen", { "Dampen Magic", "Amplify Magic" }, "Dampen Magic", L["Dampen Magic is missing (solo: less magic damage taken)."])
+		buff("dampen", { "Dampen Magic", "Amplify Magic" }, "Dampen Magic", L["Dampen Magic is missing (solo: less magic damage taken)."], true)
 	end
 end)

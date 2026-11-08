@@ -171,6 +171,9 @@ local function slot(i)
 		if self.entry.use then
 			GameTooltip:AddLine(L["Left-click: use %s"]:format(CK:ItemName(self.entry.use) or "?"), 0.4, 0.8, 1)
 			if self.entry.spell then GameTooltip:AddLine(L["Right-click: "] .. self.entry.spell, 0.4, 0.8, 1) end
+		elseif self.entry.spell and self.entry.anyTarget then
+			GameTooltip:AddLine(L["Left-click: your friendly target, or yourself"], 0.4, 0.8, 1)
+			GameTooltip:AddLine(L["Right-click: always yourself"], 0.4, 0.8, 1)
 		elseif self.entry.spell then
 			GameTooltip:AddLine(L["Click: "] .. self.entry.spell, 0.4, 0.8, 1)
 		end
@@ -243,10 +246,14 @@ function LV:UpdateStrip()
 		b:SetAttribute("spell", e.spell)
 		b:SetAttribute("unit", e.spell and "player" or nil)
 		b:SetAttribute("macrotext", e.macrotext)
-		b:SetAttribute("type1", item and "item" or nil)
+		-- e.anyTarget (buffs for others): left click your friendly target or yourself, right click yourself
+		local other = e.anyTarget and e.spell and not item
+		b:SetAttribute("type1", item and "item" or (other and "macro") or nil)
 		b:SetAttribute("item1", item)
-		b:SetAttribute("type2", item and "spell" or nil)
-		b:SetAttribute("spell2", item and e.spell or nil)
+		b:SetAttribute("macrotext1", other and ("/cast [@target,help,nodead][@player] " .. e.spell) or nil)
+		b:SetAttribute("type2", (item or other) and "spell" or nil)
+		b:SetAttribute("spell2", (item or other) and e.spell or nil)
+		b:SetAttribute("unit2", other and "player" or nil)
 		if e.warn then
 			b:SetBackdropBorderColor(unpack(S.colors.warn))
 			b.pulse:Play()

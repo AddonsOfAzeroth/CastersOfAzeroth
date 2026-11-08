@@ -43,6 +43,8 @@ add({
 	["AoE mode (multiple enemies)"] = "AoE-modus (meerdere vijanden)",
 	["AoE mode off (single target)."] = "AoE-modus uit (één doelwit).",
 	["AoE mode on."] = "AoE-modus aan.",
+	["Left-click: your friendly target, or yourself"] = "Linkerklik: je vriendelijke doelwit, of jezelf",
+	["Right-click: always yourself"] = "Rechterklik: altijd jezelf",
 	["Arcane Intellect is missing."] = "Arcane Intellect ontbreekt.",
 	["Inner Fire is missing."] = "Inner Fire ontbreekt.",
 	["Power Word: Fortitude is missing."] = "Power Word: Fortitude ontbreekt.",
