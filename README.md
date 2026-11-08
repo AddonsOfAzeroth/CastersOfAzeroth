@@ -19,7 +19,9 @@ Werkt op een kale installatie, zonder ElvUI of Bartender4.
 - **Mage**: tellers voor conjured water, food en mana gems (klik = bijmaken), één klik eten en drinken,
   herinnering voor armor en Arcane Intellect, tip voor beter water bij de innkeeper.
 - **Priest**: Shadow-rotatie (Shadow Word: Pain, Devouring Plague, Vampiric Embrace, Mind Blast, Shadow Word: Death,
-  Mind Flay), Holy/Discipline voor solo leveling met Smite; schild, heal en Psychic Scream wanneer het nodig is;
+  Mind Flay); Holy en Discipline healen in een groep (Renew, Flash Heal, Greater Heal, Prayer of Healing,
+  Circle of Healing, Prayer of Mending, schild op de tank; Discipline ook Penance en Pain Suppression) en doen solo
+  schade met Smite; schild, heal en Psychic Scream wanneer het nodig is;
   Night Elf: Starshards en Elune's Grace; herinnering voor Inner Fire, Fortitude, Shadow Protection en Divine Spirit.
 - **Micromenu en tassen** samen in één paneel, met vrije tasplaatsen.
 - **Lettertype**: standaard Roboto met een zachte schaduw (instelbaar).

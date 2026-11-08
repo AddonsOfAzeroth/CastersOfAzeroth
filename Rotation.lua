@@ -205,7 +205,8 @@ function R:Evaluate()
 	local spec = CK:GetSpec()
 	local c = self:BuildContext()
 	local list = {}
-	local wantTarget = c.hostile or not cfg.onlyHostile
+	-- healer specs (spec.healer) also suggest heals in a group without an enemy target
+	local wantTarget = c.hostile or not cfg.onlyHostile or (spec and spec.healer and IsInGroup())
 	local useCustom = cfg.source == "custom" or not self:HasBlizzard()
 
 	if wantTarget then

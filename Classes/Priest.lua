@@ -153,24 +153,124 @@ local function shadow(ctx, list, add)
 end
 
 ---------------------------------------------------------------------------
--- Holy / Discipline (solo leveling: Smite, Holy Fire, Shadow Word: Pain, wand)
+-- Healing (Holy and Discipline in a group). Healers have no fixed rotation
+-- (Warcraft Tavern Forever guides): this suggests the spell, you pick who,
+-- e.g. with mouseover casting (Options > Combat). Health that Blizzard hides
+-- in combat counts as unknown, never as low.
 ---------------------------------------------------------------------------
-local function holy(ctx, list, add)
-	local function push(n, k) add(list, n, k) end
+local PARTY = { "player", "party1", "party2", "party3", "party4" }
+
+local function unitPct(u)
+	if not UnitExists(u) or Safe(UnitIsDeadOrGhost(u), true) or not Safe(UnitIsConnected(u), true) then return end
+	local hp, max = Safe(UnitHealth(u), nil), Safe(UnitHealthMax(u), nil)
+	if type(hp) ~= "number" or type(max) ~= "number" or max <= 0 then return end
+	if u ~= "player" and Safe(UnitInRange(u), true) == false then return end
+	return hp / max
+end
+
+local function myAura(u, name)
+	return CK:FindAura(u, name, "HELPFUL|PLAYER")
+end
+
+-- who needs what: lowest member, how many are hurt, the tank
+local function groupState()
+	local g = { injured = 0, known = 0, lowest = nil, lowestPct = 1, tank = nil, tankPct = nil }
+	for _, u in ipairs(PARTY) do
+		local pct = unitPct(u)
+		if pct then
+			g.known = g.known + 1
+			if pct < 0.85 then g.injured = g.injured + 1 end
+			if pct < g.lowestPct then g.lowest, g.lowestPct = u, pct end
+			if u ~= "player" and UnitGroupRolesAssigned and Safe(UnitGroupRolesAssigned(u), "NONE") == "TANK" then
+				g.tank, g.tankPct = u, pct
+			end
+		end
+	end
+	return g
+end
+
+local function shieldable(u)
+	return u and not myAura(u, "Power Word: Shield") and not CK:FindAura(u, "Weakened Soul", "HARMFUL")
+end
+
+-- returns true when it suggested a heal (then no damage filler)
+local function heal(ctx, push, disc)
+	local g = groupState()
+	if g.known == 0 then return false end
+	local low, pct = g.lowest, g.lowestPct
+	local still = not ctx.moving
+	local before = 0
+	local function suggest(n, k) before = before + 1; push(n, k) end
+
+	-- emergencies first
+	if disc and g.tank and g.tankPct < 0.25 and ctx:Ready("Pain Suppression") then suggest("Pain Suppression", "defensive") end
+	if pct < 0.35 then
+		if shieldable(low) and ctx:Ready("Power Word: Shield") then suggest("Power Word: Shield", "defensive") end
+		if disc and ctx:Ready("Penance") then suggest("Penance") end
+		if ctx:Ready("Inner Focus") then suggest("Inner Focus", "hint") end
+		if ctx:Ready("Flash Heal") then suggest("Flash Heal") end
+	end
+	-- several hurt: group heals
+	if g.injured >= 3 then
+		if ctx:Ready("Circle of Healing") then suggest("Circle of Healing") end
+		if still and ctx:Ready("Prayer of Healing") then suggest("Prayer of Healing") end
+		if ctx:Ready("Holy Nova") then suggest("Holy Nova") end
+	end
+	-- the tank in combat: shield and Prayer of Mending before the hits land
+	if ctx.inCombat and g.tank then
+		if shieldable(g.tank) and ctx:Ready("Power Word: Shield") then suggest("Power Word: Shield") end
+		if ctx:Ready("Prayer of Mending") and not myAura(g.tank, "Prayer of Mending") then suggest("Prayer of Mending") end
+	end
+	if pct < 0.6 then
+		if disc and ctx:Ready("Penance") then suggest("Penance") end
+		if still and pct < 0.5 and ctx:Ready("Greater Heal") then suggest("Greater Heal") end
+		if ctx:Ready("Flash Heal") then suggest("Flash Heal") end
+	end
+	if pct < 0.85 then
+		if low and not myAura(low, "Renew") and ctx:Ready("Renew") then suggest("Renew") end
+		if still and pct < 0.75 then
+			if ctx:Ready("Heal") then suggest("Heal") elseif ctx:Ready("Lesser Heal") then suggest("Lesser Heal") end
+		end
+	end
+	-- Discipline in combat: shield whoever is hurt (Divine Aegis, Renewed Hope)
+	if disc and ctx.inCombat and pct < 0.9 and shieldable(low) and ctx:Ready("Power Word: Shield") then suggest("Power Word: Shield") end
+	return before > 0
+end
+
+---------------------------------------------------------------------------
+-- Holy / Discipline: heal in a group, deal damage solo (Smite leveling)
+---------------------------------------------------------------------------
+local function damage(ctx, push, disc)
 	if not ctx.hostile then return end
-	interrupt(ctx, push)
-	defensive(ctx, push)
-	selfHeal(ctx, push)
 	local lowMana = ctx.manaPct < 0.3
 	if ctx.aoe and ctx.nearby >= 3 and ctx:Ready("Holy Nova") then push("Holy Nova") end
 	if not ctx.inCombat and not ctx.moving and ctx:Ready("Holy Fire") then push("Holy Fire") end
 	if needsDot(ctx, "Shadow Word: Pain") then push("Shadow Word: Pain") end
+	if disc and ctx:Ready("Penance") then push("Penance") end
 	if not ctx.moving and ctx:Ready("Mind Blast") then push("Mind Blast") end
 	if ctx.targetHealthPct and ctx.targetHealthPct < 0.2 and ctx:Ready("Shadow Word: Death") then push("Shadow Word: Death") end
 	if not ctx.moving and ctx:Ready("Starshards") then push("Starshards") end
 	if not ctx.moving and ctx:Known("Shoot") and (lowMana or ctx.inCombat) then push("Shoot") end
 	if not ctx.moving then push("Smite") end
 end
+
+local function healerSpec(disc)
+	return function(ctx, list, add)
+		local function push(n, k) add(list, n, k) end
+		if ctx.hostile then interrupt(ctx, push) end
+		if IsInGroup() then
+			if ctx.targetingMe == true and ctx:Ready("Fade") then push("Fade", "defensive") end
+			-- nothing to heal: help with damage while mana allows
+			if not heal(ctx, push, disc) and ctx.manaPct > 0.6 then damage(ctx, push, disc) end
+			return
+		end
+		if not ctx.hostile then return end
+		defensive(ctx, push)
+		selfHeal(ctx, push)
+		damage(ctx, push, disc)
+	end
+end
+local holy, discipline = healerSpec(false), healerSpec(true)
 
 ---------------------------------------------------------------------------
 -- Registration
@@ -179,8 +279,8 @@ local Priest = {
 	defaultSpec = "SHADOW",
 	specs = {
 		SHADOW = { name = "Shadow", icon = 136207, rotation = shadow },
-		DISCIPLINE = { name = "Discipline", icon = 135940, rotation = holy },
-		HOLY = { name = "Holy", icon = 237542, rotation = holy },
+		DISCIPLINE = { name = "Discipline", icon = 135940, rotation = discipline, healer = true },
+		HOLY = { name = "Holy", icon = 237542, rotation = holy, healer = true },
 	},
 	specOrder = { "SHADOW", "DISCIPLINE", "HOLY" },
 	partyBuffs = {
