@@ -884,7 +884,7 @@ end
 function B:UpdateBar()
 	local f = self.frame
 	if not f then return end
-	f.gold:SetText(GetCoinTextureString and GetCoinTextureString(num(GetMoney(), 0)) or "")
+	f.gold:SetText(CK.MoneyText(GetMoney()))
 	local free, rfree = 0, 0
 	for _, bag in ipairs(BAGS) do
 		local n, family = freeSlots(bag)

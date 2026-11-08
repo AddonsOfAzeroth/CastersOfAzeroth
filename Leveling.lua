@@ -329,14 +329,14 @@ local function onMerchant()
 			end
 		end)
 		if sold > 0 then
-			CK:Print(L["Sold %d grey item(s) for %s."]:format(sold, GetCoinTextureString(value)))
+			CK:Print(L["Sold %d grey item(s) for %s."]:format(sold, CK.MoneyText(value)))
 		end
 	end
 	if cfg.repair and CanMerchantRepair and CanMerchantRepair() then
 		local cost, needed = GetRepairAllCost()
 		if needed and cost > 0 and cost <= GetMoney() then
 			RepairAllItems()
-			CK:Print(L["Repaired your gear for %s."]:format(GetCoinTextureString(cost)))
+			CK:Print(L["Repaired your gear for %s."]:format(CK.MoneyText(cost)))
 		end
 	end
 end

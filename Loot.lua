@@ -522,15 +522,7 @@ local function parseMoney(s)
 end
 
 local function moneyText(copper)
-	if C_CurrencyInfo and C_CurrencyInfo.GetCoinTextureString then
-		local s = try(C_CurrencyInfo.GetCoinTextureString, copper)
-		if s then return s end
-	end
-	if GetMoneyString then
-		local s = try(GetMoneyString, copper, true)
-		if s then return s end
-	end
-	return tostring(copper)
+	return CK.MoneyText(copper)
 end
 
 local entries = {} -- newest first

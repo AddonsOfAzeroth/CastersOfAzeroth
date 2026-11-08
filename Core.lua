@@ -240,6 +240,34 @@ function CK.Safe(v, default)
 end
 local Safe = CK.Safe
 
+-- Copper as gold/silver/copper with coin icons. The coin helpers moved between
+-- clients (C_CurrencyInfo, GetMoneyString, GetCoinTextureString), so try each
+-- and build the text ourselves as a last resort.
+local COIN = "|TInterface\\MoneyFrame\\UI-%sIcon:0:0:2:0|t"
+function CK.MoneyText(copper)
+	copper = Safe(copper, nil)
+	if type(copper) ~= "number" then return "" end
+	local fns = {
+		C_CurrencyInfo and C_CurrencyInfo.GetCoinTextureString,
+		GetCoinTextureString,
+		GetMoneyString and function(c) return GetMoneyString(c, true) end,
+	}
+	for i = 1, 3 do
+		local fn = fns[i]
+		if fn then
+			local ok, s = pcall(fn, copper)
+			if ok and type(s) == "string" and s ~= "" and not issecret(s) then return s end
+		end
+	end
+	copper = math.floor(copper)
+	local g, s, c = math.floor(copper / 10000), math.floor(copper / 100) % 100, copper % 100
+	local out = {}
+	if g > 0 then out[#out + 1] = BreakUpLargeNumbers and BreakUpLargeNumbers(g) or tostring(g); out[#out] = out[#out] .. COIN:format("Gold") end
+	if s > 0 or g > 0 then out[#out + 1] = s .. COIN:format("Silver") end
+	out[#out + 1] = c .. COIN:format("Copper")
+	return table.concat(out, " ")
+end
+
 ---------------------------------------------------------------------------
 -- Spell helpers (spellbook scan; names are enUS)
 ---------------------------------------------------------------------------
