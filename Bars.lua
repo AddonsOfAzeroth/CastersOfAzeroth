@@ -110,6 +110,17 @@ function Bars:CreatePanel()
 	end)
 	mover:Hide()
 	self.mover = mover
+	-- resize: the corner grip sets the bars' scale setting
+	S:AddSizeGrip(p, {
+		parent = mover,
+		get = function() return CK.char.bars.scale end,
+		set = function(v) CK.char.bars.scale = v end,
+		save = function(f)
+			local l, t = f:GetLeft(), f:GetTop()
+			if l and t then CK.char.bars.point = { "TOPLEFT", "UIParent", "BOTTOMLEFT", math.floor(l + 0.5), math.floor(t + 0.5) } end
+		end,
+		done = function() CK:Fire("SETTINGS", "bars") end,
+	})
 end
 
 function Bars:CreateButtons()

@@ -754,6 +754,7 @@ function UF:Build()
 	self.partyAnchor = party
 	for i = 1, 4 do
 		local pf = createFrame("CasterKitParty" .. i, "party" .. i, 180, 36, { power = true, font = 11 })
+		pf.sizeKey = "party" -- resized together with the party mover
 		pf:SetPoint("TOPLEFT", party, "TOPLEFT", 0, -(i - 1) * 44)
 		pf.role = pf:CreateTexture(nil, "OVERLAY")
 		pf.role:SetSize(14, 14)
@@ -862,7 +863,7 @@ function UF:Apply()
 	local cfg = CK.char.units
 	local on = cfg.enabled
 	local function set(f, show, watched)
-		f:SetScale(cfg.scale)
+		S:SetBaseScale(f, cfg.scale) -- times the mover's resize grip
 		if watched then
 			if show then RegisterUnitWatch(f) else UnregisterUnitWatch(f); f:Hide() end
 		else
@@ -873,7 +874,7 @@ function UF:Apply()
 	set(self.frames.player, on and cfg.player, false)
 	set(self.frames.target, on and cfg.target, true)
 	set(self.frames.targettarget, on and cfg.target and cfg.tot, true)
-	self.partyAnchor:SetScale(cfg.scale)
+	S:SetBaseScale(self.partyAnchor, cfg.scale)
 	for i = 1, 4 do set(self.frames["party" .. i], on and cfg.party, true) end
 	if on then self:HideBlizzard() end
 	for _, key in ipairs({ "player", "target", "tot", "party" }) do
@@ -891,6 +892,12 @@ function UF:OnEnable()
 	CK:Listen("SETTINGS", function(group)
 		if (group == "units" or group == "bars") and self.built then
 			CK:OutOfCombat("units-apply", function() self:Apply() end)
+		end
+	end)
+	-- the party members follow the party mover's resize grip
+	CK:Listen("SIZE", function(key)
+		if key == "party" and self.built then
+			for i = 1, 4 do S:ApplyScale(self.frames["party" .. i]) end
 		end
 	end)
 	CK:Listen("PANEL_LAYOUT", function()

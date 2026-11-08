@@ -408,6 +408,7 @@ add({
 	["Buffs and debuffs on player and target"] = "Buffs en debuffs op speler en doelwit",
 	["Debuffs in the row right above the frame (coloured by type), buffs smaller above them. Hover for details."] = "Debuffs in de rij vlak boven het kader (gekleurd per soort), buffs kleiner daarboven. Beweeg erover voor details.",
 	["Target: only my debuffs"] = "Doelwit: alleen mijn debuffs",
+	["Drag: bigger or smaller. Double-click: normal size."] = "Slepen: groter of kleiner. Dubbelklik: normale grootte.",
 	["Only your own DoTs and debuffs on the target."] = "Alleen je eigen DoTs en debuffs op het doelwit.",
 	["KILL"] = "DOOD",
 	["OOM"] = "GEEN MANA",
