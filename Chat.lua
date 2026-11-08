@@ -362,9 +362,14 @@ function Chat:CreatePanel()
 
 	local cfg = CK.char.chat
 	p:SetSize(cfg.width, cfg.height)
+	local live = false -- the full layout only once the chat is set up
 	S:RegisterMover(p, "chat", L["Chat"], function(f)
 		f:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", 8, 8)
-	end)
+	end, nil, S:Sizing(p, "chat", { min = { 200, 80 }, max = { 1000, 700 }, apply = function(w, h)
+		cfg.width, cfg.height = w or 440, h or 190
+		if live then Chat:Layout() else p:SetSize(cfg.width, cfg.height) end
+	end }))
+	live = true
 end
 
 ---------------------------------------------------------------------------

@@ -719,7 +719,7 @@ function UF:Build()
 	player:RegisterUnitEvent("UNIT_AURA", "player")
 	S:RegisterMover(player, "player", L["Player"], function(f)
 		f:SetPoint("BOTTOMRIGHT", panel, "TOPLEFT", -12, 64)
-	end)
+	end, nil, S:Sizing(player, "player", { default = { 220, 48 }, min = { 120, 24 }, max = { 420, 120 } }))
 
 	local target = createFrame("CasterKitTargetFrame", "target", 220, 48, { power = true, level = true })
 	self:AddAuras(target)
@@ -727,7 +727,7 @@ function UF:Build()
 	target:RegisterUnitEvent("UNIT_AURA", "target")
 	S:RegisterMover(target, "target", L["Target"], function(f)
 		f:SetPoint("BOTTOMLEFT", panel, "TOPRIGHT", 12, 64)
-	end)
+	end, nil, S:Sizing(target, "target", { default = { 220, 48 }, min = { 120, 24 }, max = { 420, 120 } }))
 
 	local tot = createFrame("CasterKitToTFrame", "targettarget", 110, 24, { font = 10 })
 	tot.compact = true
@@ -744,7 +744,7 @@ function UF:Build()
 	end)
 	S:RegisterMover(tot, "tot", "ToT", function(f)
 		f:SetPoint("BOTTOMLEFT", target, "BOTTOMRIGHT", 6, 0)
-	end)
+	end, nil, S:Sizing(tot, "tot", { default = { 110, 24 }, min = { 60, 16 }, max = { 300, 80 } }))
 
 	local party = CreateFrame("Frame", "CasterKitPartyAnchor", UIParent)
 	party:SetSize(180, 4 * 36 + 3 * 8)
@@ -762,6 +762,19 @@ function UF:Build()
 		wire(pf, { "GROUP_ROSTER_UPDATE", "PLAYER_ROLES_ASSIGNED" })
 		self:AddPartyBuffs(pf)
 	end
+	-- resize: the party mover's grip sizes each member (4 rows, 8 px apart)
+	local ps = S:Sizing(party, "party", { min = { 100, 4 * 18 + 24 }, max = { 400, 4 * 90 + 24 }, apply = function(w, h)
+		local mw, mh = w or 180, h and math.floor((h - 24) / 4) or 36
+		for i = 1, 4 do
+			local pf = self.frames["party" .. i]
+			pf:SetSize(mw, mh)
+			pf:ClearAllPoints()
+			pf:SetPoint("TOPLEFT", party, "TOPLEFT", 0, -(i - 1) * (mh + 8))
+		end
+		party:SetSize(mw, 4 * mh + 24)
+	end })
+	ps.parent = S.movers.party.overlay
+	S:AddSizeGrip(party, ps)
 
 	self.built = true
 end

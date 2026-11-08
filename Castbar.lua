@@ -128,6 +128,8 @@ function Bar:ApplyLayout()
 	local sc = num(cfg().scale) or 1
 	if sc <= 0 then sc = 1 end
 	local w, h = self.baseW * sc, self.baseH * sc
+	local sw, sh = S:SavedSize(self.moverKey or "") -- resized with its grip: text stays the same
+	if sw then w, h = sw, sh end
 	self:SetSize(w, h)
 	self.innerW = w - 2
 	self.icon:SetSize(h, h)
@@ -521,8 +523,12 @@ end
 function CB:OnEnable()
 	self.player = CreateBar("CasterKitCastbar", "player", PLAYER_W, PLAYER_H, 11, L["Cast bar"])
 	self.target = CreateBar("CasterKitTargetCastbar", "target", TARGET_W, TARGET_H, 9, L["Target cast bar"])
-	S:RegisterMover(self.player, "castbar", L["Cast bar"], placePlayer)
-	S:RegisterMover(self.target, "targetcastbar", L["Target cast bar"], placeTarget)
+	for bar, key in pairs({ [self.player] = "castbar", [self.target] = "targetcastbar" }) do bar.moverKey = key end
+	local function sizing(bar)
+		return S:Sizing(bar, bar.moverKey, { min = { 80, 10 }, max = { 700, 60 }, apply = function() bar:ApplyLayout() end })
+	end
+	S:RegisterMover(self.player, "castbar", L["Cast bar"], placePlayer, nil, sizing(self.player))
+	S:RegisterMover(self.target, "targetcastbar", L["Target cast bar"], placeTarget, nil, sizing(self.target))
 
 	self:ApplyAll()
 	-- the target unit frame may be created later in the login

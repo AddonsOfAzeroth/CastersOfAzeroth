@@ -110,6 +110,22 @@ function Bars:CreatePanel()
 	end)
 	mover:Hide()
 	self.mover = mover
+	-- wider = bigger buttons (the keybind text keeps its size)
+	S:AddSizeGrip(p, {
+		parent = mover, axis = "x", min = { 120, 0 }, max = { 1400, 0 },
+		get = function() return p:GetWidth(), p:GetHeight() end,
+		set = function(w)
+			local cfg = CK.char.bars
+			local pad = cfg.background and 5 or 0
+			cfg.size = math.max(20, math.min(64, math.floor((w - pad * 2 - (cfg.perRow - 1) * cfg.spacing) / cfg.perRow)))
+			Bars:Layout()
+		end,
+		reset = function() CK.char.bars.size = 36 Bars:Layout() end,
+		save = function(f)
+			local l, t = f:GetLeft(), f:GetTop()
+			if l and t then CK.char.bars.point = { "TOPLEFT", "UIParent", "BOTTOMLEFT", math.floor(l + 0.5), math.floor(t + 0.5) } end
+		end,
+	})
 end
 
 function Bars:CreateButtons()

@@ -1540,9 +1540,15 @@ function B:CreateWindow()
 		end
 	end)
 
+	-- wider = more columns
 	S:RegisterMover(f, "bags", L["Bags"], function(frame)
 		frame:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMRIGHT", -6, 60)
-	end)
+	end, nil, S:Sizing(f, "bags", { axis = "x", min = { MIN_W, 0 }, max = { 1400, 0 }, apply = function(w)
+		if type(CK.char.bags) ~= "table" then CK.char.bags = {} end
+		local size = clamp(math.floor(num(opt("iconSize"), 34)), 20, 60)
+		CK.char.bags.columns = w and clamp(math.floor((w - PAD * 2 + GAP) / (size + GAP)), 4, 30) or 10
+		B:Layout()
+	end }))
 end
 
 ---------------------------------------------------------------------------
