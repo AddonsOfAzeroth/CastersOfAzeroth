@@ -34,15 +34,6 @@ function M:CreatePanel()
 		CK.char.micro.point = { pt, "UIParent", rp, math.floor(x + 0.5), math.floor(y + 0.5) }
 	end)
 	self.panel = p
-	-- resize: the corner grip (frames unlocked) sets the micro menu's scale
-	self.grip = S:AddSizeGrip(p, {
-		get = function() return CK.char.micro.scale end,
-		set = function(v) CK.char.micro.scale = v end,
-		save = function(f)
-			local l, t = f:GetLeft(), f:GetTop()
-			if l and t then CK.char.micro.point = { "TOPLEFT", "UIParent", "BOTTOMLEFT", math.floor(l + 0.5), math.floor(t + 0.5) } end
-		end,
-	})
 
 	local free = S:Font(p, 12)
 	self.freeText = free
@@ -78,7 +69,6 @@ function M:DoLayout()
 	local pt = cfg.point
 	p:SetPoint(pt[1], UIParent, pt[3], pt[4], pt[5])
 	p:EnableMouse(not CK.char.bars.locked)
-	self.grip:SetShown(not CK.char.bars.locked and not InCombatLockdown())
 
 	local pad, gap = 4, 2
 	local x = pad
