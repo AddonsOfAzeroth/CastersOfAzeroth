@@ -111,6 +111,8 @@ local charDefaults = {
 		hideBlizzardCastbar = true,
 		castbarLatency = true,
 		partyBuffs = true,
+		auras = true,          -- buffs and debuffs on the player and target frames
+		onlyMyDebuffs = false, -- target: only your own debuffs
 	},
 	chat = {
 		enabled = true,

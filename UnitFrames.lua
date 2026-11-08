@@ -223,50 +223,154 @@ function UF:UpdateStatus(f)
 end
 
 ---------------------------------------------------------------------------
--- Target: your debuffs with timers
+-- Buffs and debuffs on the player and target frames.
+-- Debuffs: the row right above the frame (bigger); buffs: a smaller row above
+-- that. In combat this client can hide aura data: icons and timers are then
+-- passed straight to the widgets (allowed for hidden values), never compared.
 ---------------------------------------------------------------------------
-local MAX_AURAS = 8
+local ROWS = {
+	debuffs = { filter = "HARMFUL", size = 24, max = 10 },
+	buffs = { filter = "HELPFUL", size = 18, max = 12 },
+}
+local DEBUFF_COLORS = {
+	Magic = { 0.2, 0.6, 1 }, Curse = { 0.6, 0, 1 }, Disease = { 0.6, 0.4, 0 }, Poison = { 0, 0.6, 0 },
+}
 
-function UF:AddAuras(f)
-	f.auras = {}
-	for i = 1, MAX_AURAS do
-		local a = S:Icon(f, 22)
-		a:SetPoint("BOTTOMLEFT", f, "TOPLEFT", (i - 1) * 24, 4)
+local function auraTooltip(a)
+	if not (a.unit and a:IsShown()) then return end
+	GameTooltip:SetOwner(a, "ANCHOR_BOTTOMRIGHT")
+	local id = a.auraInstanceID
+	if id and GameTooltip.SetUnitAuraByAuraInstanceID and pcall(GameTooltip.SetUnitAuraByAuraInstanceID, GameTooltip, a.unit, id) then
+		return GameTooltip:Show()
+	end
+	if a.index and GameTooltip.SetUnitAura then pcall(GameTooltip.SetUnitAura, GameTooltip, a.unit, a.index, a.filter) end
+	GameTooltip:Show()
+end
+
+local function makeRow(f, key, y)
+	local r = ROWS[key]
+	local row = {}
+	for i = 1, r.max do
+		local a = S:Icon(f, r.size)
+		a:SetPoint("BOTTOMLEFT", f, "TOPLEFT", (i - 1) * (r.size + 2), y)
 		a.cd = CreateFrame("Cooldown", nil, a, "CooldownFrameTemplate")
 		a.cd:SetPoint("TOPLEFT", 1, -1)
 		a.cd:SetPoint("BOTTOMRIGHT", -1, 1)
 		a.cd:SetDrawEdge(false)
 		a.cd:SetReverse(true)
-		a.count = S:Font(a, 10)
+		a.cd:SetHideCountdownNumbers(r.size < 20)
+		a.count = S:Font(a, r.size < 20 and 9 or 10)
 		a.count:SetPoint("BOTTOMRIGHT", -1, 1)
+		a:EnableMouse(true)
+		a:SetScript("OnEnter", auraTooltip)
+		a:SetScript("OnLeave", function() GameTooltip:Hide() end)
 		a:Hide()
-		f.auras[i] = a
+		row[i] = a
 	end
+	return row
+end
+
+function UF:AddAuras(f)
+	f.auras = {
+		debuffs = makeRow(f, "debuffs", 4),
+		buffs = makeRow(f, "buffs", 4 + ROWS.debuffs.size + 3),
+	}
+end
+
+-- Calls fn(n, data, index) for up to max auras; works with hidden data too.
+local function eachAura(unit, filter, max, fn)
+	local n = 0
+	if C_UnitAuras and C_UnitAuras.GetAuraDataByIndex then
+		for i = 1, 40 do
+			local ok, d = pcall(C_UnitAuras.GetAuraDataByIndex, unit, i, filter)
+			if not ok then n = -1 break end -- this client hides them right now
+			if not d then return n end
+			n = n + 1
+			fn(n, d, i)
+			if n >= max then return n end
+		end
+	end
+	-- fallback that hands out hidden data instead of throwing
+	if n < 0 and C_UnitAuras and C_UnitAuras.GetUnitAuras then
+		n = 0
+		local ok, list = pcall(C_UnitAuras.GetUnitAuras, unit, filter, max)
+		if ok and type(list) == "table" then
+			for i, d in ipairs(list) do
+				n = n + 1
+				fn(n, d, i)
+				if n >= max then break end
+			end
+		end
+	end
+	return math.max(n, 0)
+end
+
+local function fillIcon(a, unit, d, index, filter, isDebuff)
+	a.unit, a.index, a.filter = unit, index, filter
+	local id = d.auraInstanceID
+	a.auraInstanceID = (not IsSecret(id)) and id or nil
+	pcall(a.icon.SetTexture, a.icon, d.icon)
+	-- stacks
+	local apps = Safe(d.applications)
+	if type(apps) == "number" then
+		a.count:SetText(apps > 1 and apps or "")
+	elseif a.auraInstanceID and C_UnitAuras.GetAuraApplicationDisplayCount then
+		local ok, txt = pcall(C_UnitAuras.GetAuraApplicationDisplayCount, unit, a.auraInstanceID, 2, 99)
+		pcall(a.count.SetText, a.count, ok and txt or "")
+	else
+		a.count:SetText("")
+	end
+	-- timer
+	local dur, exp = Safe(d.duration), Safe(d.expirationTime)
+	local timed = false
+	if type(dur) == "number" and type(exp) == "number" then
+		if dur > 0 then
+			a.cd:SetCooldown(exp - dur, dur)
+			timed = true
+		end
+	elseif a.auraInstanceID and C_UnitAuras.GetAuraDuration and a.cd.SetCooldownFromDurationObject then
+		timed = pcall(function()
+			a.cd:SetCooldownFromDurationObject(C_UnitAuras.GetAuraDuration(unit, a.auraInstanceID))
+		end) and true or false
+	end
+	a.cd:SetShown(timed)
+	-- border: debuff type colour, red for other debuffs
+	if isDebuff then
+		local kind = Safe(d.dispelName)
+		local c = type(kind) == "string" and DEBUFF_COLORS[kind] or { 0.8, 0.1, 0.1 }
+		a:SetBackdropBorderColor(c[1], c[2], c[3], 1)
+	else
+		a:SetBackdropBorderColor(0, 0, 0, 1)
+	end
+	a:Show()
 end
 
 function UF:UpdateAuras(f)
-	local shown = 0
-	if C_UnitAuras and C_UnitAuras.GetAuraDataByIndex then
-		for i = 1, 40 do
-			local ok, d = pcall(C_UnitAuras.GetAuraDataByIndex, f.unit, i, "HARMFUL|PLAYER")
-			if not ok or not d then break end
-			shown = shown + 1
-			if shown > MAX_AURAS then break end
-			local a = f.auras[shown]
-			pcall(a.icon.SetTexture, a.icon, d.icon)
-			local apps = Safe(d.applications, 0)
-			a.count:SetText(apps and apps > 1 and apps or "")
-			local dur, exp = Safe(d.duration), Safe(d.expirationTime)
-			if dur and exp and dur > 0 then
-				a.cd:SetCooldown(exp - dur, dur)
-				a.cd:Show()
-			else
-				a.cd:Hide()
-			end
-			a:Show()
+	if not f.auras then return end
+	local cfg = CK.char.units
+	local unit = f.unit
+	for key, r in pairs(ROWS) do
+		local row = f.auras[key]
+		local filter = r.filter
+		local isDebuff = key == "debuffs"
+		-- on an enemy you can show only your own debuffs (DoTs)
+		if isDebuff and cfg.onlyMyDebuffs and unit ~= "player" then filter = "HARMFUL|PLAYER" end
+		local n = 0
+		if cfg.auras ~= false and UnitExists(unit) then
+			n = eachAura(unit, filter, r.max, function(i, d, index) fillIcon(row[i], unit, d, index, filter, isDebuff) end)
+		end
+		for i = n + 1, r.max do row[i]:Hide() end
+	end
+	-- buffs sit right above the frame when there are no debuffs
+	local up = ROWS.debuffs.size + 3
+	if not f.auras.debuffs[1]:IsShown() then up = 0 end
+	if f.auraShift ~= up then
+		f.auraShift = up
+		for i, a in ipairs(f.auras.buffs) do
+			a:ClearAllPoints()
+			a:SetPoint("BOTTOMLEFT", f, "TOPLEFT", (i - 1) * (ROWS.buffs.size + 2), 4 + up)
 		end
 	end
-	for i = math.min(shown, MAX_AURAS) + 1, MAX_AURAS do f.auras[i]:Hide() end
 end
 
 ---------------------------------------------------------------------------
@@ -285,6 +389,7 @@ local function wire(f, unitEvents)
 			UF:UpdateHealth(self)
 		elseif event == "PLAYER_REGEN_DISABLED" or event == "PLAYER_REGEN_ENABLED" or event == "PLAYER_UPDATE_RESTING" then
 			if self.status then UF:UpdateStatus(self) end
+			if self.auras then UF:UpdateAuras(self) end
 		else
 			UF:UpdateAll(self)
 		end
@@ -337,7 +442,9 @@ function UF:Build()
 
 	local player = createFrame("CasterKitPlayerFrame", "player", 220, 48, { power = true, level = true })
 	self:AddStatus(player)
+	self:AddAuras(player)
 	wire(player, { "PLAYER_REGEN_DISABLED", "PLAYER_REGEN_ENABLED", "PLAYER_UPDATE_RESTING", "PLAYER_ENTERING_WORLD" })
+	player:RegisterUnitEvent("UNIT_AURA", "player")
 	S:RegisterMover(player, "player", L["Player"], function(f)
 		f:SetPoint("BOTTOMRIGHT", panel, "TOPLEFT", -12, 64)
 	end)
