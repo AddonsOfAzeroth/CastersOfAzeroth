@@ -442,10 +442,11 @@ local function fillIcon(a, unit, d, index, filter, isDebuff)
 end
 
 ---------------------------------------------------------------------------
--- Your own debuffs from your own casts. This client keeps other units' auras
--- secret from addons, but your casts are yours: cast a harmful spell whose
--- tooltip says how long it lasts ("over 18 sec", "for 9 sec") and it shows on
--- the target frame with a timer. It cannot see resists or dispels.
+-- Your own debuffs and buffs from your own casts. This client keeps other
+-- units' auras secret from addons, but your casts are yours: a harmful spell on
+-- an enemy or a helpful one on a friendly target, whose tooltip says how long
+-- it lasts ("over 18 sec", "for 30 min"), shows on the target frame with a
+-- timer. It cannot see resists or dispels.
 ---------------------------------------------------------------------------
 local mine = {} -- [guid] = { [spellID] = { icon, start, dur } }
 local durations = {}
@@ -477,16 +478,22 @@ local function harmful(id)
 		local name = C_Spell.GetSpellName(id)
 		return name and Safe(IsHarmfulSpell(name), false) or false
 	end
-	return true
+	return nil -- unknown
 end
 
 -- called on your successful casts
 function UF:TrackCast(spellID)
 	local id = Safe(spellID, nil)
 	if type(id) ~= "number" then return end
-	if not (UnitExists("target") and Safe(UnitCanAttack("player", "target"), false)) then return end
+	if not UnitExists("target") then return end
+	-- your own auras are readable: the player frame shows those already
+	if Safe(UnitIsUnit("target", "player"), false) then return end
+	local hostile = Safe(UnitCanAttack("player", "target"), false)
+	if not hostile and not Safe(UnitIsFriend("player", "target"), false) then return end
+	local h = harmful(id)
+	if h ~= nil and h ~= hostile then return end -- debuffs on enemies, buffs on friends
 	local guid = Safe(UnitGUID("target"), nil)
-	if not guid or not harmful(id) then return end
+	if not guid then return end
 	local dur = spellDuration(id)
 	if not dur or dur <= 0 then return end
 	local now = GetTime()
@@ -495,7 +502,7 @@ function UF:TrackCast(spellID)
 		if not next(t) then mine[g] = nil end
 	end
 	mine[guid] = mine[guid] or {}
-	mine[guid][id] = { icon = spellIcon(id), start = now, dur = dur }
+	mine[guid][id] = { icon = spellIcon(id), start = now, dur = dur, harmful = hostile }
 	local f = self.frames.target
 	if f then
 		self:UpdateAuras(f)
@@ -513,7 +520,7 @@ local function trackedOn(unit)
 	for id, e in pairs(t) do
 		if e.start + e.dur > now then
 			out[#out + 1] = { d = { icon = e.icon, duration = e.dur, expirationTime = e.start + e.dur, applications = 0,
-				isFromPlayerOrPlayerPet = true, spellId = id, tracked = true }, harmful = true, start = e.start }
+				isFromPlayerOrPlayerPet = true, spellId = id, tracked = true }, harmful = e.harmful, start = e.start }
 		end
 	end
 	table.sort(out, function(a, b) return a.start < b.start end)
