@@ -277,17 +277,30 @@ function UF:AddAuras(f)
 	}
 end
 
+-- a table we may look into (in combat the client can hand over secret tables)
+local function open(t)
+	return type(t) == "table" and not IsSecret(t) and (not canaccesstable or canaccesstable(t))
+end
+local EMPTY = {}
+local function items(t) return open(t) and t or EMPTY end
+
 -- Ways to read one filter's auras. Each returns a list of aura data, or nil
 -- when it is missing or refused. Clients differ: some return nothing (no error)
 -- for other units through one way and do through another, so all are tried.
+local lastErr -- first refusal message, for /coaauras
+local function refused(err)
+	lastErr = lastErr or (type(err) == "string" and not IsSecret(err) and err:gsub("^.-:%d+: ", ""):sub(1, 90)) or nil
+end
+
 local SOURCES = {
 	{ "byIndex", function(unit, filter)
 		if not (C_UnitAuras and C_UnitAuras.GetAuraDataByIndex) then return end
 		local out = {}
 		for i = 1, 40 do
 			local ok, d = pcall(C_UnitAuras.GetAuraDataByIndex, unit, i, filter)
-			if not ok then return end
+			if not ok then return refused(d) end
 			if not d then break end
+			if not open(d) then return end
 			out[#out + 1] = d
 		end
 		return out
@@ -295,16 +308,22 @@ local SOURCES = {
 	{ "unitAuras", function(unit, filter)
 		if not (C_UnitAuras and C_UnitAuras.GetUnitAuras) then return end
 		local ok, auras = pcall(C_UnitAuras.GetUnitAuras, unit, filter)
-		if ok and type(auras) == "table" then return auras end
+		if not ok then return refused(auras) end
+		if open(auras) then
+			for _, d in ipairs(auras) do if not open(d) then return end end
+			return auras
+		end
 	end },
 	{ "slots", function(unit, filter)
 		if not (C_UnitAuras and C_UnitAuras.GetAuraSlots and C_UnitAuras.GetAuraDataBySlot) then return end
-		local r = { pcall(C_UnitAuras.GetAuraSlots, unit, filter) }
-		if not r[1] then return end
+		local r = { n = 0 }
+		local function grab(ok, ...) r.n = select("#", ...) for i = 1, r.n do r[i] = (select(i, ...)) end return ok end
+		local ok = grab(pcall(C_UnitAuras.GetAuraSlots, unit, filter))
+		if not ok then return refused(r[1]) end
 		local out = {}
-		for i = 3, #r do -- r[2] is the continuation token
+		for i = 2, r.n do -- r[1] is the continuation token
 			local ok, d = pcall(C_UnitAuras.GetAuraDataBySlot, unit, r[i])
-			if ok and d then out[#out + 1] = d end
+			if ok and open(d) then out[#out + 1] = d end
 		end
 		return out
 	end },
@@ -313,7 +332,7 @@ local SOURCES = {
 		local out = {}
 		for i = 1, 40 do
 			local ok, name, icon, count, kind, dur, exp, source, _, _, spellId = pcall(UnitAura, unit, i, filter)
-			if not ok then return end
+			if not ok then return refused(name) end
 			if not IsSecret(name) and name == nil then break end
 			local src = Safe(source, nil)
 			out[#out + 1] = { name = name, icon = icon, applications = count, dispelName = kind, duration = dur,
@@ -429,8 +448,8 @@ function UF:UpdateAuras(f, info)
 	local partial = type(info) == "table" and Safe(info.isFullUpdate, false) ~= true
 	f.auraEvents = (f.auraEvents or 0) + (info and 1 or 0)
 	if partial then
-		f.auraLast = ("+%d ~%d -%d"):format(#(info.addedAuras or {}), #(info.updatedAuraInstanceIDs or {}),
-			#(info.removedAuraInstanceIDs or {}))
+		local function n(t) return t == nil and 0 or (open(t) and #t or "?") end
+		f.auraLast = ("+%s ~%s -%s"):format(n(info.addedAuras), n(info.updatedAuraInstanceIDs), n(info.removedAuraInstanceIDs))
 	elseif info then
 		f.auraLast = "full"
 	end
@@ -449,20 +468,21 @@ function UF:UpdateAuras(f, info)
 		for _, r in ipairs(list) do r.mine = true cache[#cache + 1] = r end
 	end
 	if partial and not (list and complete) then
-		for _, id in ipairs(info.removedAuraInstanceIDs or {}) do
+		for _, id in ipairs(items(info.removedAuraInstanceIDs)) do
 			id = Safe(id)
 			for i = #cache, 1, -1 do if id and cache[i].id == id then table.remove(cache, i) end end
 		end
-		for _, id in ipairs(info.updatedAuraInstanceIDs or {}) do
+		for _, id in ipairs(items(info.updatedAuraInstanceIDs)) do
 			id = Safe(id)
 			if id and C_UnitAuras and C_UnitAuras.GetAuraDataByAuraInstanceID then
 				local ok, d = pcall(C_UnitAuras.GetAuraDataByAuraInstanceID, unit, id)
-				if ok and d then
+				if ok and open(d) then
 					for _, r in ipairs(cache) do if r.id == id then r.d = d end end
 				end
 			end
 		end
-		for _, d in ipairs(info.addedAuras or {}) do
+		for _, d in ipairs(items(info.addedAuras)) do
+			if not open(d) then break end
 			local id = Safe(d.auraInstanceID)
 			if id then
 				for i = #cache, 1, -1 do if cache[i].id == id then table.remove(cache, i) end end
@@ -505,6 +525,7 @@ SLASH_CASTERSAURAS1 = "/coaauras"
 SlashCmdList.CASTERSAURAS = function()
 	local unit = UnitExists("target") and "target" or "player"
 	local counts = {}
+	lastErr = nil
 	for _, src in ipairs(SOURCES) do
 		local h, b = src[2](unit, "HARMFUL"), src[2](unit, "HELPFUL")
 		counts[#counts + 1] = src[1] .. " " .. (h and #h or "-") .. "/" .. (b and #b or "-")
@@ -519,6 +540,7 @@ SlashCmdList.CASTERSAURAS = function()
 	CK:Print(("auras %s (debuffs/buffs): %s; kept %d, shown %d, events %d (last %s)"):format(unit,
 		table.concat(counts, ", "), f and f.auraCache and #f.auraCache or 0, shown,
 		f and f.auraEvents or 0, f and f.auraLast or "-"))
+	if lastErr then CK:Print("refused: " .. lastErr) end
 end
 
 ---------------------------------------------------------------------------
