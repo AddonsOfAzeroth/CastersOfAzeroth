@@ -395,16 +395,14 @@ local function skin(b, name)
 	ov:SetFrameLevel(b:GetFrameLevel() + 4)
 	v.border = makeBorder(ov)
 
-	if v.count then
-		v.count:SetParent(ov)
-		v.count:SetFont(S.font, 11, "OUTLINE")
-		v.count:ClearAllPoints()
-		v.count:SetPoint("BOTTOMRIGHT", -2, 2)
-		v.count:SetJustifyH("RIGHT")
-	else
-		v.count = S:Font(ov, 11)
-		v.count:SetPoint("BOTTOMRIGHT", -2, 2)
-	end
+	-- our own stack count: Blizzard's Count starts hidden and its code shows it,
+	-- which we never call (we only own the text)
+	hideRegion(v.count)
+	v.count = ov:CreateFontString(nil, "OVERLAY")
+	v.count:SetFont(S.font, 11, "OUTLINE")
+	v.count:SetTextColor(1, 1, 1)
+	v.count:SetPoint("BOTTOMRIGHT", -2, 2)
+	v.count:SetJustifyH("RIGHT")
 
 	v.ilvl = S:Font(ov, 10)
 	v.ilvl:SetPoint("TOPLEFT", 2, -2)
