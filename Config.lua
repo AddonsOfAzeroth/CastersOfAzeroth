@@ -241,6 +241,7 @@ function C:CreateWindow()
 	self.frame = f
 	self.pages = {}
 	self.tabs = {}
+	local navY = 8 -- next free spot in the sidebar
 
 	local function newPage(key, label)
 		local container = CreateFrame("Frame", nil, f)
@@ -251,8 +252,9 @@ function C:CreateWindow()
 		self.pages[key] = page
 
 		local tab = CreateFrame("Button", nil, nav)
-		tab:SetSize(138, 26)
-		tab:SetPoint("TOPLEFT", 1, -8 - (#self.tabs) * 28)
+		tab:SetSize(138, 24)
+		tab:SetPoint("TOPLEFT", 1, -navY)
+		navY = navY + 25
 		local hl = tab:CreateTexture(nil, "BACKGROUND")
 		hl:SetAllPoints()
 		hl:SetColorTexture(0.41, 0.80, 0.94, 0.18)
@@ -266,7 +268,16 @@ function C:CreateWindow()
 		table.insert(self.tabs, tab)
 		return page
 	end
+	-- a small title in the sidebar above the pages of one add-on
+	local function navHeader(text)
+		local t = S:Font(nav, 10)
+		t:SetPoint("TOPLEFT", 8, -navY - 6)
+		t:SetText(text)
+		t:SetTextColor(unpack(S.colors.muted))
+		navY = navY + 20
+	end
 
+	navHeader("Casters of Azeroth")
 	self:BuildGeneral(newPage("general", L["General"]))
 	self:BuildBars(newPage("bars", L["Action bars"]))
 	self:BuildMicro(newPage("micro", L["Micro menu"]))
@@ -279,14 +290,26 @@ function C:CreateWindow()
 	self:BuildChat(newPage("chat", L["Chat"]))
 	self:BuildLoot(newPage("loot", L["Loot"]))
 	-- pages from optional add-ons: CK.configPages = { { key, label, build = function(page) end } }
+	-- grouped per add-on (def.group), each group under its own small title
 	if type(CK.configPages) == "table" then
+		local groups, order = {}, {}
 		for _, def in ipairs(CK.configPages) do
 			if type(def) == "table" and type(def.key) == "string" and type(def.build) == "function" and not self.pages[def.key] then
+				local g = def.group or def.label or def.key
+				if not groups[g] then groups[g] = {} order[#order + 1] = g end
+				table.insert(groups[g], def)
+			end
+		end
+		for _, g in ipairs(order) do
+			local list = groups[g]
+			if #list > 1 or list[1].group then navHeader(g) end
+			for _, def in ipairs(list) do
 				local ok, err = pcall(def.build, newPage(def.key, def.label or def.key))
 				if not ok and CK.debug then CK:Print("config page " .. def.key .. ":", tostring(err)) end
 			end
 		end
 	end
+	navY = navY + 10 -- a little space before Profiles and About
 	self:BuildProfiles(newPage("profiles", L["Profiles"]))
 	self:BuildAbout(newPage("about", L["About"]))
 end
