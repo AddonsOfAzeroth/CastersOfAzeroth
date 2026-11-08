@@ -25,6 +25,7 @@ Leveling.lua
 Bags.lua
 Loot.lua
 UnitFrames.lua
+Predict.lua
 Castbar.lua
 Tooltip.lua
 Map.lua

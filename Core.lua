@@ -113,6 +113,7 @@ local charDefaults = {
 		partyBuffs = true,
 		auras = true,          -- buffs and debuffs on the player and target frames
 		onlyMyDebuffs = false, -- target: only your own debuffs
+		predict = true,        -- estimate of the spell you cast or hover, on the health and mana bars
 	},
 	chat = {
 		enabled = true,
