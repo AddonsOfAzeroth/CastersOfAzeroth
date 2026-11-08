@@ -277,32 +277,44 @@ function UF:AddAuras(f)
 	}
 end
 
--- Calls fn(n, data, index) for up to max auras; works with hidden data too.
-local function eachAura(unit, filter, max, fn)
-	local n = 0
-	if C_UnitAuras and C_UnitAuras.GetAuraDataByIndex then
-		for i = 1, 40 do
-			local ok, d = pcall(C_UnitAuras.GetAuraDataByIndex, unit, i, filter)
-			if not ok then n = -1 break end -- this client hides them right now
-			if not d then return n end
-			n = n + 1
-			fn(n, d, i)
-			if n >= max then return n end
-		end
-	end
-	-- fallback that hands out hidden data instead of throwing
-	if n < 0 and C_UnitAuras and C_UnitAuras.GetUnitAuras then
-		n = 0
-		local ok, list = pcall(C_UnitAuras.GetUnitAuras, unit, filter, max)
-		if ok and type(list) == "table" then
-			for i, d in ipairs(list) do
-				n = n + 1
-				fn(n, d, i)
-				if n >= max then break end
+-- Full read of a unit's auras: a list of { d, id, harmful, index, filter },
+-- or nil when this client refuses right now (enemy auras in combat).
+local function scan(unit)
+	local list = {}
+	for _, filter in ipairs({ "HARMFUL", "HELPFUL" }) do
+		local got = false
+		if C_UnitAuras and C_UnitAuras.GetAuraDataByIndex then
+			got = true
+			for i = 1, 40 do
+				local ok, d = pcall(C_UnitAuras.GetAuraDataByIndex, unit, i, filter)
+				if not ok then got = false break end
+				if not d then break end
+				list[#list + 1] = { d = d, id = Safe(d.auraInstanceID), harmful = filter == "HARMFUL", index = i, filter = filter }
 			end
 		end
+		if not got and C_UnitAuras and C_UnitAuras.GetUnitAuras then
+			local ok, auras = pcall(C_UnitAuras.GetUnitAuras, unit, filter)
+			got = ok and type(auras) == "table"
+			if got then
+				for i, d in ipairs(auras) do
+					list[#list + 1] = { d = d, id = Safe(d.auraInstanceID), harmful = filter == "HARMFUL", index = i, filter = filter }
+				end
+			end
+		end
+		if not got then return nil, filter end
 	end
-	return math.max(n, 0)
+	return list
+end
+UF.ScanAuras = scan
+
+-- harmful or not for an aura handed over by UNIT_AURA (its flags can be hidden)
+local function isHarmful(unit, d)
+	local h = Safe(d.isHarmful)
+	if type(h) == "boolean" then return h end
+	local helpful = Safe(d.isHelpful)
+	if type(helpful) == "boolean" then return not helpful end
+	-- unknown: on an enemy it is most likely your debuff, on you a buff
+	return unit ~= "player" and Safe(UnitCanAttack("player", unit), false) and true or false
 end
 
 local function fillIcon(a, unit, d, index, filter, isDebuff)
@@ -328,10 +340,16 @@ local function fillIcon(a, unit, d, index, filter, isDebuff)
 			a.cd:SetCooldown(exp - dur, dur)
 			timed = true
 		end
-	elseif a.auraInstanceID and C_UnitAuras.GetAuraDuration and a.cd.SetCooldownFromDurationObject then
-		timed = pcall(function()
-			a.cd:SetCooldownFromDurationObject(C_UnitAuras.GetAuraDuration(unit, a.auraInstanceID))
-		end) and true or false
+	else
+		-- hidden timer: hand it to the cooldown widget as it is
+		if a.auraInstanceID and C_UnitAuras.GetAuraDuration and a.cd.SetCooldownFromDurationObject then
+			timed = pcall(function()
+				a.cd:SetCooldownFromDurationObject(C_UnitAuras.GetAuraDuration(unit, a.auraInstanceID))
+			end) and true or false
+		end
+		if not timed and a.cd.SetCooldownFromExpirationTime then
+			timed = pcall(a.cd.SetCooldownFromExpirationTime, a.cd, d.expirationTime, d.duration) and true or false
+		end
 	end
 	a.cd:SetShown(timed)
 	-- border: debuff type colour, red for other debuffs
@@ -345,25 +363,62 @@ local function fillIcon(a, unit, d, index, filter, isDebuff)
 	a:Show()
 end
 
-function UF:UpdateAuras(f)
+-- info: UNIT_AURA's update info. While the client refuses a full read (enemy
+-- in combat) the list is kept up to date from the auras that event hands over.
+function UF:UpdateAuras(f, info)
 	if not f.auras then return end
 	local cfg = CK.char.units
 	local unit = f.unit
-	for key, r in pairs(ROWS) do
-		local row = f.auras[key]
-		local filter = r.filter
-		local isDebuff = key == "debuffs"
-		-- on an enemy you can show only your own debuffs (DoTs)
-		if isDebuff and cfg.onlyMyDebuffs and unit ~= "player" then filter = "HARMFUL|PLAYER" end
-		local n = 0
-		if cfg.auras ~= false and UnitExists(unit) then
-			n = eachAura(unit, filter, r.max, function(i, d, index) fillIcon(row[i], unit, d, index, filter, isDebuff) end)
+	local cache = f.auraCache or {}
+	f.auraCache = cache
+	local partial = type(info) == "table" and Safe(info.isFullUpdate, true) == false
+	local list = not partial and scan(unit)
+	if list then
+		wipe(cache)
+		for i, r in ipairs(list) do cache[i] = r end
+	elseif partial then
+		for _, id in ipairs(info.removedAuraInstanceIDs or {}) do
+			id = Safe(id)
+			for i = #cache, 1, -1 do if id and cache[i].id == id then table.remove(cache, i) end end
 		end
-		for i = n + 1, r.max do row[i]:Hide() end
+		for _, id in ipairs(info.updatedAuraInstanceIDs or {}) do
+			id = Safe(id)
+			if id and C_UnitAuras and C_UnitAuras.GetAuraDataByAuraInstanceID then
+				local ok, d = pcall(C_UnitAuras.GetAuraDataByAuraInstanceID, unit, id)
+				if ok and d then
+					for _, r in ipairs(cache) do if r.id == id then r.d = d end end
+				end
+			end
+		end
+		for _, d in ipairs(info.addedAuras or {}) do
+			local id = Safe(d.auraInstanceID)
+			if id then
+				for i = #cache, 1, -1 do if cache[i].id == id then table.remove(cache, i) end end
+			end
+			local h = isHarmful(unit, d)
+			cache[#cache + 1] = { d = d, id = id, harmful = h, filter = h and "HARMFUL" or "HELPFUL" }
+		end
+	end
+
+	local count = { debuffs = 0, buffs = 0 }
+	if cfg.auras ~= false and UnitExists(unit) then
+		for _, r in ipairs(cache) do
+			local key = r.harmful and "debuffs" or "buffs"
+			local row = f.auras[key]
+			-- on an enemy you can show only your own debuffs (DoTs)
+			local mine = Safe(r.d.isFromPlayerOrPlayerPet)
+			local wanted = not (r.harmful and cfg.onlyMyDebuffs and unit ~= "player" and mine == false)
+			if wanted and count[key] < #row then
+				count[key] = count[key] + 1
+				fillIcon(row[count[key]], unit, r.d, r.index, r.filter, r.harmful)
+			end
+		end
+	end
+	for key, row in pairs(f.auras) do
+		for i = count[key] + 1, #row do row[i]:Hide() end
 	end
 	-- buffs sit right above the frame when there are no debuffs
-	local up = ROWS.debuffs.size + 3
-	if not f.auras.debuffs[1]:IsShown() then up = 0 end
+	local up = count.debuffs > 0 and (ROWS.debuffs.size + 3) or 0
 	if f.auraShift ~= up then
 		f.auraShift = up
 		for i, a in ipairs(f.auras.buffs) do
@@ -373,17 +428,30 @@ function UF:UpdateAuras(f)
 	end
 end
 
+-- /coaauras: what this client allows for your target's auras (for bug reports)
+SLASH_CASTERSAURAS1 = "/coaauras"
+SlashCmdList.CASTERSAURAS = function()
+	local unit = UnitExists("target") and "target" or "player"
+	local list, refused = scan(unit)
+	CK:Print(("auras %s: full read %s, GetUnitAuras %s, by-id %s, duration object %s, kept %d"):format(unit,
+		list and ("ok (" .. #list .. ")") or ("refused (" .. tostring(refused) .. ")"),
+		tostring(C_UnitAuras and C_UnitAuras.GetUnitAuras ~= nil),
+		tostring(C_UnitAuras and C_UnitAuras.GetAuraDataByAuraInstanceID ~= nil),
+		tostring(C_UnitAuras and C_UnitAuras.GetAuraDuration ~= nil),
+		UF.frames[unit] and UF.frames[unit].auraCache and #UF.frames[unit].auraCache or 0))
+end
+
 ---------------------------------------------------------------------------
 -- Events
 ---------------------------------------------------------------------------
 local function wire(f, unitEvents)
-	f:SetScript("OnEvent", function(self, event, unit)
+	f:SetScript("OnEvent", function(self, event, unit, info)
 		if event == "UNIT_HEALTH" or event == "UNIT_MAXHEALTH" or event == "UNIT_CONNECTION" then
 			UF:UpdateHealth(self)
 		elseif event == "UNIT_POWER_FREQUENT" or event == "UNIT_MAXPOWER" or event == "UNIT_DISPLAYPOWER" then
 			UF:UpdatePower(self)
 		elseif event == "UNIT_AURA" then
-			if self.auras then UF:UpdateAuras(self) end
+			if self.auras then UF:UpdateAuras(self, info) end
 		elseif event == "UNIT_NAME_UPDATE" or event == "UNIT_LEVEL" or event == "RAID_TARGET_UPDATE" or event == "UNIT_FACTION" then
 			UF:UpdateName(self)
 			UF:UpdateHealth(self)
@@ -391,6 +459,8 @@ local function wire(f, unitEvents)
 			if self.status then UF:UpdateStatus(self) end
 			if self.auras then UF:UpdateAuras(self) end
 		else
+			-- a new target: forget the old one's auras (in combat they come back with UNIT_AURA)
+			if event == "PLAYER_TARGET_CHANGED" and self.auraCache then wipe(self.auraCache) end
 			UF:UpdateAll(self)
 		end
 	end)
