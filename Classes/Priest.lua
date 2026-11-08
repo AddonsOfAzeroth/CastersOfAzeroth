@@ -82,6 +82,15 @@ local function selfHeal(ctx, push)
 	if ctx:Missing("Renew") and ctx:Ready("Renew") then push("Renew", "defensive") end
 end
 
+-- Pull with a long cast: the mob only comes once it lands, then the DoTs go on
+-- while it runs to you. Not while that cast is already going.
+local function opener(ctx, push)
+	if ctx.inCombat or ctx.moving or ctx.casting or ctx.channeling then return end
+	for _, n in ipairs({ "Mind Blast", "Holy Fire", "Smite" }) do
+		if ctx:Ready(n) then push(n) return end
+	end
+end
+
 local function manaTools(ctx, push)
 	if ctx.inCombat and ctx.manaPct < 0.35 and ctx:Ready("Shadowfiend") then push("Shadowfiend", "hint") end
 end
@@ -119,10 +128,8 @@ local function shadow(ctx, list, add)
 		end
 	end
 
-	-- out of combat: open with Mind Blast (Starshards for a Night Elf without it)
-	if not ctx.inCombat and not ctx.moving then
-		if ctx:Ready("Mind Blast") then push("Mind Blast") end
-	end
+	-- out of combat: pull with a long cast first (Mind Blast, Holy Fire or Smite)
+	opener(ctx, push)
 	-- 1. DoTs up (they tag the mob at once)
 	if dotWorth and needsDot(ctx, "Shadow Word: Pain") then push("Shadow Word: Pain") end
 	if dotWorth and needsDot(ctx, "Devouring Plague") then push("Devouring Plague") end
@@ -244,7 +251,7 @@ local function damage(ctx, push, disc)
 	if not ctx.hostile then return end
 	local lowMana = ctx.manaPct < 0.3
 	if ctx.aoe and ctx.nearby >= 3 and ctx:Ready("Holy Nova") then push("Holy Nova") end
-	if not ctx.inCombat and not ctx.moving and ctx:Ready("Holy Fire") then push("Holy Fire") end
+	opener(ctx, push)
 	if needsDot(ctx, "Shadow Word: Pain") then push("Shadow Word: Pain") end
 	if disc and ctx:Ready("Penance") then push("Penance") end
 	if not ctx.moving and ctx:Ready("Mind Blast") then push("Mind Blast") end
