@@ -144,10 +144,10 @@ function M:HideContainers()
 		if mm.BackgroundArt then mm.BackgroundArt:SetAlpha(0) end
 	end
 	if CK.char.micro.bags then
+		-- invisible but left in place: Blizzard's MicroMenuContainer measures it
+		-- on Edit Mode updates and warns when it has no position (hidden parent)
 		local bb = _G.BagsBar
-		if bb then
-			CK.HideBlizzardFrame(bb, hider)
-		end
+		if bb then bb:SetAlpha(0) end
 		if _G.BagBarExpandToggle then _G.BagBarExpandToggle:SetParent(hider) end
 	end
 end
