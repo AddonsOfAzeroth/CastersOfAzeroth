@@ -239,6 +239,10 @@ local DEBUFF_COLORS = {
 local function auraTooltip(a)
 	if not (a.unit and a:IsShown()) then return end
 	GameTooltip:SetOwner(a, "ANCHOR_BOTTOMRIGHT")
+	if a.spellID then
+		GameTooltip:SetSpellByID(a.spellID)
+		return GameTooltip:Show()
+	end
 	local id = a.auraInstanceID
 	if id and GameTooltip.SetUnitAuraByAuraInstanceID and pcall(GameTooltip.SetUnitAuraByAuraInstanceID, GameTooltip, a.unit, id) then
 		return GameTooltip:Show()
@@ -392,6 +396,7 @@ end
 
 local function fillIcon(a, unit, d, index, filter, isDebuff)
 	a.unit, a.index, a.filter = unit, index, filter
+	a.spellID = d.tracked and d.spellId or nil
 	local id = d.auraInstanceID
 	a.auraInstanceID = (not IsSecret(id)) and id or nil
 	pcall(a.icon.SetTexture, a.icon, d.icon)
@@ -435,6 +440,86 @@ local function fillIcon(a, unit, d, index, filter, isDebuff)
 	end
 	a:Show()
 end
+
+---------------------------------------------------------------------------
+-- Your own debuffs from your own casts. This client keeps other units' auras
+-- secret from addons, but your casts are yours: cast a harmful spell whose
+-- tooltip says how long it lasts ("over 18 sec", "for 9 sec") and it shows on
+-- the target frame with a timer. It cannot see resists or dispels.
+---------------------------------------------------------------------------
+local mine = {} -- [guid] = { [spellID] = { icon, start, dur } }
+local durations = {}
+
+local function spellDuration(id)
+	if durations[id] == nil then
+		local dur = false
+		local P = CK.Predict
+		for _, raw in ipairs(P and P.TooltipLines and P.TooltipLines(id) or {}) do
+			local t = raw:lower()
+			local n = t:match("over (%d+%.?%d*) sec") or t:match("for (%d+%.?%d*) sec") or t:match("lasts (%d+%.?%d*) sec")
+			local m = t:match("for (%d+) min") or t:match("lasts (%d+) min")
+			dur = (n and tonumber(n)) or (m and tonumber(m) * 60) or false
+			if dur then break end
+		end
+		durations[id] = dur
+	end
+	return durations[id] or nil
+end
+
+local function spellIcon(id)
+	if C_Spell and C_Spell.GetSpellTexture then return C_Spell.GetSpellTexture(id) end
+	if GetSpellTexture then return GetSpellTexture(id) end
+end
+
+local function harmful(id)
+	if C_Spell and C_Spell.IsSpellHarmful then return Safe(C_Spell.IsSpellHarmful(id), false) end
+	if IsHarmfulSpell and C_Spell and C_Spell.GetSpellName then
+		local name = C_Spell.GetSpellName(id)
+		return name and Safe(IsHarmfulSpell(name), false) or false
+	end
+	return true
+end
+
+-- called on your successful casts
+function UF:TrackCast(spellID)
+	local id = Safe(spellID, nil)
+	if type(id) ~= "number" then return end
+	if not (UnitExists("target") and Safe(UnitCanAttack("player", "target"), false)) then return end
+	local guid = Safe(UnitGUID("target"), nil)
+	if not guid or not harmful(id) then return end
+	local dur = spellDuration(id)
+	if not dur or dur <= 0 then return end
+	local now = GetTime()
+	for g, t in pairs(mine) do -- forget what ran out
+		for s, e in pairs(t) do if e.start + e.dur < now then t[s] = nil end end
+		if not next(t) then mine[g] = nil end
+	end
+	mine[guid] = mine[guid] or {}
+	mine[guid][id] = { icon = spellIcon(id), start = now, dur = dur }
+	local f = self.frames.target
+	if f then
+		self:UpdateAuras(f)
+		C_Timer.After(dur + 0.1, function() self:UpdateAuras(f) end)
+	end
+end
+
+-- aura-like entries for your debuffs on this unit
+local function trackedOn(unit)
+	local out = {}
+	local guid = Safe(UnitGUID(unit), nil)
+	local t = guid and mine[guid]
+	if not t or Safe(UnitIsDead(unit), false) then return out end
+	local now = GetTime()
+	for id, e in pairs(t) do
+		if e.start + e.dur > now then
+			out[#out + 1] = { d = { icon = e.icon, duration = e.dur, expirationTime = e.start + e.dur, applications = 0,
+				isFromPlayerOrPlayerPet = true, spellId = id, tracked = true }, harmful = true, start = e.start }
+		end
+	end
+	table.sort(out, function(a, b) return a.start < b.start end)
+	return out
+end
+UF.TrackedOn = trackedOn -- for tests
 
 -- info: UNIT_AURA's update info. While the client refuses a full read (enemy
 -- in combat) the list is kept up to date from the auras that event hands over.
@@ -492,9 +577,17 @@ function UF:UpdateAuras(f, info)
 		end
 	end
 
+	-- the client keeps this unit's auras secret: show what you put on it yourself
+	local shown = cache
+	if not list and unit ~= "player" then
+		shown = {}
+		for _, r in ipairs(cache) do shown[#shown + 1] = r end
+		for _, r in ipairs(trackedOn(unit)) do shown[#shown + 1] = r end
+	end
+
 	local count = { debuffs = 0, buffs = 0 }
 	if cfg.auras ~= false and UnitExists(unit) then
-		for _, r in ipairs(cache) do
+		for _, r in ipairs(shown) do
 			local key = r.harmful and "debuffs" or "buffs"
 			local row = f.auras[key]
 			-- on an enemy you can show only your own debuffs (DoTs)
@@ -797,4 +890,7 @@ function UF:OnEnable()
 		if self.built then CK:OutOfCombat("units-apply", function() self:Apply() end) end
 	end)
 	C_Timer.NewTicker(1, function() pcall(self.UpdatePartyBuffs, self) end)
+	CK:On("UNIT_SPELLCAST_SUCCEEDED", function(_, unit, _, spellID)
+		if unit == "player" and self.built then self:TrackCast(spellID) end
+	end)
 end

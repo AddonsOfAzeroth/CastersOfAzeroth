@@ -76,6 +76,7 @@ function P:Estimate(spellID)
 	return cache[spellID] or nil
 end
 P.Parse = parse -- for tests
+P.TooltipLines = tooltipText
 
 ---------------------------------------------------------------------------
 -- Which spell: the one you cast, else the one under the mouse
