@@ -908,6 +908,19 @@ function B:UpdateBar()
 	end
 	self:SetButtonEnabled(f.sellBtn, self:MerchantOpen() and not self.selling and self:JunkCount() > 0)
 	f.viewBtn.icon:SetTexture(opt("view") == "bag" and "Interface\\Icons\\INV_Misc_Bag_10" or "Interface\\Icons\\INV_Misc_Book_09")
+
+	-- "Bigger bag" only shows when it can help (no extra clutter)
+	local up = f.upBtn
+	local p = not self.upgrade and not InCombatLockdown() and self:UpgradePlan()
+	if self.upgrade then
+		up.text:SetText(L["Swapping bags..."])
+		up.text:SetTextColor(unpack(S.colors.text))
+	elseif p then
+		up.text:SetText(L["Bigger bag +%d"]:format(p.to - p.from))
+		up.text:SetTextColor(unpack(p.fits and S.colors.accent or S.colors.warn))
+	end
+	up:SetWidth(up.text:GetStringWidth() + 10)
+	up:SetShown((self.upgrade or p) and true or false)
 end
 
 ---------------------------------------------------------------------------
@@ -954,7 +967,7 @@ function B:StopSelling()
 	if self.selling then
 		self.selling = false
 		if (self.sold or 0) > 0 then
-			CK:Print(L["Sold %d junk item(s) for %s."]:format(self.sold, GetCoinTextureString(self.soldValue or 0)))
+			CK:Print(L["Sold %d junk item(s) for %s."]:format(self.sold, CK.MoneyText(self.soldValue or 0)))
 		end
 	end
 end
@@ -1001,6 +1014,193 @@ seller:SetScript("OnUpdate", function(self, elapsed)
 			B:StopSelling()
 			B:RequestUpdate()
 		end
+	end)
+end)
+
+---------------------------------------------------------------------------
+-- Bigger bag: on your click, empty the smallest bag into the others and put the
+-- biggest bag you carry in its place. The same moves you would make by hand,
+-- one at a time, out of combat; it stops as soon as anything looks wrong.
+---------------------------------------------------------------------------
+local CONTAINER = IC.Container or 1
+local MOVE_INTERVAL, MOVE_TIMEOUT = 0.15, 30
+local sizeCache = {}
+local slotsPattern
+
+local function pickup(bag, slot)
+	try(CC and CC.PickupContainerItem or PickupContainerItem, bag, slot)
+end
+
+local function cursorHasItem()
+	return CursorHasItem and CursorHasItem() and true or false
+end
+
+local function tooltipLines(bag, slot)
+	local out = {}
+	local data = C_TooltipInfo and try(C_TooltipInfo.GetBagItem, bag, slot)
+	if type(data) == "table" and type(data.lines) == "table" then
+		for _, line in ipairs(data.lines) do
+			local t = str(line.leftText)
+			if t then out[#out + 1] = t end
+		end
+	end
+	return out
+end
+
+-- Slots of a bag item in your bags: its tooltip says "16 Slot Bag".
+local function bagItemSize(bag, slot, id)
+	if sizeCache[id] then return sizeCache[id] end
+	if not slotsPattern then
+		local fmt = type(CONTAINER_SLOTS) == "string" and CONTAINER_SLOTS or "%d Slot %s"
+		fmt = fmt:gsub("([%(%)%.%+%-%*%?%[%]%^%$])", "%%%1")
+		fmt = fmt:gsub("%%d", "(%%d+)")
+		fmt = fmt:gsub("%%s", ".+")
+		slotsPattern = "^" .. fmt
+	end
+	for _, t in ipairs(tooltipLines(bag, slot)) do
+		local n = tonumber(t:match(slotsPattern))
+		if n then
+			sizeCache[id] = n
+			return n
+		end
+	end
+end
+
+-- A normal bag (no herb, soul or other profession bag).
+local function isPlainBag(id)
+	local _, _, _, _, _, classID, subclassID = try(C_Item and C_Item.GetItemInfoInstant or GetItemInfoInstant, id)
+	return classID == CONTAINER and subclassID == 0
+end
+
+local function equippedIsPlain(bag)
+	local _, family = freeSlots(bag)
+	return family == 0
+end
+
+local function anyLocked()
+	for _, bag in ipairs(BAGS) do
+		for slot = 1, numSlots(bag) do
+			local info = slotInfo(bag, slot)
+			if info and flag(info.isLocked) then return true end
+		end
+	end
+	return false
+end
+
+local function freeSlotOutside(target)
+	for bag = 0, NUM_BAGS do
+		if bag ~= target and numSlots(bag) > 0 and equippedIsPlain(bag) then
+			for slot = 1, numSlots(bag) do
+				if not slotInfo(bag, slot) then return bag, slot end
+			end
+		end
+	end
+end
+
+local function findItem(id, skipBag)
+	for _, bag in ipairs(BAGS) do
+		if bag ~= skipBag then
+			for slot = 1, numSlots(bag) do
+				local info = slotInfo(bag, slot)
+				if info and num(info.itemID) == id then return bag, slot end
+			end
+		end
+	end
+end
+
+-- The swap that gains the most slots, or nil when there is none.
+function B:UpgradePlan()
+	local target, tsize
+	for bag = 1, NUM_BAGS do
+		local n = numSlots(bag)
+		if (n == 0 or equippedIsPlain(bag)) and (not target or n < tsize) then target, tsize = bag, n end
+	end
+	if not target then return end
+	local best
+	for _, bag in ipairs(BAGS) do
+		for slot = 1, numSlots(bag) do
+			local info = slotInfo(bag, slot)
+			local id = info and num(info.itemID)
+			if id and isPlainBag(id) then
+				local size = bagItemSize(bag, slot, id)
+				if size and size > tsize and (not best or size > best.size) then
+					best = { id = id, size = size, link = str(info.hyperlink) }
+				end
+			end
+		end
+	end
+	if not best then return end
+	local used = tsize - (freeSlots(target))
+	local room = 0
+	for bag = 0, NUM_BAGS do
+		if bag ~= target and equippedIsPlain(bag) then room = room + (freeSlots(bag)) end
+	end
+	return { target = target, from = tsize, to = best.size, id = best.id, link = best.link, used = used, fits = room >= used }
+end
+
+local mover = CreateFrame("Frame")
+mover:Hide()
+
+function B:StopUpgrade(msg)
+	mover:Hide()
+	if self.upgrade then
+		self.upgrade = nil
+		if msg then CK:Print(msg) end
+	end
+	self:RequestUpdate()
+end
+
+function B:StartUpgrade()
+	if self.upgrade or InCombatLockdown() or cursorHasItem() then return end
+	local p = self:UpgradePlan()
+	if not p then return end
+	if not p.fits then
+		CK:Print(L["Not enough free slots to empty your smallest bag (%d needed)."]:format(p.used))
+		return
+	end
+	p.started = GetTime()
+	self.upgrade = p
+	mover.wait = 0
+	mover:Show()
+	self:UpdateBar()
+end
+
+mover:SetScript("OnUpdate", function(self, elapsed)
+	self.wait = (self.wait or 0) - elapsed
+	if self.wait > 0 then return end
+	self.wait = MOVE_INTERVAL
+	guard(function()
+		local p = B.upgrade
+		if not p then self:Hide() return end
+		if InCombatLockdown() then return B:StopUpgrade(L["Bag swap stopped: you entered combat."]) end
+		if GetTime() - p.started > MOVE_TIMEOUT then return B:StopUpgrade(L["Bag swap stopped: items did not move."]) end
+		if anyLocked() then return end -- the last move is not done yet
+		local t = p.target
+		if p.swapped then
+			-- the old bag can stay on the cursor: put it in a free slot
+			if cursorHasItem() then
+				local bag, slot = freeSlotOutside(-1)
+				if bag then pickup(bag, slot) end
+			end
+			return B:StopUpgrade(L["Bigger bag in place: %d to %d slots."]:format(p.from, p.to))
+		end
+		if cursorHasItem() then return B:StopUpgrade(L["Bag swap stopped: something is on your cursor."]) end
+		for slot = 1, numSlots(t) do
+			if slotInfo(t, slot) then
+				local bag, free = freeSlotOutside(t)
+				if not bag then return B:StopUpgrade(L["Bag swap stopped: no free slot left."]) end
+				pickup(t, slot)
+				pickup(bag, free)
+				return
+			end
+		end
+		-- the smallest bag is empty now: put the bigger one in its place
+		local bag, slot = findItem(p.id, t)
+		local inv = invID(t)
+		if not (bag and inv and PutItemInBag) then return B:StopUpgrade(L["Bag swap stopped: the bigger bag is gone."]) end
+		pickup(bag, slot)
+		PutItemInBag(inv)
+		p.swapped = true
 	end)
 end)
 
@@ -1227,7 +1427,7 @@ function B:CreateWindow()
 		GameTooltip:AddLine(L["Sell junk"], 1, 1, 1)
 		GameTooltip:AddLine(L["Grey items and items you marked as junk (Alt-click)."], 0.6, 0.65, 0.71, true)
 		local n, value = B:JunkCount()
-		if n > 0 then GameTooltip:AddLine(L["%d item(s), worth %s"]:format(n, GetCoinTextureString(value)), 1, 1, 1) end
+		if n > 0 then GameTooltip:AddLine(L["%d item(s), worth %s"]:format(n, CK.MoneyText(value)), 1, 1, 1) end
 		if not B:MerchantOpen() then GameTooltip:AddLine(L["Open a merchant first."], 1, 0.3, 0.3) end
 	end)
 	f.sellBtn:SetPoint("RIGHT", f.viewBtn, "LEFT", -3, 0)
@@ -1302,6 +1502,27 @@ function B:CreateWindow()
 	f.gold:SetPoint("BOTTOMLEFT", 8, 5)
 	f.free = S:Font(f, 11)
 	f.free:SetPoint("BOTTOMRIGHT", -8, 5)
+
+	local up = CreateFrame("Button", nil, f)
+	up:SetHeight(16)
+	up:SetPoint("BOTTOM", 0, 3)
+	up.text = S:Font(up, 11)
+	up.text:SetPoint("CENTER")
+	up:SetScript("OnClick", function() guard(B.StartUpgrade, B) end)
+	up:SetScript("OnEnter", function(self)
+		GameTooltip:SetOwner(self, "ANCHOR_TOP")
+		GameTooltip:AddLine(L["Bigger bag"], 1, 1, 1)
+		local p = B:UpgradePlan()
+		if p then
+			GameTooltip:AddLine(L["Empties your smallest bag (%d slots) into the others and puts %s (%d slots) in its place."]:format(p.from, p.link or L["the bigger bag"], p.to), 0.6, 0.65, 0.71, true)
+			if not p.fits then GameTooltip:AddLine(L["Not enough free slots to empty your smallest bag (%d needed)."]:format(p.used), 1, 0.3, 0.3, true) end
+		end
+		if InCombatLockdown() then GameTooltip:AddLine(L["Not in combat."], 1, 0.3, 0.3) end
+		GameTooltip:Show()
+	end)
+	up:SetScript("OnLeave", function() GameTooltip:Hide() end)
+	up:Hide()
+	f.upBtn = up
 
 	f:SetScript("OnShow", function()
 		B.shownAt = GetTime()
@@ -1577,6 +1798,7 @@ function B:OnEnable()
 	on("QUEST_REMOVED", update)
 	on("BAG_SLOT_FLAGS_UPDATED", function() B:UpdateStrip() end)
 	on("PLAYER_MONEY", function() B:UpdateBar() end)
+	on("PLAYER_REGEN_DISABLED", function() B:UpdateBar() end)
 	on("MERCHANT_SHOW", function()
 		B.atMerchant = true
 		B:UpdateBar()
