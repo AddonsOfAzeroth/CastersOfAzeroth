@@ -31,4 +31,5 @@ Map.lua
 Chat.lua
 Skins.lua
 Classes\Mage.lua
+Classes\Priest.lua
 Config.lua

@@ -18,6 +18,9 @@ Werkt op een kale installatie, zonder ElvUI of Bartender4.
   grijs verkopen en herstellen bij een verkoper.
 - **Mage**: tellers voor conjured water, food en mana gems (klik = bijmaken), één klik eten en drinken,
   herinnering voor armor en Arcane Intellect, tip voor beter water bij de innkeeper.
+- **Priest**: Shadow-rotatie (Shadow Word: Pain, Devouring Plague, Vampiric Embrace, Mind Blast, Shadow Word: Death,
+  Mind Flay), Holy/Discipline voor solo leveling met Smite; schild, heal en Psychic Scream wanneer het nodig is;
+  Night Elf: Starshards en Elune's Grace; herinnering voor Inner Fire, Fortitude, Shadow Protection en Divine Spirit.
 - **Micromenu en tassen** samen in één paneel, met vrije tasplaatsen.
 - **Lettertype**: standaard Roboto met een zachte schaduw (instelbaar).
 - **Instellingen**: `/coa` (of `/ck`) of de minimapknop. Rechtsklik op de minimapknop = kaders verslepen.
@@ -38,6 +41,7 @@ maar cast nooit zelf iets, verstuurt geen chatberichten en werkt niet met extern
 | `Rotation.lua` | rotatiemotor, racials, glow op knoppen, hintblokje |
 | `Leveling.lua` | XP-balk, tooltip "kills tot level", herinneringen, verkoper |
 | `Classes/Mage.lua` | Frost/Fire/Arcane-prioriteiten, conjured food/water, buffs |
+| `Classes/Priest.lua` | Shadow/Discipline/Holy-prioriteiten, DoT-tijden, buffs |
 | `Map.lua` | wereldkaart: coördinaten, vervagen tijdens lopen, vlak kader, coördinaten op de minimap |
 | `Config.lua` | instellingenvenster, minimapknop |
 
