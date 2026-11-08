@@ -1075,7 +1075,14 @@ function Chat:OnSettings()
 	self:MaybeAskSetup()
 end
 
+-- Chat of Azeroth (its own add-on) runs the chat: then this module stays out of it
+function Chat.OtherChat()
+	local loaded = C_AddOns and C_AddOns.IsAddOnLoaded or IsAddOnLoaded
+	return loaded and loaded("ChatOfAzeroth") and true or false
+end
+
 function Chat:OnEnable()
+	if Chat.OtherChat() then return end
 	CK:Listen("SETTINGS", function(group)
 		if group == "chat" then safe(self.OnSettings, self) end
 	end)

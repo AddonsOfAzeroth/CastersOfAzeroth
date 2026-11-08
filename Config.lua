@@ -513,6 +513,10 @@ end
 
 function C:BuildChat(p)
 	p:Header("Chat")
+	if CK.Chat and CK.Chat.OtherChat and CK.Chat.OtherChat() then
+		p:Note(L["Chat of Azeroth runs your chat: its settings are under Chat of Azeroth."])
+		return
+	end
 	p:Check(L["Casters of Azeroth chat (IRC style)"], nil, setting("chat", "enabled"))
 	p:Check(L["Timestamps [14:03]"], nil, setting("chat", "timestamps"))
 	p:Check(L["Short channel names ([T], [G], [g]…)"], nil, setting("chat", "shortChannels"))
