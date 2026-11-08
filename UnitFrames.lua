@@ -806,13 +806,6 @@ function UF:AddPartyBuffs(pf)
 		btn.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
 		btn.text = S:Font(btn, 9)
 		btn.text:SetPoint("BOTTOM", 0, 1)
-		local ag = btn:CreateAnimationGroup()
-		ag:SetLooping("BOUNCE")
-		local a = ag:CreateAnimation("Alpha")
-		a:SetFromAlpha(1)
-		a:SetToAlpha(0.4)
-		a:SetDuration(0.6)
-		btn.pulse = ag
 		btn.def = b
 		btn:SetScript("OnEnter", function(self)
 			GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
@@ -859,12 +852,10 @@ function UF:UpdatePartyBuffs()
 				btn.icon:SetDesaturated(inRange == false)
 				if low then
 					btn:SetBackdropBorderColor(unpack(S.colors.warn))
-					btn.icon:SetAlpha(1)
-					if not btn.pulse:IsPlaying() then btn.pulse:Play() end
+					btn.icon:SetAlpha(1) -- red border, no blinking
 				else
 					btn:SetBackdropBorderColor(0, 0, 0, 1)
 					btn.icon:SetAlpha(0.6)
-					btn.pulse:Stop()
 				end
 			end
 		end

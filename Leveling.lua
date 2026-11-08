@@ -157,13 +157,6 @@ local function slot(i)
 	b.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
 	b.count = S:Font(b, 11)
 	b.count:SetPoint("BOTTOMRIGHT", -1, 1)
-	local ag = b:CreateAnimationGroup()
-	ag:SetLooping("BOUNCE")
-	local a = ag:CreateAnimation("Alpha")
-	a:SetFromAlpha(1)
-	a:SetToAlpha(0.4)
-	a:SetDuration(0.6)
-	b.pulse = ag
 	b:SetScript("OnEnter", function(self)
 		if not self.entry then return end
 		GameTooltip:SetOwner(self, "ANCHOR_TOP")
@@ -194,6 +187,10 @@ function LV:CreateStrip()
 end
 
 function LV:PlaceStrip()
+	-- the strip holds secure buttons: it can't move in combat, so wait for the end
+	if InCombatLockdown() then
+		return CK:OutOfCombat("reminders-place", function() self:PlaceStrip() end)
+	end
 	local f = self.strip
 	f:ClearAllPoints()
 	f:SetPoint("BOTTOMLEFT", CK.panel, "TOPLEFT", 0, 10)
@@ -255,11 +252,9 @@ function LV:UpdateStrip()
 		b:SetAttribute("spell2", (item or other) and e.spell or nil)
 		b:SetAttribute("unit2", other and "player" or nil)
 		if e.warn then
-			b:SetBackdropBorderColor(unpack(S.colors.warn))
-			b.pulse:Play()
+			b:SetBackdropBorderColor(unpack(S.colors.warn)) -- red border, no blinking
 		else
 			b:SetBackdropBorderColor(0, 0, 0, 1)
-			b.pulse:Stop()
 		end
 		b:ClearAllPoints()
 		b:SetPoint("BOTTOMLEFT", self.strip, "BOTTOMLEFT", (i - 1) * 29, 0)

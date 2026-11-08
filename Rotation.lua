@@ -327,14 +327,7 @@ local function overlay(btn)
 	edge("BOTTOMLEFT", "BOTTOMRIGHT", nil, t)
 	edge("TOPLEFT", "BOTTOMLEFT", t, nil)
 	edge("TOPRIGHT", "BOTTOMRIGHT", t, nil)
-	local ag = f:CreateAnimationGroup()
-	ag:SetLooping("BOUNCE")
-	local a = ag:CreateAnimation("Alpha")
-	a:SetFromAlpha(1)
-	a:SetToAlpha(0.25)
-	a:SetDuration(0.45)
-	f.pulse = ag
-	f:Hide()
+	f:Hide() -- a steady coloured border: nothing blinks
 	btn.ckGlow = f
 	return f
 end
@@ -349,7 +342,6 @@ local function applyGlow(btn, level)
 	local f = overlay(btn)
 	if level == "secondary" then
 		setColor(f, S.colors.hint, 0.45)
-		f.pulse:Stop()
 		f:Show()
 		if btn.ckLBG and LBG then LBG.HideOverlayGlow(btn); btn.ckLBG = nil end
 		return
@@ -362,19 +354,16 @@ local function applyGlow(btn, level)
 			f:Hide()
 		else
 			setColor(f, color, 1)
-			f.pulse:Play()
 			f:Show()
 		end
 	else
 		setColor(f, color, 1)
-		f.pulse:Play()
 		f:Show()
 	end
 end
 
 local function clearGlow(btn)
 	if btn.ckGlow then
-		btn.ckGlow.pulse:Stop()
 		btn.ckGlow:Hide()
 	end
 	if btn.ckLBG and LBG then
@@ -419,10 +408,6 @@ end
 function R:CreateHint()
 	local f = CreateFrame("Frame", "CasterKitHint", UIParent)
 	f:SetSize(80, 42)
-	f:SetMovable(true)
-	f:SetClampedToScreen(true)
-	f:EnableMouse(false)
-	f:RegisterForDrag("LeftButton")
 
 	f.main = S:Icon(f, 40)
 	f.main:SetPoint("LEFT")
@@ -433,27 +418,18 @@ function R:CreateHint()
 	f.aoe:SetText("AoE")
 	f.aoe:SetTextColor(unpack(S.colors.hint))
 
-	f:SetScript("OnDragStart", function(self) self:StartMoving() end)
-	f:SetScript("OnDragStop", function(self)
-		self:StopMovingOrSizing()
-		local p, _, rp, x, y = self:GetPoint()
-		CK.char.rotation.point = { p, "UIParent", rp, math.floor(x + 0.5), math.floor(y + 0.5) }
-	end)
 	self.hint = f
-	self:PlaceHint()
+	-- moved like every other frame (the old spot of its own drag carries over)
+	local old = CK.char.rotation.point
+	if old and not CK.char.points.rotation then CK.char.points.rotation = old end
+	CK.char.rotation.point = nil
+	S:RegisterMover(f, "rotation", CK.L["Rotation hint"], function(fr)
+		fr:SetPoint("BOTTOM", CK.panel, "TOP", 20, 10)
+	end)
 end
 
 function R:PlaceHint()
-	local f = self.hint
-	f:ClearAllPoints()
-	local pt = CK.char.rotation.point
-	if pt then
-		f:SetPoint(pt[1], UIParent, pt[3], pt[4], pt[5])
-	else
-		f:SetPoint("BOTTOM", CK.panel, "TOP", 20, 10)
-	end
-	local unlocked = not CK.char.bars.locked
-	f:EnableMouse(unlocked)
+	S:ApplyPoint(self.hint, "rotation")
 end
 
 local function setIcon(icon, entry)

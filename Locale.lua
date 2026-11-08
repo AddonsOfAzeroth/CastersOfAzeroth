@@ -120,7 +120,8 @@ add({
 	["Party"] = "Groep",
 	["Player"] = "Speler",
 	["Positions and bar settings reset."] = "Posities en balkinstellingen teruggezet.",
-	["Pulsing border"] = "Pulserende rand",
+	["Coloured border"] = "Gekleurde rand",
+	["Rotation hint"] = "Rotatiehint",
 	["Reload UI"] = "Interface herladen",
 	["Reload the UI to apply the language everywhere."] = "Herlaad de interface om de taal overal toe te passen.",
 	["Font"] = "Lettertype",
@@ -510,7 +511,7 @@ add({
 	["Friends, who and raid"] = "Vrienden, wie en raid",
 	["Game menu, addon list and settings"] = "Spelmenu, addonlijst en instellingen",
 	["Pop-up dialogs"] = "Pop-upvensters",
-	["Other windows (bank, trade, dressing room, group finder…)"] = "Andere vensters (bank, handel, paskamer, groepzoeker…)",
+	["Other windows (trade, dressing room, group finder…)"] = "Andere vensters (handel, paskamer, groepzoeker…)",
 	["ElvUI skins Blizzard's windows itself: Casters of Azeroth leaves those windows to ElvUI. Turn off ElvUI's Blizzard skins to use these."] = "ElvUI stylet de Blizzard-vensters zelf: Casters of Azeroth laat die vensters aan ElvUI. Zet de Blizzard-skins van ElvUI uit om deze te gebruiken.",
 	["Changes apply after a reload (/reload)."] = "Wijzigingen gelden na herladen (/reload).",
 })

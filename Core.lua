@@ -173,7 +173,7 @@ CK.CopyTable = copy
 -- Printing, events, modules
 ---------------------------------------------------------------------------
 function CK:Print(...)
-	print("|cff69ccf0CasterKit|r:", ...)
+	print("|cff69ccf0Casters of Azeroth|r:", ...)
 end
 
 local handlers = {}
@@ -704,6 +704,7 @@ SlashCmdList.CASTERKIT = function(msg)
 		CK:OutOfCombat("reset", function()
 			CK:ResetGroup("bars")
 			CK.char.rotation.point = nil
+			CK.char.points.rotation = nil
 			CK:Fire("SETTINGS", "rotation")
 			CK:Print(CK.L["Positions and bar settings reset."])
 		end)

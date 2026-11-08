@@ -677,7 +677,7 @@ end
 
 local function skinOther()
 	if not elvOwns("dressingroom") then window(_G.DressUpFrame) end
-	if not elvOwns("bags") then window(_G.BankFrame) end
+	-- not the bank: restyling it taints Blizzard's own "buy a bank tab" (PurchaseBankTab)
 	if not elvOwns("trade") then
 		local tf = _G.TradeFrame
 		if window(tf) then

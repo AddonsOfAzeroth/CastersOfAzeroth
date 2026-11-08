@@ -426,14 +426,7 @@ local function skin(b, name)
 	v.glow:SetTexture(S.flat)
 	v.glow:SetBlendMode("ADD")
 	local a = S.colors.accent
-	v.glow:SetVertexColor(a[1], a[2], a[3], 0.35)
-	local ag = v.glow:CreateAnimationGroup()
-	ag:SetLooping("BOUNCE")
-	local anim = ag:CreateAnimation("Alpha")
-	anim:SetFromAlpha(1)
-	anim:SetToAlpha(0.2)
-	anim:SetDuration(0.8)
-	v.glowAnim = ag
+	v.glow:SetVertexColor(a[1], a[2], a[3], 0.35) -- steady, it does not blink
 	v.glow:Hide()
 end
 
@@ -498,9 +491,7 @@ local function paint(b)
 
 	if has and d.new and opt("showNewGlow") then
 		v.glow:Show()
-		if not v.glowAnim:IsPlaying() then v.glowAnim:Play() end
 	else
-		v.glowAnim:Stop()
 		v.glow:Hide()
 	end
 	paintCooldown(b)
@@ -592,7 +583,7 @@ local function onItemEnter(self)
 		if d.new then
 			if C_NewItems and C_NewItems.RemoveNewItem then try(C_NewItems.RemoveNewItem, d.bag, d.slot) end
 			d.new = false
-			if v then v.glowAnim:Stop(); v.glow:Hide() end
+			if v then v.glow:Hide() end
 		end
 		if not B.tooltipHooked and GameTooltip:IsOwned(self) then
 			addTooltipLines(GameTooltip, d)
