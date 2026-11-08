@@ -33,4 +33,8 @@ Chat.lua
 Skins.lua
 Classes\Mage.lua
 Classes\Priest.lua
+Classes\Warlock.lua
+Classes\Druid.lua
+Classes\Shaman.lua
+Classes\Paladin.lua
 Config.lua

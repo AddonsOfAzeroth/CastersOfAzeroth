@@ -18,6 +18,8 @@ Werkt op een kale installatie, zonder ElvUI of Bartender4.
   grijs verkopen en herstellen bij een verkoper.
 - **Mage**: tellers voor conjured water, food en mana gems (klik = bijmaken), één klik eten en drinken,
   herinnering voor armor en Arcane Intellect, tip voor beter water bij de innkeeper.
+- **Warlock, Druid, Shaman, Holy Paladin** (beta, nog niet in het spel getest): eigen prioriteiten volgens de
+  leveling-gidsen, met buffs, demon of totems en healen in een groep.
 - **Priest**: Shadow-rotatie (Shadow Word: Pain, Devouring Plague, Vampiric Embrace, Mind Blast, Shadow Word: Death,
   Mind Flay); Holy en Discipline healen in een groep (Renew, Flash Heal, Greater Heal, Prayer of Healing,
   Circle of Healing, Prayer of Mending, schild op de tank; Discipline ook Penance en Pain Suppression) en doen solo
@@ -44,6 +46,10 @@ maar cast nooit zelf iets, verstuurt geen chatberichten en werkt niet met extern
 | `Leveling.lua` | XP-balk, tooltip "kills tot level", herinneringen, verkoper |
 | `Classes/Mage.lua` | Frost/Fire/Arcane-prioriteiten, conjured food/water, buffs |
 | `Classes/Priest.lua` | Shadow/Discipline/Holy-prioriteiten, DoT-tijden, buffs |
+| `Classes/Warlock.lua` | beta: Affliction/Demonology/Destruction, demon, Life Tap, healthstone |
+| `Classes/Druid.lua` | beta: Balance/Restoration, Mark of the Wild, Thorns |
+| `Classes/Shaman.lua` | beta: Elemental/Restoration, totems, shields |
+| `Classes/Paladin.lua` | beta: Holy (heal in groep, seals en Judgement solo), aura's, blessings |
 | `Map.lua` | wereldkaart: coördinaten, vervagen tijdens lopen, vlak kader, coördinaten op de minimap |
 | `Config.lua` | instellingenvenster, minimapknop |
 

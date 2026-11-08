@@ -505,6 +505,10 @@ function C:BuildRotation(p)
 	p:Header(L["Rotation helper"])
 	p:Note(L["Casters of Azeroth only shows which button to press. You press it yourself: nothing is ever cast automatically."])
 	p:Check(L["Rotation helper on"], nil, setting("rotation", "enabled"))
+	local def = CK:GetClass()
+	if def and def.beta then
+		p:Note("|cffffd040" .. L["Beta: this class's own priority is built from the leveling guides and not yet tested in the game. Suggestions can be off; nothing is ever cast for you."] .. "|r")
+	end
 	p:Choice(L["Suggestion source"], { { "blizzard", "Blizzard (Assisted Combat)" }, { "custom", L["Own priority (guide)"] } }, setting("rotation", "source"))
 	p:Note(L["In combat Blizzard hides many values from addons. Blizzard's own suggestion always works; the own priority falls back to Blizzard when something is hidden."])
 	p:Check(L["Light up buttons"], nil, setting("rotation", "glow"))
