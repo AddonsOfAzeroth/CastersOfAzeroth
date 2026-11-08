@@ -277,33 +277,71 @@ function UF:AddAuras(f)
 	}
 end
 
+-- Ways to read one filter's auras. Each returns a list of aura data, or nil
+-- when it is missing or refused. Clients differ: some return nothing (no error)
+-- for other units through one way and do through another, so all are tried.
+local SOURCES = {
+	{ "byIndex", function(unit, filter)
+		if not (C_UnitAuras and C_UnitAuras.GetAuraDataByIndex) then return end
+		local out = {}
+		for i = 1, 40 do
+			local ok, d = pcall(C_UnitAuras.GetAuraDataByIndex, unit, i, filter)
+			if not ok then return end
+			if not d then break end
+			out[#out + 1] = d
+		end
+		return out
+	end },
+	{ "unitAuras", function(unit, filter)
+		if not (C_UnitAuras and C_UnitAuras.GetUnitAuras) then return end
+		local ok, auras = pcall(C_UnitAuras.GetUnitAuras, unit, filter)
+		if ok and type(auras) == "table" then return auras end
+	end },
+	{ "slots", function(unit, filter)
+		if not (C_UnitAuras and C_UnitAuras.GetAuraSlots and C_UnitAuras.GetAuraDataBySlot) then return end
+		local r = { pcall(C_UnitAuras.GetAuraSlots, unit, filter) }
+		if not r[1] then return end
+		local out = {}
+		for i = 3, #r do -- r[2] is the continuation token
+			local ok, d = pcall(C_UnitAuras.GetAuraDataBySlot, unit, r[i])
+			if ok and d then out[#out + 1] = d end
+		end
+		return out
+	end },
+	{ "unitAura", function(unit, filter)
+		if not UnitAura then return end
+		local out = {}
+		for i = 1, 40 do
+			local ok, name, icon, count, kind, dur, exp, source, _, _, spellId = pcall(UnitAura, unit, i, filter)
+			if not ok then return end
+			if not IsSecret(name) and name == nil then break end
+			local src = Safe(source, nil)
+			out[#out + 1] = { name = name, icon = icon, applications = count, dispelName = kind, duration = dur,
+				expirationTime = exp, sourceUnit = source, spellId = spellId,
+				isFromPlayerOrPlayerPet = type(src) == "string" and (src == "player" or src == "pet") or nil }
+		end
+		return out
+	end },
+}
+
 -- Full read of a unit's auras: a list of { d, id, harmful, index, filter },
 -- or nil when this client refuses right now (enemy auras in combat).
+-- Second value: the way that worked (or the filter that was refused).
 local function scan(unit)
-	local list = {}
+	local list, used = {}, nil
 	for _, filter in ipairs({ "HARMFUL", "HELPFUL" }) do
-		local got = false
-		if C_UnitAuras and C_UnitAuras.GetAuraDataByIndex then
-			got = true
-			for i = 1, 40 do
-				local ok, d = pcall(C_UnitAuras.GetAuraDataByIndex, unit, i, filter)
-				if not ok then got = false break end
-				if not d then break end
-				list[#list + 1] = { d = d, id = Safe(d.auraInstanceID), harmful = filter == "HARMFUL", index = i, filter = filter }
-			end
+		local best
+		for _, src in ipairs(SOURCES) do
+			local got = src[2](unit, filter)
+			if got and (not best or #got > #best) then best, used = got, src[1] end
+			if best and #best > 0 then break end
 		end
-		if not got and C_UnitAuras and C_UnitAuras.GetUnitAuras then
-			local ok, auras = pcall(C_UnitAuras.GetUnitAuras, unit, filter)
-			got = ok and type(auras) == "table"
-			if got then
-				for i, d in ipairs(auras) do
-					list[#list + 1] = { d = d, id = Safe(d.auraInstanceID), harmful = filter == "HARMFUL", index = i, filter = filter }
-				end
-			end
+		if not best then return nil, filter end
+		for i, d in ipairs(best) do
+			list[#list + 1] = { d = d, id = Safe(d.auraInstanceID), harmful = filter == "HARMFUL", index = i, filter = filter }
 		end
-		if not got then return nil, filter end
 	end
-	return list
+	return list, used
 end
 UF.ScanAuras = scan
 
@@ -432,13 +470,18 @@ end
 SLASH_CASTERSAURAS1 = "/coaauras"
 SlashCmdList.CASTERSAURAS = function()
 	local unit = UnitExists("target") and "target" or "player"
-	local list, refused = scan(unit)
-	CK:Print(("auras %s: full read %s, GetUnitAuras %s, by-id %s, duration object %s, kept %d"):format(unit,
-		list and ("ok (" .. #list .. ")") or ("refused (" .. tostring(refused) .. ")"),
-		tostring(C_UnitAuras and C_UnitAuras.GetUnitAuras ~= nil),
-		tostring(C_UnitAuras and C_UnitAuras.GetAuraDataByAuraInstanceID ~= nil),
-		tostring(C_UnitAuras and C_UnitAuras.GetAuraDuration ~= nil),
-		UF.frames[unit] and UF.frames[unit].auraCache and #UF.frames[unit].auraCache or 0))
+	local counts = {}
+	for _, src in ipairs(SOURCES) do
+		local h, b = src[2](unit, "HARMFUL"), src[2](unit, "HELPFUL")
+		counts[#counts + 1] = src[1] .. " " .. (h and #h or "-") .. "/" .. (b and #b or "-")
+	end
+	local f = UF.frames[unit]
+	local shown = 0
+	if f and f.auras then
+		for _, row in pairs(f.auras) do for _, a in ipairs(row) do if a:IsShown() then shown = shown + 1 end end end
+	end
+	CK:Print(("auras %s (debuffs/buffs): %s; kept %d, shown %d, frame %s"):format(unit, table.concat(counts, ", "),
+		f and f.auraCache and #f.auraCache or 0, shown, tostring(f and f:IsVisible())))
 end
 
 ---------------------------------------------------------------------------
