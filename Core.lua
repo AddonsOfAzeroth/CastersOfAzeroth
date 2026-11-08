@@ -379,10 +379,11 @@ end
 -- Auras whose data is secret are skipped (treated as not found).
 -- Returns the aura (or nil) and, as second value, true when auras are hidden
 -- right now (secret in combat): then "nil" means unknown, not missing.
-function CK:FindAura(unit, name, filter)
+local function rawFindAura(unit, name, filter)
 	if C_UnitAuras and C_UnitAuras.GetAuraDataBySpellName then
 		local ok, a = pcall(C_UnitAuras.GetAuraDataBySpellName, unit, name, filter)
-		if ok and not issecret(a) then return a, false end
+		-- nil can also mean "hidden right now": then the scan below tells which
+		if ok and a ~= nil and not issecret(a) then return a, false end
 	end
 	if C_UnitAuras and C_UnitAuras.GetAuraDataByIndex then
 		for i = 1, 40 do
@@ -402,6 +403,30 @@ function CK:FindAura(unit, name, filter)
 		end
 	end
 end
+
+-- Your own buffs flicker to "missing" when Blizzard hides auras for a moment
+-- (combat, loading). Remember when each was last seen to run out: while that
+-- time is still ahead, a miss counts as hidden instead of missing.
+local seenUntil = {}
+function CK:FindAura(unit, name, filter)
+	local a, hidden = rawFindAura(unit, name, filter)
+	if unit ~= "player" or (filter and filter:find("HARMFUL")) then return a, hidden end
+	local now = GetTime()
+	if a then
+		local exp = Safe(a.expirationTime)
+		seenUntil[name] = (exp == nil and now + 30) or (exp == 0 and math.huge) or exp
+		return a, false
+	end
+	local untilT = seenUntil[name]
+	-- out of combat a clean miss is real (clicked off, dispelled): trust it
+	if untilT and untilT > now + 1 and (hidden or InCombatLockdown() or now < (CK.auraGrace or 0)) then
+		return nil, true
+	end
+	if not hidden then seenUntil[name] = nil end
+	return nil, hidden
+end
+-- auras come in late after a loading screen
+CK:On("PLAYER_ENTERING_WORLD", function() CK.auraGrace = GetTime() + 5 end)
 
 function CK:AuraRemaining(unit, name, filter)
 	local a = self:FindAura(unit, name, filter)
