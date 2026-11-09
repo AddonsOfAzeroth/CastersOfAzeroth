@@ -318,7 +318,8 @@ local function onMerchant()
 	if cfg.sellGrey then
 		local sold, value = 0, 0
 		CK:ForEachBagItem(function(bag, slotIndex, info)
-			if sold < 12 and info.quality == 0 and not info.hasNoValue and not info.isLocked then
+			local usedByAlt = CK.Bags and CK.Bags.UsedBy and CK.Bags.UsedBy(info.itemID)
+			if sold < 12 and info.quality == 0 and not info.hasNoValue and not info.isLocked and not usedByAlt then
 				local getInfo = C_Item and C_Item.GetItemInfo or GetItemInfo
 				local price = select(11, getInfo(info.itemID)) or 0
 				value = value + price * (info.stackCount or 1)

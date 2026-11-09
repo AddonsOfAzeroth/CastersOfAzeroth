@@ -123,6 +123,7 @@ add({
 	["Coloured border"] = "Gekleurde rand",
 	["Rotation hint"] = "Rotatiehint",
 	["more..."] = "meer...",
+	["Kept %s (marked as junk): %s uses it."] = "%s gehouden (gemarkeerd als junk): %s gebruikt het.",
 	["Chat of Azeroth runs your chat: its settings are under Chat of Azeroth."] = "Chat of Azeroth beheert je chat: de instellingen staan onder Chat of Azeroth.",
 	["Reload UI"] = "Interface herladen",
 	["Reload the UI to apply the language everywhere."] = "Herlaad de interface om de taal overal toe te passen.",

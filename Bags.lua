@@ -309,8 +309,25 @@ local function disenchantable(d)
 end
 
 -- Junk the Sell button may sell: greys and items you marked, with a vendor price.
+-- with Mail of Azeroth: the character (you or an alt) that uses this item, or nil
+local function usedBy(id)
+	local moa = _G.MailOfAzeroth
+	local R = type(moa) == "table" and moa.Rules
+	if not (R and R.WhoUses and moa.db) then return end
+	local ok, who = pcall(R.WhoUses, R, id)
+	return ok and who or nil
+end
+B.UsedBy = usedBy
+
 local function sellable(d)
 	if not d.id or not d.junk or d.noValue or d.locked then return false end
+	-- marked by mistake? a reagent one of your characters uses is never sold
+	local who = usedBy(d.id)
+	if who then
+		B.keptForAlt = B.keptForAlt or {}
+		B.keptForAlt[d.id] = who
+		return false
+	end
 	if d.quality == 0 and not d.marked and FLAG_NOJUNKSELL and d.bag ~= 0 and getFlag(d.bag, FLAG_NOJUNKSELL) then
 		return false
 	end
@@ -988,12 +1005,18 @@ end
 function B:SellJunk()
 	if self.selling or not self:MerchantOpen() then return end
 	local queue = {}
+	B.keptForAlt = {}
 	for _, bag in ipairs(BAGS) do
 		for slot = 1, numSlots(bag) do
 			local b = buttons[bag] and buttons[bag][slot]
 			local d = b and readSlot(b)
 			if d and sellable(d) then queue[#queue + 1] = { bag = bag, slot = slot, id = d.id } end
 		end
+	end
+	-- say what was kept back for a character that uses it
+	for id, who in pairs(B.keptForAlt) do
+		local name = (C_Item and C_Item.GetItemNameByID and C_Item.GetItemNameByID(id)) or tostring(id)
+		CK:Print(L["Kept %s (marked as junk): %s uses it."]:format(name, who))
 	end
 	if #queue == 0 then return end
 	self.queue, self.sold, self.soldValue, self.selling = queue, 0, 0, true
