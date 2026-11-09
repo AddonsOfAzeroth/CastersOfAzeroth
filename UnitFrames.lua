@@ -882,6 +882,8 @@ function UF:Apply()
 	local loaded = C_AddOns and C_AddOns.IsAddOnLoaded or IsAddOnLoaded
 	local healers = loaded and loaded("HealersOfAzeroth")
 	for i = 1, 4 do set(self.frames["party" .. i], on and cfg.party and not healers, true) end
+	-- no box to move for frames that are not there
+	if S.movers.party then S.movers.party.hidden = healers or not (on and cfg.party) end
 	if on then self:HideBlizzard() end
 	for _, key in ipairs({ "player", "target", "tot", "party" }) do
 		local m = S.movers[key]

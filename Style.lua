@@ -267,7 +267,7 @@ end
 
 function S:UpdateMovers()
 	local show = not CK.char.bars.locked and not InCombatLockdown()
-	for _, m in pairs(self.movers) do m.overlay:SetShown(show) end
+	for _, m in pairs(self.movers) do m.overlay:SetShown(show and not m.hidden) end
 end
 
 function S:ResetMovers()
