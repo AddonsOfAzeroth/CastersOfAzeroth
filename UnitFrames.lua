@@ -878,7 +878,10 @@ function UF:Apply()
 	set(self.frames.target, on and cfg.target, true)
 	set(self.frames.targettarget, on and cfg.target and cfg.tot, true)
 	self.partyAnchor:SetScale(cfg.scale)
-	for i = 1, 4 do set(self.frames["party" .. i], on and cfg.party, true) end
+	-- Healers of Azeroth draws the group: then our party frames step aside
+	local loaded = C_AddOns and C_AddOns.IsAddOnLoaded or IsAddOnLoaded
+	local healers = loaded and loaded("HealersOfAzeroth")
+	for i = 1, 4 do set(self.frames["party" .. i], on and cfg.party and not healers, true) end
 	if on then self:HideBlizzard() end
 	for _, key in ipairs({ "player", "target", "tot", "party" }) do
 		local m = S.movers[key]
