@@ -237,6 +237,17 @@ function C:CreateWindow()
 	nav:SetWidth(140)
 	nav:SetBackdrop({ bgFile = S.flat })
 	nav:SetBackdropColor(0.06, 0.07, 0.10, 1)
+	-- the list scrolls with the mouse wheel when it is longer than the window
+	pcall(nav.SetClipsChildren, nav, true)
+	local navContent = CreateFrame("Frame", nil, nav)
+	navContent:SetPoint("TOPLEFT", 0, 0)
+	navContent:SetPoint("TOPRIGHT", 0, 0)
+	navContent:SetHeight(1)
+	local navMore = S:Font(nav, 10)
+	navMore:SetPoint("BOTTOM", 0, 4)
+	navMore:SetTextColor(unpack(S.colors.muted))
+	navMore:SetText(L["more..."])
+	local navOffset = 0
 
 	self.frame = f
 	self.pages = {}
@@ -251,7 +262,7 @@ function C:CreateWindow()
 		local page = setmetatable({ frame = container, y = 0, widgets = {} }, Page)
 		self.pages[key] = page
 
-		local tab = CreateFrame("Button", nil, nav)
+		local tab = CreateFrame("Button", nil, navContent)
 		tab:SetSize(138, 24)
 		tab:SetPoint("TOPLEFT", 1, -navY)
 		navY = navY + 25
@@ -270,7 +281,7 @@ function C:CreateWindow()
 	end
 	-- a small title in the sidebar above the pages of one add-on
 	local function navHeader(text)
-		local t = S:Font(nav, 10)
+		local t = S:Font(navContent, 10)
 		t:SetPoint("TOPLEFT", 8, -navY - 6)
 		t:SetText(text)
 		t:SetTextColor(unpack(S.colors.muted))
@@ -312,6 +323,20 @@ function C:CreateWindow()
 	navY = navY + 10 -- a little space before Profiles and About
 	self:BuildProfiles(newPage("profiles", L["Profiles"]))
 	self:BuildAbout(newPage("about", L["About"]))
+
+	-- scrolling the sidebar
+	local function scroll(delta)
+		local room = math.max(0, navY + 8 - nav:GetHeight())
+		navOffset = math.max(0, math.min(room, navOffset - delta * 40))
+		navContent:ClearAllPoints()
+		navContent:SetPoint("TOPLEFT", 0, navOffset)
+		navContent:SetPoint("TOPRIGHT", 0, navOffset)
+		navMore:SetShown(navOffset < room)
+	end
+	nav:EnableMouseWheel(true)
+	nav:SetScript("OnMouseWheel", function(_, delta) scroll(delta) end)
+	nav:SetScript("OnSizeChanged", function() scroll(0) end)
+	C_Timer.After(0, function() scroll(0) end)
 end
 
 function C:Show(key)
