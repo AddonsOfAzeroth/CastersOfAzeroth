@@ -39,7 +39,7 @@ add({
 	["About"] = "Over",
 	["Action bars"] = "Actiebalken",
 	["Also show the next spell (faint border)"] = "Volgende spreuk ook tonen (zwakke rand)",
-	["Also via /ck aoe, middle-click on the minimap button or your own key binding."] = "Ook via /ck aoe, middelklik op de minimapknop of een eigen sneltoets.",
+	["Also via /ck aoe, middle-click on Casters in the Addons of Azeroth minimap list, or your own key binding."] = "Ook via /ck aoe, middelklik op Casters in het minimaplijstje van Addons of Azeroth, of een eigen sneltoets.",
 	["AoE mode (multiple enemies)"] = "AoE-modus (meerdere vijanden)",
 	["AoE mode off (single target)."] = "AoE-modus uit (één doelwit).",
 	["AoE mode on."] = "AoE-modus aan.",
