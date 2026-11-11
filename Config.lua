@@ -366,7 +366,7 @@ function C:BuildGeneral(p)
 		function(v) CK.char.bars.locked = v; changed("bars"); changed("micro") end)
 	p:Check(L["Show minimap button"], nil,
 		function() return not CK.db.minimap.hide end,
-		function(v) CK.db.minimap.hide = not v; C:UpdateMinimapButton() end)
+		function(v) CK.db.minimap.hide = not v; if AddonsOfAzerothHub then AddonsOfAzerothHub:SetHidden(not v) else C:UpdateMinimapButton() end end)
 	p:Choice(L["Language"], CK.languages,
 		function() return CK.db.language end,
 		function(v) CK.db.language = v end)

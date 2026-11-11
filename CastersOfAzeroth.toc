@@ -10,6 +10,7 @@
 ## SavedVariablesPerCharacter: CasterKitCharDB
 ## OptionalDeps: ElvUI, Bartender4
 
+Hub.lua
 libs\LibStub\LibStub.lua
 libs\CallbackHandler-1.0\CallbackHandler-1.0.xml
 libs\LibButtonGlow-1.0\LibButtonGlow-1.0.lua
@@ -39,3 +40,4 @@ Classes\Druid.lua
 Classes\Shaman.lua
 Classes\Paladin.lua
 Config.lua
+HubEntry.lua
