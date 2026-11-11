@@ -1,4 +1,5 @@
 ## Interface: 16001
+## Category: Addons of Azeroth
 ## Title: Casters of Azeroth
 ## Notes: Caster UI: all action bars in one frame, a rotation helper, leveling helpers, bags, loot and chat.
 ## Notes-nlNL: Caster-UI: alle actiebalken in één kader, een rotatiehulp, levelhulpjes, tassen, loot en chat.
