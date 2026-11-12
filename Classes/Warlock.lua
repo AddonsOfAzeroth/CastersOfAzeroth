@@ -122,7 +122,12 @@ local function affliction(ctx, list, add)
 	-- Nightfall: a free instant Shadow Bolt
 	if ctx:Buff("Shadow Trance") and ctx:Ready("Shadow Bolt") then push("Shadow Bolt", "proc") end
 	if ctx.aoe and ctx:Ready("Seed of Corruption") and not ctx.moving then push("Seed of Corruption") end
-	dots(ctx, push, { "Corruption", "Unstable Affliction", "Siphon Life" })
+	-- Immolate while leveling (from level 1), until Unstable Affliction takes its place
+	local wanted = { "Corruption" }
+	if not ctx:Known("Unstable Affliction") then wanted[#wanted + 1] = "Immolate" end
+	wanted[#wanted + 1] = "Unstable Affliction"
+	wanted[#wanted + 1] = "Siphon Life"
+	dots(ctx, push, wanted)
 	curse(ctx, push)
 	shardFarm(ctx, push)
 	sustain(ctx, push)
