@@ -29,6 +29,7 @@ Loot.lua
 UnitFrames.lua
 Predict.lua
 Castbar.lua
+Pets.lua
 Tooltip.lua
 Map.lua
 Chat.lua

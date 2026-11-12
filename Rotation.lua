@@ -177,6 +177,7 @@ local function push(list, name, kind, front)
 	if front then table.insert(list, 1, e) else list[#list + 1] = e end
 end
 R.Push = push
+R.layers = {} -- fn(ctx, list, push), after the class layer
 
 local function firstReady(names)
 	for _, n in ipairs(names) do
@@ -235,6 +236,8 @@ function R:Evaluate()
 	-- class extras that also apply without a target (e.g. Slow Fall, Blink)
 	local def = CK:GetClass()
 	if def and def.Always then layer(def.Always, c, list, push) end
+	-- other modules (Pets: your minion's health and its return)
+	for _, fn in ipairs(self.layers) do layer(fn, c, list, push) end
 
 	return list
 end

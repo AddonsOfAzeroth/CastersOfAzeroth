@@ -686,6 +686,9 @@ local function hideBlizzard(frame)
 	end
 end
 
+-- for Pets.lua: the pet frame is built the same way
+UF.CreateUnitFrame, UF.Wire, UF.HideBlizzardUnit = createFrame, wire, hideBlizzard
+
 function UF:HideBlizzard()
 	local cfg = CK.char.units
 	if not cfg.hideBlizzard or self.blizzardHidden then return end

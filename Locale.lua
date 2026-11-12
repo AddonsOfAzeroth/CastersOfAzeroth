@@ -626,3 +626,24 @@ add({
 BINDING_HEADER_CASTERKIT = "Casters of Azeroth"
 BINDING_NAME_CASTERKIT_AOE = "Toggle AoE mode"
 BINDING_NAME_CASTERKIT_CONFIG = "Open settings"
+
+add({
+	["Minions"] = "Minions",
+	["Minion helpers"] = "Hulp voor je minion",
+	["Your demon, water elemental or other pet: its frame, its bar and warnings. Nothing ever commands it by itself."] = "Je demon, water elemental of ander huisdier: een kader, een balk en waarschuwingen. Niets stuurt hem uit zichzelf aan.",
+	["Pet"] = "Pet",
+	["Pet frame"] = "Pet-kader",
+	["Health and mana, and under it what your pet attacks."] = "Levens en mana, en eronder wat je pet aanvalt.",
+	["Pet bar"] = "Pet-balk",
+	["Its actions. Green corner = autocast on; right-click a button to switch autocast."] = "Zijn acties. Groen hoekje = autocast aan; rechtsklik op een knop om autocast te wisselen.",
+	["Summon buttons"] = "Oproepknoppen",
+	["Summons"] = "Oproepen",
+	["One button per demon you know, the one that is out has a green border. Your Soul Shards next to them."] = "Eén knop per demon die je kent; die van de demon die er nu is, heeft een groene rand. Je Soul Shards ernaast.",
+	["Warnings"] = "Waarschuwingen",
+	["Low health: Health Funnel lights up. Gone in combat: Fel Domination. Not attacking while you fight: the Attack button glows. Your target hits you: the taunt (Torment) glows."] = "Weinig levens: Health Funnel licht op. Weg in gevecht: Fel Domination. Valt niet aan terwijl jij vecht: de Attack-knop licht op. Je doelwit slaat jou: de taunt (Torment) licht op.",
+	["Hide Blizzard pet frame and bar"] = "Blizzards pet-kader en -balk verbergen",
+	["Turning this off needs a reload."] = "Uitzetten vraagt een reload.",
+	["Not attacking: click Attack on its bar"] = "Valt niet aan: klik Attack op zijn balk",
+	["Low health"] = "Weinig levens",
+	["Right-click: autocast on or off"] = "Rechtsklik: autocast aan of uit",
+})

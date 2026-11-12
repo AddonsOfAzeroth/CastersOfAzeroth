@@ -139,6 +139,14 @@ local charDefaults = {
 		fadeAlpha = 0.5,
 		scale = 1,
 	},
+	pets = {
+		enabled = true,
+		frame = true,        -- your minion's frame (mover "pet")
+		bar = true,          -- its action bar (mover "petbar")
+		summons = true,      -- a button per demon you know (mover "summons")
+		warnings = true,     -- low health / gone in combat / not attacking
+		hideBlizzard = true,
+	},
 	points = {}, -- saved positions of movable frames, by key
 	class = {},
 }
