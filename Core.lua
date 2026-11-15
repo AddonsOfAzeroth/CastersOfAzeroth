@@ -74,6 +74,7 @@ local charDefaults = {
 		hint = true,
 		aoe = false,
 		autoAoe = true, -- AoE priority by itself with 3+ enemies close by (nameplates)
+		coach = true,   -- cast log for analysis outside the game (Coach.lua)
 		point = nil,
 	},
 	leveling = {

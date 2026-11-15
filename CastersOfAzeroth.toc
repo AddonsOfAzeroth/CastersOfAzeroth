@@ -30,6 +30,7 @@ UnitFrames.lua
 Predict.lua
 Castbar.lua
 Pets.lua
+Coach.lua
 Tooltip.lua
 Map.lua
 Chat.lua

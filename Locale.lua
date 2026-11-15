@@ -647,3 +647,7 @@ add({
 	["Low health"] = "Weinig levens",
 	["Right-click: autocast on or off"] = "Rechtsklik: autocast aan of uit",
 })
+add({
+	["Keep a cast log for analysis"] = "Cast-logboek bijhouden voor analyse",
+	["Every cast with what the helper suggested, your mana and health, the target's health. Saved on logout or /reload (WTF > SavedVariables > CastersOfAzeroth.lua), for a look outside the game."] = "Elke cast met wat de hulp voorstelde, je mana en levens, de levens van je doelwit. Bewaard bij uitloggen of /reload (WTF > SavedVariables > CastersOfAzeroth.lua), om buiten het spel te bekijken.",
+})

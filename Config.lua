@@ -578,6 +578,7 @@ function C:BuildRotation(p)
 	p:Check(L["Only with a hostile target"], nil, setting("rotation", "onlyHostile"))
 	p:Check(L["AoE mode (multiple enemies)"], L["Also via /ck aoe, middle-click on Casters in the Addons of Azeroth minimap list, or your own key binding."], setting("rotation", "aoe"))
 	p:Check(L["Automatic AoE with 3+ enemies close by"], L["Counts enemies within about 10 yards from their nameplates. Turn enemy nameplates on (V)."], setting("rotation", "autoAoe"))
+	p:Check(L["Keep a cast log for analysis"], L["Every cast with what the helper suggested, your mana and health, the target's health. Saved on logout or /reload (WTF > SavedVariables > CastersOfAzeroth.lua), for a look outside the game."], setting("rotation", "coach"))
 	p:Gap()
 	p:Note(L["Colors: gold = press now, purple = proc (e.g. Fingers of Frost), blue = defensive (falling, rooted, too close)."])
 end
