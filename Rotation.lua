@@ -35,10 +35,21 @@ end
 
 function ctx:CooldownRemaining(name) return CK:CooldownRemaining(name) end
 function ctx:Buff(name) return CK:FindAura("player", name, "HELPFUL") ~= nil end
--- true only when the buff is known to be absent (false while auras are hidden)
+-- buffs that run out: while auras are hidden, your last cast tells whether it is still on
+local BUFF_TIME = { ["Ice Barrier"] = 60, ["Mana Shield"] = 60, ["Power Word: Shield"] = 30, ["Renew"] = 15,
+	["Rejuvenation"] = 12, ["Regrowth"] = 21, ["Ice Armor"] = 1800, ["Frost Armor"] = 1800, ["Mage Armor"] = 1800 }
+R.BUFF_TIME = BUFF_TIME
+
+-- true when the buff is absent; while auras are hidden: when your last cast of it
+-- has run out (buffs in BUFF_TIME), else false (unknown)
 function ctx:Missing(name)
 	local a, hidden = CK:FindAura("player", name, "HELPFUL")
-	return a == nil and not hidden
+	if a then return false end
+	if not hidden then return true end
+	local d = BUFF_TIME[name]
+	if not d then return false end
+	local since = CK:SinceCast(name)
+	return since == nil or since > d
 end
 function ctx:BuffRemaining(name) return CK:AuraRemaining("player", name, "HELPFUL") end
 function ctx:Debuff(name, mine)
@@ -87,7 +98,7 @@ end
 
 -- Enemies near you and enemies attacking you, from the visible nameplates.
 local function countEnemies()
-	local near, attackers = 0, 0
+	local near, attackers, hidden = 0, 0, false
 	if not (C_NamePlate and C_NamePlate.GetNamePlates) then return near, attackers end
 	local ok, plates = pcall(C_NamePlate.GetNamePlates)
 	if not ok or type(plates) ~= "table" then return near, attackers end
@@ -95,9 +106,12 @@ local function countEnemies()
 		local u = Safe(plate.namePlateUnitToken or (plate.UnitFrame and plate.UnitFrame.unit))
 		if type(u) == "string" and Safe(UnitCanAttack("player", u), false) and not Safe(UnitIsDead(u), false) then
 			if isClose(u) then near = near + 1 end
-			if Safe(UnitIsUnit(u .. "target", "player"), false) then attackers = attackers + 1 end
+			local onMe = UnitIsUnit(u .. "target", "player")
+			if CK.IsSecret(onMe) then hidden = true elseif onMe then attackers = attackers + 1 end
 		end
 	end
+	-- who they attack is hidden in combat: count the enemies close by instead
+	if hidden and attackers == 0 then attackers = near end
 	return near, attackers
 end
 
@@ -212,8 +226,12 @@ function R:Evaluate()
 
 	if wantTarget then
 		if useCustom and spec and spec.rotation then
-			-- secret values make parts of the custom priority unreadable in combat
-			if not pcall(spec.rotation, c, list, push) then wipe(list) end
+			-- secret values can break a rule in combat: keep what came before it
+			local ok, err = pcall(spec.rotation, c, list, push)
+			if not ok then
+				self.lastError = tostring(err)
+				if CK.debug then CK:Print("rotation:", err) end
+			end
 		end
 		local blizz = self:BlizzardNext()
 		if blizz and (not useCustom or #list == 0) then push(list, blizz, "hint", true) end
@@ -451,7 +469,13 @@ function R:UpdateHint(list)
 	local show = cfg.enabled and cfg.hint and (list[1] ~= nil or not CK.char.bars.locked)
 	f:SetShown(show)
 	if not show then return end
-	setIcon(f.main, list[1] or { name = "Frostbolt" })
+	if list[1] then
+		setIcon(f.main, list[1])
+	else -- unlocked, nothing to suggest: a plain placeholder to drag
+		f.main.icon:SetTexture(134400)
+		f.main:SetBackdropBorderColor(0, 0, 0, 1)
+		f.main:Show()
+	end
 	setIcon(f.next, cfg.secondary and list[2] or nil)
 	f.aoe:SetShown(cfg.aoe)
 end

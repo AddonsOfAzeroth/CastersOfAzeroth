@@ -45,7 +45,7 @@ local function dotLeft(ctx, name)
 	local g = targetGUID()
 	local t = g and cast[g] and cast[g][name]
 	if not t then return 0 end
-	return math.max(0, (DOT_TIME[name] or 15) - (ctx.now - t))
+	return math.max(0, CK:DotTime(name, DOT_TIME[name] or 15) - (ctx.now - t))
 end
 
 local function needsDot(ctx, name)
@@ -139,9 +139,11 @@ local function curse(ctx, push)
 	if tough(ctx) and needsDot(ctx, "Curse of the Elements") then push("Curse of the Elements") end
 end
 
-local function filler(ctx, push)
+-- wandFirst (Affliction, Demonology): the guides finish with the wand after the
+-- DoTs (Shadow Bolt costs a lot of mana for its damage); Destruction casts Shadow Bolt
+local function filler(ctx, push, wandFirst)
 	if ctx.moving then return end
-	if ctx:Known("Shoot") and ctx.manaPct < 0.1 then push("Shoot") return end
+	if ctx:Known("Shoot") and (wandFirst or ctx.manaPct < 0.1) then push("Shoot") return end
 	push(ctx:Known("Shadow Bolt") and "Shadow Bolt" or "Shoot")
 end
 
@@ -172,7 +174,7 @@ local function affliction(ctx, list, add)
 		if ctx:Ready("Wrack") and ctx.healthPct > 0.6 and ctx.manaPct > 0.4 then push("Wrack") end
 		if (Safe(ctx.level, 0) or 0) >= 30 and ctx:Ready("Drain Life") then push("Drain Life") end
 	end
-	filler(ctx, push)
+	filler(ctx, push, true)
 end
 
 local function demonology(ctx, list, add)
@@ -190,7 +192,7 @@ local function demonology(ctx, list, add)
 	dots(ctx, push, { "Immolate", "Corruption" })
 	shardFarm(ctx, push)
 	sustain(ctx, push)
-	filler(ctx, push)
+	filler(ctx, push, true)
 end
 
 local function destruction(ctx, list, add)
@@ -240,6 +242,11 @@ local Warlock = {
 
 function Warlock.Always(ctx, list, add)
 	if ctx.control == "FEAR" and ctx:Ready("Will of the Forsaken") then add(list, "Will of the Forsaken", "defensive", true) end
+	-- between pulls: Life Tap when you have more health than mana (drink or eat for the rest)
+	if not ctx.inCombat and not ctx.hostile and ctx.manaPct < 0.7 and ctx.healthPct > ctx.manaPct + 0.2
+		and ctx.healthPct > 0.5 and ctx:Ready("Life Tap") then
+		add(list, "Life Tap", "hint")
+	end
 	-- no demon out of combat: summon the one for your spec
 	if not ctx.inCombat and not petAlive() and not CK.char.leveling.buffsOff.pet then
 		local _, key = CK:GetSpec()

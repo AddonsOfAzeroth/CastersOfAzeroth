@@ -26,7 +26,7 @@ local function dotLeft(ctx, name)
 	local g = targetGUID()
 	local t = g and cast[g] and cast[g][name]
 	if not t then return 0 end
-	return math.max(0, (DOT_TIME[name] or 12) - (ctx.now - t))
+	return math.max(0, CK:DotTime(name, DOT_TIME[name] or 12) - (ctx.now - t))
 end
 
 local function needsDot(ctx, name)

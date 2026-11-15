@@ -33,7 +33,7 @@ local function dotLeft(ctx, name)
 	local g = targetGUID()
 	local t = g and cast[g] and cast[g][name]
 	if not t then return 0 end
-	return math.max(0, (DOT_TIME[name] or 15) - (ctx.now - t))
+	return math.max(0, CK:DotTime(name, DOT_TIME[name] or 15) - (ctx.now - t))
 end
 
 local function needsDot(ctx, name)
@@ -60,8 +60,10 @@ end
 
 local function defensive(ctx, push)
 	local onMe = ctx.targetingMe ~= false and ctx.inCombat
-	-- shield: no pushback on your casts; Weakened Soul blocks a new one
-	if onMe and ctx.healthPct < 0.8 and ctx:Missing("Power Word: Shield") and not weakenedSoul()
+	-- shield: no pushback on your casts; Weakened Soul blocks a new one. Solo it
+	-- costs a fifth of your mana for little: only when health really drops
+	local shieldAt = IsInGroup() and 0.8 or 0.5
+	if onMe and ctx.healthPct < shieldAt and ctx:Missing("Power Word: Shield") and not weakenedSoul()
 		and ctx:Ready("Power Word: Shield") then
 		push("Power Word: Shield", "defensive")
 	end
@@ -143,8 +145,8 @@ local function shadow(ctx, list, add)
 	if not ctx.moving and ctx:Ready("Mind Blast") then push("Mind Blast") end
 	-- 5. Shadow Word: Death (execute, or on cooldown when health is hidden)
 	if deathNow and ctx:Ready("Shadow Word: Death") then push("Shadow Word: Death") end
-	-- 6. Night Elf: Starshards (channel, no mana)
-	if not ctx.moving and ctx:Ready("Starshards") then push("Starshards") end
+	-- 6. Night Elf: Starshards (channel; costs mana for about wand damage: only with mana to spare)
+	if not ctx.moving and ctx.manaPct > 0.5 and ctx:Ready("Starshards") then push("Starshards") end
 	manaTools(ctx, push)
 	-- moving: instants only
 	if ctx.moving then

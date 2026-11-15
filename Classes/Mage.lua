@@ -81,7 +81,9 @@ local function manaTools(ctx, push)
 	if ctx.manaPct < 0.15 then
 		local gem = gemReady()
 		if gem then push(gem, "hint") end
-		if ctx:Ready("Evocation") and ctx.targetingMe == false then push("Evocation", "hint") end
+		-- not while the mob hits you; hidden in combat: when it is not next to you
+		local safe = ctx.targetingMe == false or (ctx.targetingMe == nil and not inMelee())
+		if ctx:Ready("Evocation") and safe then push("Evocation", "hint") end
 	end
 end
 
@@ -104,7 +106,8 @@ local function frost(ctx, list, add)
 	local lowMana = ctx.manaPct < 0.25
 	local execute = ctx.targetHealthPct and ctx.targetHealthPct < 0.2
 	-- target health hidden in combat: the guides say Fire Blast on cooldown then
-	local fireBlastNow = execute or (ctx.inCombat and ctx.targetHealthPct == nil)
+	-- (only with mana to spare: on every cooldown it drains you)
+	local fireBlastNow = execute or (ctx.inCombat and ctx.targetHealthPct == nil and ctx.manaPct > 0.4)
 	local melee = inMelee()
 
 	if ctx.aoe then

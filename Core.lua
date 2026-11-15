@@ -339,6 +339,40 @@ function CK:SpellTexture(name)
 	return GetSpellTexture(id)
 end
 
+-- Your own casts: when each spell was last cast. In combat this client can
+-- hide cooldowns and auras; then the last cast stands in for them.
+local castAt = {}
+CK:On("UNIT_SPELLCAST_SUCCEEDED", function(_, unit, _, spellID)
+	if unit ~= "player" then return end
+	local id = CK.Safe(spellID, nil)
+	local name = type(id) == "number" and GetName(id)
+	if name then castAt[name] = GetTime() end
+end)
+function CK:SinceCast(name)
+	local t = castAt[name]
+	return t and GetTime() - t or nil
+end
+
+-- the spell's own cooldown in seconds (without talents), false when none
+local baseCD = {}
+local function baseCooldown(id)
+	if baseCD[id] == nil then
+		local ms = GetSpellBaseCooldown and select(2, pcall(GetSpellBaseCooldown, id))
+		ms = CK.Safe(ms, nil)
+		baseCD[id] = type(ms) == "number" and ms > 0 and ms / 1000 or false
+	end
+	return baseCD[id]
+end
+
+-- how long a DoT or buff of yours lasts: from the spell's tooltip (right for
+-- your rank, e.g. Corruption rank 1 = 12 s), else the given default
+function CK:DotTime(name, default)
+	local id = known[name]
+	local UF = self.UnitFrames
+	local d = id and UF and UF.SpellDuration and UF.SpellDuration(id)
+	return d or default
+end
+
 -- Returns start, duration; nil, nil when the values are secret.
 local function rawCooldown(id)
 	local s, d
@@ -365,7 +399,13 @@ function CK:CooldownRemaining(name)
 	local id = known[name]
 	if not id then return math.huge end
 	local s, d = rawCooldown(id)
-	if not s then return math.huge end
+	if not s then
+		-- hidden (combat): from your last cast and the spell's own cooldown;
+		-- never cast this session = ready
+		local since, base = self:SinceCast(name), baseCooldown(id)
+		if since and base then return math.max(0, base - since) end
+		return 0
+	end
 	if s == 0 or d == 0 then return 0 end
 	local _, gd = rawCooldown(61304)
 	if gd and gd > 0 and d <= gd + 0.05 then return 0 end
@@ -381,7 +421,8 @@ function CK:IsUsable(name)
 	else
 		usable, noMana = IsUsableSpell(id)
 	end
-	if issecret(usable) or issecret(noMana) then return false, false end
+	-- hidden (combat): assume usable; mana is checked by the rotation itself
+	if issecret(usable) or issecret(noMana) then return true, false end
 	return usable, noMana
 end
 

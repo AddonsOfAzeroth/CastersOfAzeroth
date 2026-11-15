@@ -527,6 +527,7 @@ local function trackedOn(unit)
 	return out
 end
 UF.TrackedOn = trackedOn -- for tests
+UF.SpellDuration = spellDuration -- Core: CK:DotTime
 
 -- info: UNIT_AURA's update info. While the client refuses a full read (enemy
 -- in combat) the list is kept up to date from the auras that event hands over.
