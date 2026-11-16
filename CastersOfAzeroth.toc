@@ -22,6 +22,7 @@ Style.lua
 Bars.lua
 Keybind.lua
 MicroMenu.lua
+Mana.lua
 Rotation.lua
 Leveling.lua
 Bags.lua

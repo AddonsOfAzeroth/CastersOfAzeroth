@@ -132,7 +132,14 @@ function R:BuildContext()
 	ctx.targetHealthPct = ctx.hostile and ratio(UnitHealth("target"), UnitHealthMax("target")) or nil
 	ctx.targetIsBoss = ctx.hostile and Safe(UnitClassification("target")) == "worldboss"
 	ctx.healthPct = ratio(UnitHealth("player"), UnitHealthMax("player"), 1)
-	ctx.manaPct = ratio(UnitPower("player", 0), UnitPowerMax("player", 0), 1)
+	-- the client may hide your health: rules that spend health need to know it
+	ctx.healthKnown = type(Safe(UnitHealth("player"), nil)) == "number"
+	-- the client may hide your mana too: then the Mana module's estimate stands in
+	if CK.Mana then
+		ctx.manaPct, ctx.manaKnown = CK.Mana:Pct()
+	else
+		ctx.manaPct, ctx.manaKnown = ratio(UnitPower("player", 0), UnitPowerMax("player", 0), 1), true
+	end
 	ctx.moving = (Safe(GetUnitSpeed("player"), 0) or 0) > 0
 	local okCount, near, attackers = pcall(countEnemies)
 	ctx.nearby = okCount and near or 0

@@ -96,7 +96,9 @@ end
 
 -- Life Tap when you have more health than mana, Drain Life when health runs low
 local function sustain(ctx, push)
-	if ctx.manaPct < 0.7 and ctx.healthPct > ctx.manaPct + 0.2 and ctx.healthPct > 0.5 and ctx:Ready("Life Tap") then
+	-- in combat only when your health is visible: tapping blind could kill you
+	if (ctx.healthKnown or not ctx.inCombat) and ctx.manaPct < 0.7 and ctx.healthPct > ctx.manaPct + 0.2
+		and ctx.healthPct > 0.5 and ctx:Ready("Life Tap") then
 		push("Life Tap", "hint")
 	end
 	if ctx.inCombat and ctx.healthPct < 0.45 and not ctx.moving and ctx:Ready("Drain Life") then push("Drain Life") end
