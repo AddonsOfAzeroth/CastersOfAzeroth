@@ -35,6 +35,14 @@ end
 
 local function pct(v) return type(v) == "number" and math.floor(v * 100 + 0.5) or nil end
 
+-- percent of a and b, or nil when the client hides either: the rotation's context
+-- falls back to "full", which would log 100 % for every hidden cast
+local function share(a, b)
+	a, b = Safe(a, nil), Safe(b, nil)
+	if type(a) ~= "number" or type(b) ~= "number" or b <= 0 then return nil end
+	return math.floor(a / b * 100 + 0.5)
+end
+
 -- the helper's first two suggestions right now
 local function suggestion()
 	local R = CK.Rotation
@@ -117,7 +125,8 @@ function C:Record(spellID, castGUID)
 		at = time(), gt = math.floor(GetTime() * 10 + 0.5) / 10,
 		id = id, sp = CK.GetSpellName and CK.GetSpellName(id) or nil,
 		s1 = s1, k1 = k1, s2 = s2, b1 = b1,
-		mp = pct(ctx.manaPct), hp = pct(ctx.healthPct), th = pct(ctx.targetHealthPct),
+		mp = share(UnitPower("player", 0), UnitPowerMax("player", 0)),
+		hp = share(UnitHealth("player"), UnitHealthMax("player")), th = pct(ctx.targetHealthPct),
 		cb = ctx.inCombat and 1 or 0, ao = ctx.aoe and 1 or 0, nb = ctx.nearby,
 		mv = ctx.moving and 1 or 0, boss = ctx.targetIsBoss and 1 or nil,
 		lv = Safe(UnitLevel("player"), nil), spec = specKey,
