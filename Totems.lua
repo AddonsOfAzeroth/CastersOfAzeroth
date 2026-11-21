@@ -510,21 +510,20 @@ function T:Update(now)
 			local slot = b.element.slot
 			local name, left, dur = self:Remaining(slot, now)
 			if name then
-				b.icon:SetDesaturated(false)
-				b.icon:SetAlpha(1)
+				b.icon:Show()
 				b.time:SetText(clock(left))
 				pcall(CooldownFrame_Set, b.cd, now - (dur - left), dur, 1)
 				-- the totem that stands, when it is not your pick
 				local tex = CK:SpellTexture(name)
 				if tex then b.icon:SetTexture(tex) end
 			else
-				b.icon:SetDesaturated(true)
-				b.icon:SetAlpha(b.off and 0.3 or 0.6)
+				-- nothing stands: a dark tile with only the element's colour strip
+				b.icon:Hide()
 				b.time:SetText("")
 				b.cd:Hide()
-				local pick = b:GetAttribute("spell")
-				if pick then b.icon:SetTexture(CK:SpellTexture(pick)) end
 			end
+			-- an element left out of the set: a fainter strip
+			b.strip:SetAlpha(b.off and 0.35 or 1)
 			local far = name and c.range and (self:Distance(slot) or 0) > RANGE
 			if far then
 				b:SetBackdropBorderColor(unpack(S.colors.warn))
