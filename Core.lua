@@ -148,6 +148,15 @@ local charDefaults = {
 		warnings = true,     -- low health / gone in combat / not attacking
 		hideBlizzard = true,
 	},
+	totems = {               -- shamans only (mover "totems")
+		enabled = true,
+		dropAll = true,      -- one button that drops the next totem of your set per click
+		recall = true,       -- Totemic Recall button
+		range = true,        -- red when you walked out of a totem's reach
+		glow = true,         -- the element the rotation helper suggests glows
+		hideBlizzard = true, -- Blizzard's own totem bar, where the client has one
+		chosen = {},         -- [element key] = totem name
+	},
 	points = {}, -- saved positions of movable frames, by key
 	class = {},
 }

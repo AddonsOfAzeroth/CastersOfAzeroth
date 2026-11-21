@@ -31,6 +31,7 @@ UnitFrames.lua
 Predict.lua
 Castbar.lua
 Pets.lua
+Totems.lua
 Coach.lua
 Tooltip.lua
 Map.lua
