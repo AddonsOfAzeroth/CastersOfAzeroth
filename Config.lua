@@ -462,7 +462,7 @@ function C:BuildUnits(p)
 		p:Check("   " .. L["Totemic Recall button"], nil, setting("totems", "recall"))
 		p:Check("   " .. L["Out of reach warning"], L["The button turns red when you are more than 20 yards from where you put the totem down."], setting("totems", "range"))
 		p:Check("   " .. L["Glow for the suggested totem"], L["The element the rotation helper suggests glows."], setting("totems", "glow"))
-		p:Check("   " .. L["Hide Blizzard totem bar"], L["Turning this off needs a reload."], setting("totems", "hideBlizzard"))
+		p:Check("   " .. L["Hide Blizzard totem bar"], L["Blizzard's totem bar and the totem timers under your player frame. Turning this off needs a reload."], setting("totems", "hideBlizzard"))
 	end
 	p:Gap()
 	p:Header("Castbar")

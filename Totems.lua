@@ -404,11 +404,17 @@ function T:Apply()
 	local on = c.enabled and CK.playerClass == "SHAMAN" and (self.bar.count or 0) > 0
 	self.bar:SetShown(on)
 	if not on then self.bar.fly:Hide() end
-	if c.enabled and c.hideBlizzard and not self.blizzardHidden and _G.MultiCastActionBarFrame then
+	-- Blizzard's totem bar and the totem timers under the player frame: this bar shows both
+	if on and c.hideBlizzard and not self.blizzardHidden then
 		local hider = CreateFrame("Frame")
 		hider:Hide()
-		_G.MultiCastActionBarFrame:UnregisterAllEvents()
-		CK.HideBlizzardFrame(_G.MultiCastActionBarFrame, hider)
+		for _, name in ipairs({ "MultiCastActionBarFrame", "TotemFrame" }) do
+			local f = _G[name]
+			if f then
+				f:UnregisterAllEvents()
+				CK.HideBlizzardFrame(f, hider)
+			end
+		end
 		self.blizzardHidden = true
 	end
 	local m = S.movers.totems

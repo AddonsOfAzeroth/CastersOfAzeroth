@@ -657,6 +657,7 @@ add({
 	["Glow for the suggested totem"] = "Gloed voor de voorgestelde totem",
 	["The element the rotation helper suggests glows."] = "Het element dat de rotatiehulp voorstelt, licht op.",
 	["Hide Blizzard totem bar"] = "Blizzards totembalk verbergen",
+	["Blizzard's totem bar and the totem timers under your player frame. Turning this off needs a reload."] = "Blizzards totembalk en de totemtimers onder je spelerkader. Uitzetten vraagt een reload.",
 	["Hover out of combat to pick another totem."] = "Beweeg erover buiten een gevecht om een andere totem te kiezen.",
 	["Click: cast it and keep it on this button."] = "Klik: zet hem neer en houd hem op deze knop.",
 })
