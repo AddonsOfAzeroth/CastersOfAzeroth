@@ -68,11 +68,65 @@ function T:Known(e)
 	return out
 end
 
--- the totem picked for an element: your choice when you still know it, else the first you know
-function T:Chosen(e)
-	local pick = cfg().chosen[e.key]
-	if pick and CK:Known(pick) then return pick end
+---------------------------------------------------------------------------
+-- Sets: which totem per element in which situation. An entry is a totem name,
+-- false (that element is left out) or missing (the defaults below).
+---------------------------------------------------------------------------
+local SETS = { "solo", "elite", "boss", "group", "aoe" }
+T.SETS = SETS
+local EARTH = { "Strength of Earth Totem", "Stoneskin Totem" }
+local FIRE = { "Totem of Wrath", "Searing Totem" }
+local AIR = { "Wrath of Air Totem", "Windfury Totem", "Grace of Air Totem" }
+local SET_DEFAULT = {
+	solo = { fire = { "Searing Totem" } },
+	elite = { earth = EARTH, fire = FIRE, water = { "Healing Stream Totem", "Mana Spring Totem" } },
+	boss = { earth = EARTH, fire = FIRE, water = { "Mana Spring Totem", "Healing Stream Totem" }, air = AIR },
+	group = { earth = EARTH, fire = FIRE, water = { "Mana Spring Totem", "Healing Stream Totem" }, air = AIR },
+	aoe = { earth = EARTH, fire = { "Magma Totem", "Fire Nova Totem", "Searing Totem" }, water = { "Healing Stream Totem" } },
+}
+T.SET_DEFAULT = SET_DEFAULT
+
+-- the situation right now: your fixed choice, or (auto) boss, many enemies, group, elite, solo
+function T:SetKey(ctx)
+	local mode = cfg().mode
+	if mode and mode ~= "auto" and SET_DEFAULT[mode] then return mode end
+	local class = UnitExists("target") and Safe(UnitClassification("target"), nil)
+	local lvl = UnitExists("target") and Safe(UnitLevel("target"), nil)
+	if class == "worldboss" or lvl == -1 or (ctx and ctx.targetIsBoss) then return "boss" end
+	if ctx and ctx.aoe then return "aoe" end
+	if IsInGroup and IsInGroup() then return "group" end
+	if class == "elite" or class == "rareelite" then return "elite" end
+	return "solo"
+end
+
+-- the totem of an element in a set, or nil when the set leaves that element out
+function T:Pick(e, key)
+	local c = cfg()
+	local set = c.sets[key]
+	local v = set and set[e.key]
+	if v == false then return end
+	if type(v) == "string" and CK:Known(v) then return v end
+	local d = SET_DEFAULT[key] and SET_DEFAULT[key][e.key]
+	if not d then return end
+	for _, n in ipairs(d) do if CK:Known(n) then return n end end
+	local old = c.chosen[e.key] -- the single pick from before sets
+	if old and CK:Known(old) then return old end
 	return self:Known(e)[1]
+end
+
+-- the totem on an element's button: the set's pick, else the first you know (the button always works)
+function T:Chosen(e)
+	return self:Pick(e, self.setKey or "solo") or self:Known(e)[1]
+end
+
+-- what the rotation helper puts down in this situation
+function T:ForRotation(ctx)
+	local key, out = self:SetKey(ctx), {}
+	for _, e in ipairs(ELEMENTS) do
+		local n = self:Pick(e, key)
+		if n then out[#out + 1] = { name = n, slot = e.slot } end
+	end
+	return out, key
 end
 
 -- name and seconds left of the totem in a slot (nil when none stands)
@@ -129,14 +183,49 @@ function T:Suggested()
 	end
 end
 
--- the set for "drop all": your pick per element, earth fire water air
+-- the set for "drop all": the set's pick per element, earth fire water air
 function T:Set()
-	local out = {}
+	local out, key = {}, self.setKey or "solo"
 	for _, e in ipairs(ELEMENTS) do
-		local n = self:Chosen(e)
+		local n = self:Pick(e, key)
 		if n then out[#out + 1] = n end
 	end
 	return out
+end
+
+local MODES = { "auto", "solo", "elite", "boss", "group", "aoe" }
+local LABEL = { auto = "Auto", solo = "Solo", elite = "Elite", boss = "Boss", group = "Group", aoe = "AoE",
+	earth = "Earth", fire = "Fire", water = "Water", air = "Air" }
+local SHORT = { auto = "A", solo = "S", elite = "E", boss = "B", group = "G", aoe = "AoE" }
+T.MODES = MODES
+
+-- the set button: auto, or one set you fix (out of combat: the buttons change)
+function T:CycleMode(dir)
+	if InCombatLockdown() then return end
+	local c = cfg()
+	local i = 1
+	for k, m in ipairs(MODES) do if m == (c.mode or "auto") then i = k end end
+	c.mode = MODES[(i - 1 + dir) % #MODES + 1]
+	self:Layout()
+	self:Update()
+end
+
+function T:SetTooltip(owner)
+	local c = cfg()
+	local key = self.setKey or "solo"
+	GameTooltip:SetOwner(owner, "ANCHOR_TOP")
+	if (c.mode or "auto") == "auto" then
+		GameTooltip:AddLine(L["Totem set"] .. ": " .. L["Auto"] .. " (" .. L[LABEL[key]] .. ")", 1, 1, 1)
+		GameTooltip:AddLine(L["Auto picks the set from your target and group: boss, many enemies (AoE), group, elite, else solo."], 0.8, 0.8, 0.8, true)
+	else
+		GameTooltip:AddLine(L["Totem set"] .. ": " .. L[LABEL[key]], 1, 1, 1)
+	end
+	for _, e in ipairs(ELEMENTS) do
+		local n = self:Pick(e, key)
+		GameTooltip:AddDoubleLine(L[LABEL[e.key]], n or L["left out"], e.color[1], e.color[2], e.color[3], 1, 1, 1)
+	end
+	GameTooltip:AddLine(L["Click: next set. Right-click: previous. Pick a totem in an element's list to change the set shown."], 0.4, 0.8, 1, true)
+	GameTooltip:Show()
 end
 
 function T:DropAllMacro()
@@ -177,8 +266,20 @@ end
 
 function T:Build()
 	local bar = CreateFrame("Frame", "CasterKitTotemBar", UIParent)
-	bar:SetSize(6 * (SIZE + GAP) - GAP, SIZE)
+	bar:SetSize(7 * (SIZE + GAP) - GAP, SIZE)
 	bar.elements = {}
+	-- the set in use (not a cast: a plain button)
+	local mode = CreateFrame("Button", "CasterKitTotemSet", bar, "BackdropTemplate")
+	mode:SetSize(SIZE, SIZE)
+	mode:SetPoint("LEFT", 0, 0)
+	S:Backdrop(mode, 1)
+	mode.text = S:Font(mode, 10)
+	mode.text:SetPoint("CENTER")
+	mode:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+	mode:SetScript("OnClick", function(_, button) T:CycleMode(button == "RightButton" and -1 or 1) end)
+	mode:SetScript("OnEnter", function(self) T:SetTooltip(self) end)
+	mode:SetScript("OnLeave", GameTooltip_Hide)
+	bar.mode = mode
 	for i, e in ipairs(ELEMENTS) do
 		local b = newButton(bar, "CasterKitTotem" .. e.key)
 		b:SetPoint("LEFT", (i - 1) * (SIZE + GAP), 0)
@@ -247,7 +348,9 @@ function T:FlyoutButton(i)
 	if b then return b end
 	b = newButton(fly, "CasterKitTotemPick" .. i)
 	b:SetAttribute("type", "spell")
-	b.hint = L["Click: cast it and keep it on this button."]
+	-- right-click only marks it, it does not cast
+	b:SetAttribute("type2", "macro")
+	b:SetAttribute("macrotext2", "/stopmacro")
 	b:SetScript("OnEnter", function(self)
 		spellTooltip(self)
 		T.keepFlyout = true
@@ -257,13 +360,23 @@ function T:FlyoutButton(i)
 		T.keepFlyout = nil
 		T:CloseFlyoutSoon()
 	end)
-	b:SetScript("PostClick", function(self)
+	b:SetScript("PostClick", function(self, button)
+		local fly = T.bar.fly
+		local e = fly.owner and fly.owner.element
+		if not e then return end
+		local c = cfg()
+		local key = T.setKey or "solo"
 		local n = self:GetAttribute("spell")
-		local e = n and elementOf[n]
-		if e then
-			cfg().chosen[e.key] = n
-			CK:OutOfCombat("totems-layout", function() T:Layout() end)
+		if self.none then
+			c.sets[key] = c.sets[key] or {}
+			c.sets[key][e.key] = false
+		elseif button == "RightButton" then
+			c.alt[e.key] = n
+		else
+			c.sets[key] = c.sets[key] or {}
+			c.sets[key][e.key] = n
 		end
+		CK:OutOfCombat("totems-layout", function() T:Layout() T:Update() end)
 	end)
 	fly.buttons[i] = b
 	return b
@@ -275,18 +388,36 @@ function T:OpenFlyout(owner)
 	local e = owner.element
 	local fly = self.bar.fly
 	local known = self:Known(e)
-	if #known < 2 then return end
+	if #known < 1 then return end
+	local pick, alt = self:Pick(e, self.setKey or "solo"), cfg().alt[e.key]
+	local setName = L[LABEL[self.setKey or "solo"]]
 	for i, n in ipairs(known) do
 		local b = self:FlyoutButton(i)
+		b.none = nil
+		b:SetAttribute("type", "spell")
 		b:SetAttribute("spell", n)
 		b.icon:SetTexture(CK:SpellTexture(n))
+		b.hint = L["Click: cast it and use it in the set %s. Right-click: make it this element's right-click totem."]:format(setName)
+			.. (n == alt and ("\n" .. L["Right-click totem now."]) or "")
 		b:ClearAllPoints()
 		b:SetPoint("BOTTOM", fly, "BOTTOM", 0, (i - 1) * (SIZE + GAP))
-		b:SetBackdropBorderColor(unpack(n == self:Chosen(e) and S.colors.hint or { 0, 0, 0, 1 }))
+		b:SetBackdropBorderColor(unpack(n == pick and S.colors.hint or n == alt and { 0.4, 0.8, 1 } or { 0, 0, 0, 1 }))
 		b:Show()
 	end
-	for i = #known + 1, #fly.buttons do fly.buttons[i]:Hide() end
-	fly:SetSize(SIZE, #known * (SIZE + GAP) - GAP)
+	-- last: leave this element out of the set
+	local none = self:FlyoutButton(#known + 1)
+	none.none = true
+	none:SetAttribute("type", "macro")
+	none:SetAttribute("macrotext", "/stopmacro")
+	none:SetAttribute("spell", nil)
+	none.icon:SetTexture("Interface\\Buttons\\UI-GroupLoot-Pass-Up")
+	none.hint = L["Leave this element out of the set %s: the rotation helper will not suggest it there."]:format(setName)
+	none:ClearAllPoints()
+	none:SetPoint("BOTTOM", fly, "BOTTOM", 0, #known * (SIZE + GAP))
+	none:SetBackdropBorderColor(unpack(pick == nil and S.colors.hint or { 0, 0, 0, 1 }))
+	none:Show()
+	for i = #known + 2, #fly.buttons do fly.buttons[i]:Hide() end
+	fly:SetSize(SIZE, (#known + 1) * (SIZE + GAP) - GAP)
 	fly:ClearAllPoints()
 	fly:SetPoint("BOTTOM", owner, "TOP", 0, GAP)
 	fly.owner = owner
@@ -314,13 +445,26 @@ function T:Layout()
 	local bar = self.bar
 	if not bar or InCombatLockdown() then return end
 	local c = cfg()
-	local n = 0
+	self.setKey = self:SetKey()
+	local n = 1 -- the set button comes first
 	for _, b in ipairs(bar.elements) do
 		local pick = self:Chosen(b.element)
 		b:SetShown(pick ~= nil)
 		if pick then
+			b.off = self:Pick(b.element, self.setKey) == nil
 			b:SetAttribute("spell", pick)
 			b.icon:SetTexture(CK:SpellTexture(pick))
+			-- right-click: this element's second totem
+			local alt = c.alt[b.element.key]
+			if alt and alt ~= pick and CK:Known(alt) then
+				b:SetAttribute("type2", "spell")
+				b:SetAttribute("spell2", alt)
+				b.hint = L["Hover out of combat to pick another totem."] .. "\n" .. L["Right-click: %s"]:format(alt)
+			else
+				b:SetAttribute("type2", nil)
+				b:SetAttribute("spell2", nil)
+				b.hint = L["Hover out of combat to pick another totem."]
+			end
 			b:ClearAllPoints()
 			b:SetPoint("LEFT", n * (SIZE + GAP), 0)
 			n = n + 1
@@ -356,6 +500,11 @@ function T:Update(now)
 	now = now or GetTime()
 	local c = cfg()
 	local glowFor = c.glow and self:Suggested()
+	-- the set the rotation helper uses right now (in combat too)
+	local R = CK.Rotation
+	local key = self:SetKey(R and R.ctx)
+	local auto = (c.mode or "auto") == "auto"
+	bar.mode.text:SetText(auto and ("A:" .. SHORT[key]) or SHORT[key])
 	for _, b in ipairs(bar.elements) do
 		if b:IsShown() then
 			local slot = b.element.slot
@@ -370,7 +519,7 @@ function T:Update(now)
 				if tex then b.icon:SetTexture(tex) end
 			else
 				b.icon:SetDesaturated(true)
-				b.icon:SetAlpha(0.6)
+				b.icon:SetAlpha(b.off and 0.3 or 0.6)
 				b.time:SetText("")
 				b.cd:Hide()
 				local pick = b:GetAttribute("spell")
@@ -429,7 +578,10 @@ end
 function T:OnEnable()
 	if CK.playerClass ~= "SHAMAN" then return end
 	local c = cfg()
-	if type(c.chosen) ~= "table" then c.chosen = {} end
+	for _, k in ipairs({ "chosen", "sets", "alt" }) do
+		if type(c[k]) ~= "table" then c[k] = {} end
+	end
+	c.mode = c.mode or "auto"
 	CK:OutOfCombat("totems-build", function()
 		self:Build()
 		self:Apply()
@@ -439,6 +591,14 @@ function T:OnEnable()
 	end)
 	CK:On("SPELLS_CHANGED", function() CK:OutOfCombat("totems-apply", function() self:Apply() end) end)
 	CK:On("PLAYER_TOTEM_UPDATE", function() self:Update() end)
+	-- a new target or group out of combat: the buttons follow the set
+	local function follow()
+		if self.bar and not InCombatLockdown() and self:SetKey() ~= self.setKey then
+			self:Layout()
+			self:Update()
+		end
+	end
+	for _, ev in ipairs({ "PLAYER_TARGET_CHANGED", "GROUP_ROSTER_UPDATE", "PLAYER_REGEN_ENABLED" }) do CK:On(ev, follow) end
 	CK:On("UNIT_SPELLCAST_SUCCEEDED", function(_, unit, _, spellID)
 		if unit ~= "player" then return end
 		local id = Safe(spellID, nil)

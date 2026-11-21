@@ -155,7 +155,10 @@ local charDefaults = {
 		range = true,        -- red when you walked out of a totem's reach
 		glow = true,         -- the element the rotation helper suggests glows
 		hideBlizzard = true, -- Blizzard's own totem bar, where the client has one
-		chosen = {},         -- [element key] = totem name
+		chosen = {},         -- [element key] = totem name (before sets)
+		mode = "auto",       -- the set in use: auto or solo / elite / boss / group / aoe
+		sets = {},           -- [set][element key] = totem name, or false = left out
+		alt = {},            -- [element key] = right-click totem
 	},
 	points = {}, -- saved positions of movable frames, by key
 	class = {},

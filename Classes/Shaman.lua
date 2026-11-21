@@ -69,6 +69,14 @@ end
 -- totems in a fight that lasts: fire first (damage), the rest in a group or on bosses
 local function totems(ctx, push)
 	if not ctx.inCombat or ctx.moving then return end
+	-- the totem bar's sets: which totems in this situation (solo, elite, boss, group, AoE)
+	local T = CK.Totems
+	if T and T.ForRotation then
+		for _, t in ipairs(T:ForRotation(ctx)) do
+			if not totemUp(t.slot) and ctx:Ready(t.name) then push(t.name, "hint") end
+		end
+		return
+	end
 	local long = IsInGroup() or ctx.targetIsBoss
 	for _, t in ipairs(TOTEMS) do
 		if t.slot == 1 or long then
